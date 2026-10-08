@@ -1,480 +1,953 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>R Slide - Rapid & Responsive AI Presentation Engine</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>R Slide - Rapid & Responsive AI Presentation Engine</title>
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['"PingFang TC"', '"Microsoft JhengHei"', '"Noto Sans TC"', 'sans-serif'],
-          }
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"PingFang TC"', '"Microsoft JhengHei"', '"Noto Sans TC"', 'sans-serif'],
+                    }
+                }
+            }
         }
-      }
-    }
-  </script>
-  <style>
-    .no-scrollbar::-webkit-scrollbar { display: none; }
-    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </script>
+    <style>
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
 
-    html { scroll-behavior: smooth; }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
 
-    /* ---------- 背景動態光暈 ---------- */
-    .blob {
-      position: fixed; border-radius: 9999px; filter: blur(90px);
-      opacity: .35; pointer-events: none; z-index: 0;
-      animation: float 18s ease-in-out infinite;
-    }
-    .dark .blob { opacity: .18; }
-    .blob-1 { width: 380px; height: 380px; top: -80px; left: -60px; background: #93c5fd; }
-    .blob-2 { width: 340px; height: 340px; bottom: -80px; right: -40px; background: #f9a8d4; animation-delay: -6s; }
-    .blob-3 { width: 280px; height: 280px; top: 45%; left: 55%; background: #86efac; animation-delay: -12s; }
-    @keyframes float {
-      0%, 100% { transform: translate(0, 0) scale(1); }
-      33% { transform: translate(40px, -30px) scale(1.08); }
-      66% { transform: translate(-30px, 30px) scale(.95); }
-    }
-    header, main { position: relative; z-index: 1; }
-    header { position: sticky; }
+        html {
+            scroll-behavior: smooth;
+        }
 
-    /* ---------- 捲動進度條 ---------- */
-    #scrollProgress {
-      position: fixed; top: 0; left: 0; height: 3px; width: 0;
-      background: linear-gradient(90deg, #3b82f6, #a855f7, #ec4899);
-      z-index: 100; transition: width .1s linear;
-    }
+        /* ---------- 背景動態光暈 ---------- */
+        .blob {
+            position: fixed;
+            border-radius: 9999px;
+            filter: blur(90px);
+            opacity: .35;
+            pointer-events: none;
+            z-index: 0;
+            animation: float 18s ease-in-out infinite;
+        }
 
-    /* ---------- 側邊欄 ---------- */
-    #sidebar {
-      position: fixed; top: 4rem; left: 0; bottom: 0; width: 18rem; z-index: 40;
-      transform: translateX(-100%);
-      transition: transform .35s cubic-bezier(.2,.8,.2,1);
-    }
-    body.sb-open #sidebar { transform: none; box-shadow: 8px 0 30px rgba(0,0,0,.08); }
-    #mainWrap { transition: padding-left .35s cubic-bezier(.2,.8,.2,1); }
-    @media (min-width: 1024px) { body.sb-open #mainWrap { padding-left: 18rem; } }
-    #sbOverlay { display: none; position: fixed; inset: 4rem 0 0 0; background: rgba(0,0,0,.4); z-index: 39; backdrop-filter: blur(2px); }
-    @media (max-width: 1023px) { body.sb-open #sbOverlay { display: block; animation: fadeIn .3s both; } }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes itemOut { to { opacity: 0; transform: translateX(-30px) scale(.95); height: 0; padding: 0; margin: 0; border-width: 0; } }
-    .hist-out { animation: itemOut .35s ease-in forwards; overflow: hidden; }
+        .dark .blob {
+            opacity: .18;
+        }
 
-    /* ---------- 進場動畫 ---------- */
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(24px) scale(.985); }
-      to   { opacity: 1; transform: translateY(0) scale(1); }
-    }
-    .reveal { animation: fadeUp .6s cubic-bezier(.2,.8,.2,1) both; }
-    .stagger > * { animation: fadeUp .55s cubic-bezier(.2,.8,.2,1) both; }
-    .stagger > *:nth-child(1) { animation-delay: .04s; }
-    .stagger > *:nth-child(2) { animation-delay: .10s; }
-    .stagger > *:nth-child(3) { animation-delay: .16s; }
-    .stagger > *:nth-child(4) { animation-delay: .22s; }
-    .stagger > *:nth-child(5) { animation-delay: .28s; }
-    .stagger > *:nth-child(n+6) { animation-delay: .34s; }
+        .blob-1 {
+            width: 380px;
+            height: 380px;
+            top: -80px;
+            left: -60px;
+            background: #93c5fd;
+        }
 
-    /* ---------- 投影片切換 ---------- */
-    @keyframes slideInRight { from { opacity: 0; transform: translateX(48px) scale(.98); } to { opacity: 1; transform: none; } }
-    @keyframes slideInLeft  { from { opacity: 0; transform: translateX(-48px) scale(.98); } to { opacity: 1; transform: none; } }
-    @keyframes slideFade    { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
-    .slide-in-right { animation: slideInRight .5s cubic-bezier(.2,.8,.2,1) both; }
-    .slide-in-left  { animation: slideInLeft .5s cubic-bezier(.2,.8,.2,1) both; }
-    .slide-in-fade  { animation: slideFade .5s cubic-bezier(.2,.8,.2,1) both; }
-    .slide-anim { width: 100%; height: 100%; }
-    .slide-scaler { width: 1024px; height: 576px; transform-origin: top left; }
+        .blob-2 {
+            width: 340px;
+            height: 340px;
+            bottom: -80px;
+            right: -40px;
+            background: #f9a8d4;
+            animation-delay: -6s;
+        }
 
-    /* ---------- 全螢幕 ---------- */
-    #slideStage:fullscreen { background: #000; display: flex; align-items: center; justify-content: center; }
-    #slideStage:fullscreen #slideCanvas {
-      width: min(100vw, calc(100vh * 16 / 9)); max-width: none; border-radius: 0; border: 0; box-shadow: none;
-    }
-    #slideStage:fullscreen .stage-ui { display: none; }
-    #slideStage.idle { cursor: none; }
+        .blob-3 {
+            width: 280px;
+            height: 280px;
+            top: 45%;
+            left: 55%;
+            background: #86efac;
+            animation-delay: -12s;
+        }
 
-    /* ---------- 光斑 hover ---------- */
-    .spot { position: relative; overflow: hidden; }
-    .spot::before {
-      content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0;
-      background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), rgba(99,102,241,.16), transparent 60%);
-      transition: opacity .3s;
-    }
-    .spot:hover::before { opacity: 1; }
+        @keyframes float {
 
-    /* ---------- 漣漪 ---------- */
-    .ripple-btn { position: relative; overflow: hidden; }
-    .ripple {
-      position: absolute; border-radius: 9999px; background: currentColor; opacity: .25;
-      transform: scale(0); animation: ripple .6s ease-out forwards; pointer-events: none;
-    }
-    @keyframes ripple { to { transform: scale(4); opacity: 0; } }
+            0%,
+            100% {
+                transform: translate(0, 0) scale(1);
+            }
 
-    /* ---------- 骨架屏 ---------- */
-    .skeleton {
-      background: linear-gradient(90deg, rgba(161,161,170,.15) 25%, rgba(161,161,170,.32) 50%, rgba(161,161,170,.15) 75%);
-      background-size: 200% 100%; animation: shimmer 1.4s infinite linear; border-radius: .5rem;
-    }
-    @keyframes shimmer { to { background-position: -200% 0; } }
+            33% {
+                transform: translate(40px, -30px) scale(1.08);
+            }
 
-    /* ---------- 搖晃 ---------- */
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); } 20% { transform: translateX(-8px); }
-      40% { transform: translateX(7px); } 60% { transform: translateX(-5px); } 80% { transform: translateX(3px); }
-    }
-    .shake { animation: shake .45s; }
+            66% {
+                transform: translate(-30px, 30px) scale(.95);
+            }
+        }
 
-    /* ---------- Toast ---------- */
-    #toastRoot { position: fixed; top: 76px; left: 50%; transform: translateX(-50%); z-index: 200;
-      display: flex; flex-direction: column; gap: .5rem; align-items: center; pointer-events: none; }
-    .toast {
-      pointer-events: auto; padding: .65rem 1rem; border-radius: .75rem; font-size: .85rem; font-weight: 600;
-      display: flex; align-items: center; gap: .5rem; box-shadow: 0 10px 30px rgba(0,0,0,.18);
-      background: #18181b; color: #fff; animation: toastIn .35s cubic-bezier(.2,.8,.2,1) both;
-    }
-    .dark .toast { background: #fafafa; color: #18181b; }
-    .toast.out { animation: toastOut .3s ease-in forwards; }
-    @keyframes toastIn { from { opacity: 0; transform: translateY(-14px) scale(.95); } to { opacity: 1; transform: none; } }
-    @keyframes toastOut { to { opacity: 0; transform: translateY(-10px) scale(.95); } }
+        header,
+        main {
+            position: relative;
+            z-index: 1;
+        }
 
-    /* ---------- 其他 ---------- */
-    .theme-spin { animation: spin .5s ease; }
-    @keyframes spin { from { transform: rotate(-90deg) scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
-    .pulse-dot { animation: pulseDot 1.2s infinite; }
-    @keyframes pulseDot { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.6); opacity: .5; } }
-    .step-fill { transition: width .6s cubic-bezier(.2,.8,.2,1); }
-    .icon-btn { transition: transform .2s, background-color .2s, color .2s; }
-    .icon-btn:hover:not(:disabled) { transform: translateY(-1px) scale(1.06); }
-    .icon-btn:active:not(:disabled) { transform: scale(.94); }
-    .icon-btn:disabled { opacity: .35; cursor: not-allowed; }
-    .chip { transition: transform .2s, background-color .2s, border-color .2s; }
-    .chip:hover { transform: translateY(-2px); }
-    .thumb:hover { transform: translateY(-3px); }
+        header {
+            position: sticky;
+        }
 
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
-    }
-  </style>
+        /* ---------- 捲動進度條 ---------- */
+        #scrollProgress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            width: 0;
+            background: linear-gradient(90deg, #3b82f6, #a855f7, #ec4899);
+            z-index: 100;
+            transition: width .1s linear;
+        }
+
+        /* ---------- 側邊欄 ---------- */
+        #sidebar {
+            position: fixed;
+            top: 4rem;
+            left: 0;
+            bottom: 0;
+            width: 18rem;
+            z-index: 40;
+            transform: translateX(-100%);
+            transition: transform .35s cubic-bezier(.2, .8, .2, 1);
+        }
+
+        body.sb-open #sidebar {
+            transform: none;
+            box-shadow: 8px 0 30px rgba(0, 0, 0, .08);
+        }
+
+        #mainWrap {
+            transition: padding-left .35s cubic-bezier(.2, .8, .2, 1);
+        }
+
+        @media (min-width: 1024px) {
+            body.sb-open #mainWrap {
+                padding-left: 18rem;
+            }
+        }
+
+        #sbOverlay {
+            display: none;
+            position: fixed;
+            inset: 4rem 0 0 0;
+            background: rgba(0, 0, 0, .4);
+            z-index: 39;
+            backdrop-filter: blur(2px);
+        }
+
+        @media (max-width: 1023px) {
+            body.sb-open #sbOverlay {
+                display: block;
+                animation: fadeIn .3s both;
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes itemOut {
+            to {
+                opacity: 0;
+                transform: translateX(-30px) scale(.95);
+                height: 0;
+                padding: 0;
+                margin: 0;
+                border-width: 0;
+            }
+        }
+
+        .hist-out {
+            animation: itemOut .35s ease-in forwards;
+            overflow: hidden;
+        }
+
+        /* ---------- 進場動畫 ---------- */
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(24px) scale(.985);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .reveal {
+            animation: fadeUp .6s cubic-bezier(.2, .8, .2, 1) both;
+        }
+
+        .stagger>* {
+            animation: fadeUp .55s cubic-bezier(.2, .8, .2, 1) both;
+        }
+
+        .stagger>*:nth-child(1) {
+            animation-delay: .04s;
+        }
+
+        .stagger>*:nth-child(2) {
+            animation-delay: .10s;
+        }
+
+        .stagger>*:nth-child(3) {
+            animation-delay: .16s;
+        }
+
+        .stagger>*:nth-child(4) {
+            animation-delay: .22s;
+        }
+
+        .stagger>*:nth-child(5) {
+            animation-delay: .28s;
+        }
+
+        .stagger>*:nth-child(n+6) {
+            animation-delay: .34s;
+        }
+
+        /* ---------- 投影片切換 ---------- */
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(48px) scale(.98);
+            }
+
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-48px) scale(.98);
+            }
+
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        @keyframes slideFade {
+            from {
+                opacity: 0;
+                transform: scale(.96);
+            }
+
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        .slide-in-right {
+            animation: slideInRight .5s cubic-bezier(.2, .8, .2, 1) both;
+        }
+
+        .slide-in-left {
+            animation: slideInLeft .5s cubic-bezier(.2, .8, .2, 1) both;
+        }
+
+        .slide-in-fade {
+            animation: slideFade .5s cubic-bezier(.2, .8, .2, 1) both;
+        }
+
+        .slide-anim {
+            width: 100%;
+            height: 100%;
+        }
+
+        .slide-scaler {
+            width: 1024px;
+            height: 576px;
+            transform-origin: top left;
+        }
+
+        /* ---------- 全螢幕 ---------- */
+        #slideStage:fullscreen {
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #slideStage:fullscreen #slideCanvas {
+            width: min(100vw, calc(100vh * 16 / 9));
+            max-width: none;
+            border-radius: 0;
+            border: 0;
+            box-shadow: none;
+        }
+
+        #slideStage:fullscreen .stage-ui {
+            display: none;
+        }
+
+        #slideStage.idle {
+            cursor: none;
+        }
+
+        /* ---------- 光斑 hover ---------- */
+        .spot {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .spot::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0;
+            background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), rgba(99, 102, 241, .16), transparent 60%);
+            transition: opacity .3s;
+        }
+
+        .spot:hover::before {
+            opacity: 1;
+        }
+
+        /* ---------- 漣漪 ---------- */
+        .ripple-btn {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ripple {
+            position: absolute;
+            border-radius: 9999px;
+            background: currentColor;
+            opacity: .25;
+            transform: scale(0);
+            animation: ripple .6s ease-out forwards;
+            pointer-events: none;
+        }
+
+        @keyframes ripple {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+
+        /* ---------- 骨架屏 ---------- */
+        .skeleton {
+            background: linear-gradient(90deg, rgba(161, 161, 170, .15) 25%, rgba(161, 161, 170, .32) 50%, rgba(161, 161, 170, .15) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.4s infinite linear;
+            border-radius: .5rem;
+        }
+
+        @keyframes shimmer {
+            to {
+                background-position: -200% 0;
+            }
+        }
+
+        /* ---------- 搖晃 ---------- */
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            20% {
+                transform: translateX(-8px);
+            }
+
+            40% {
+                transform: translateX(7px);
+            }
+
+            60% {
+                transform: translateX(-5px);
+            }
+
+            80% {
+                transform: translateX(3px);
+            }
+        }
+
+        .shake {
+            animation: shake .45s;
+        }
+
+        /* ---------- Toast ---------- */
+        #toastRoot {
+            position: fixed;
+            top: 76px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            gap: .5rem;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        .toast {
+            pointer-events: auto;
+            padding: .65rem 1rem;
+            border-radius: .75rem;
+            font-size: .85rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .18);
+            background: #18181b;
+            color: #fff;
+            animation: toastIn .35s cubic-bezier(.2, .8, .2, 1) both;
+        }
+
+        .dark .toast {
+            background: #fafafa;
+            color: #18181b;
+        }
+
+        .toast.out {
+            animation: toastOut .3s ease-in forwards;
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateY(-14px) scale(.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        @keyframes toastOut {
+            to {
+                opacity: 0;
+                transform: translateY(-10px) scale(.95);
+            }
+        }
+
+        /* ---------- 其他 ---------- */
+        .theme-spin {
+            animation: spin .5s ease;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(-90deg) scale(.6);
+                opacity: 0;
+            }
+
+            to {
+                transform: none;
+                opacity: 1;
+            }
+        }
+
+        .pulse-dot {
+            animation: pulseDot 1.2s infinite;
+        }
+
+        @keyframes pulseDot {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.6);
+                opacity: .5;
+            }
+        }
+
+        .step-fill {
+            transition: width .6s cubic-bezier(.2, .8, .2, 1);
+        }
+
+        .icon-btn {
+            transition: transform .2s, background-color .2s, color .2s;
+        }
+
+        .icon-btn:hover:not(:disabled) {
+            transform: translateY(-1px) scale(1.06);
+        }
+
+        .icon-btn:active:not(:disabled) {
+            transform: scale(.94);
+        }
+
+        .icon-btn:disabled {
+            opacity: .35;
+            cursor: not-allowed;
+        }
+
+        .chip {
+            transition: transform .2s, background-color .2s, border-color .2s;
+        }
+
+        .chip:hover {
+            transform: translateY(-2px);
+        }
+
+        .thumb:hover {
+            transform: translateY(-3px);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+
+            *,
+            *::before,
+            *::after {
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: .01ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
+    </style>
 </head>
-<body class="bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors duration-300 min-h-screen flex flex-col">
 
-  <div id="scrollProgress"></div>
-  <div class="blob blob-1"></div>
-  <div class="blob blob-2"></div>
-  <div class="blob blob-3"></div>
-  <div id="toastRoot" aria-live="polite"></div>
+<body
+    class="bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors duration-300 min-h-screen flex flex-col">
 
-  <!-- 頂部導航 -->
-  <header id="topHeader" class="border-b border-zinc-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-md top-0 z-50 transition-all duration-300">
-    <div class="max-w-full mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <button id="sbToggle" onclick="toggleSidebar()" class="icon-btn w-9 h-9 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 focus:outline-none" aria-label="切換歷史記錄側邊欄" title="歷史記錄">
-          <i id="sbIcon" class="fa-solid fa-bars"></i>
-        </button>
-        <div class="flex items-center gap-3 group cursor-default">
-          <div class="w-8 h-8 bg-black dark:bg-white text-white dark:text-black rounded-md flex items-center justify-center font-black text-lg transition-transform duration-500 group-hover:rotate-[360deg] group-hover:scale-110">R</div>
-          <div class="flex flex-col leading-tight">
-            <span class="font-bold text-lg tracking-tight">R Slide</span>
-            <span class="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Rapid & Responsive AI Presentation Engine</span>
-          </div>
+    <div id="scrollProgress"></div>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+    <div id="toastRoot" aria-live="polite"></div>
+
+    <!-- 頂部導航 -->
+    <header id="topHeader"
+        class="border-b border-zinc-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-md top-0 z-50 transition-all duration-300">
+        <div class="max-w-full mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <button id="sbToggle" onclick="toggleSidebar()"
+                    class="icon-btn w-9 h-9 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center text-zinc-600 dark:text-zinc-300 focus:outline-none"
+                    aria-label="切換歷史記錄側邊欄" title="歷史記錄">
+                    <i id="sbIcon" class="fa-solid fa-bars"></i>
+                </button>
+                <div class="flex items-center gap-3 group cursor-default">
+                    <div
+                        class="w-8 h-8 bg-black dark:bg-white text-white dark:text-black rounded-md flex items-center justify-center font-black text-lg transition-transform duration-500 group-hover:rotate-[360deg] group-hover:scale-110">
+                        R</div>
+                    <div class="flex flex-col leading-tight">
+                        <span class="font-bold text-lg tracking-tight">R Slide</span>
+                        <span class="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Rapid & Responsive AI
+                            Presentation Engine</span>
+                    </div>
+                </div>
+            </div>
+
+            <button id="themeBtn" onclick="toggleTheme()"
+                class="icon-btn w-9 h-9 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center focus:outline-none"
+                aria-label="Toggle Dark Mode">
+                <i class="fa-solid fa-moon hidden dark:inline text-zinc-400 hover:text-white"></i>
+                <i class="fa-solid fa-sun inline dark:hidden text-zinc-500 hover:text-amber-500"></i>
+            </button>
         </div>
-      </div>
+    </header>
 
-      <button id="themeBtn" onclick="toggleTheme()" class="icon-btn w-9 h-9 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center focus:outline-none" aria-label="Toggle Dark Mode">
-        <i class="fa-solid fa-moon hidden dark:inline text-zinc-400 hover:text-white"></i>
-        <i class="fa-solid fa-sun inline dark:hidden text-zinc-500 hover:text-amber-500"></i>
-      </button>
+    <!-- 側邊欄：歷史記錄 -->
+    <aside id="sidebar"
+        class="bg-white/95 dark:bg-zinc-900/95 backdrop-blur border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
+        <div class="p-4 border-b border-zinc-100 dark:border-zinc-800">
+            <button onclick="newPresentation()"
+                class="ripple-btn w-full bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black text-sm font-semibold py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-95">
+                <i class="fa-solid fa-plus"></i><span>新增簡報</span>
+            </button>
+        </div>
+        <div class="px-4 pt-3">
+            <div class="relative">
+                <i
+                    class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400"></i>
+                <input id="historySearch" type="text" placeholder="搜尋歷史記錄"
+                    class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow">
+            </div>
+        </div>
+        <div
+            class="px-4 pt-4 pb-2 flex items-center justify-between text-[11px] uppercase tracking-wider text-zinc-400 font-bold">
+            <span><i class="fa-solid fa-clock-rotate-left mr-1"></i>歷史記錄 <span id="historyCount"
+                    class="tabular-nums"></span></span>
+            <button onclick="clearHistory()" class="icon-btn hover:text-red-500 transition-colors" title="清除全部"
+                aria-label="清除全部歷史記錄"><i class="fa-regular fa-trash-can"></i></button>
+        </div>
+        <div id="historyList" class="flex-1 overflow-y-auto no-scrollbar px-3 pb-4 space-y-2"></div>
+        <div
+            class="p-3 border-t border-zinc-100 dark:border-zinc-800 text-[11px] text-zinc-400 flex items-center gap-1.5">
+            <i class="fa-solid fa-database"></i> 資料僅儲存於此瀏覽器
+        </div>
+    </aside>
+    <div id="sbOverlay" onclick="toggleSidebar()"></div>
+
+    <div id="mainWrap" class="flex-1 flex flex-col w-full">
+        <main class="max-w-5xl mx-auto px-6 py-10 flex-1 w-full">
+            <!-- 步驟條 -->
+            <div class="flex items-center justify-center mb-10 text-xs font-semibold tracking-wide reveal">
+                <button id="stepTag1" onclick="goStep(1)"
+                    class="transition-all duration-300 text-black dark:text-white"><i
+                        class="fa-solid fa-pen-to-square mr-1"></i>01 / 輸入</button>
+                <div class="w-8 sm:w-12 h-[2px] bg-zinc-300 dark:bg-zinc-700 mx-3 sm:mx-4 rounded overflow-hidden">
+                    <div id="stepLine1" class="step-fill h-full w-0 bg-black dark:bg-white"></div>
+                </div>
+                <button id="stepTag2" onclick="goStep(2)"
+                    class="transition-all duration-300 text-zinc-400 dark:text-zinc-600"><i
+                        class="fa-solid fa-list-check mr-1"></i>02 / 審查</button>
+                <div class="w-8 sm:w-12 h-[2px] bg-zinc-300 dark:bg-zinc-700 mx-3 sm:mx-4 rounded overflow-hidden">
+                    <div id="stepLine2" class="step-fill h-full w-0 bg-black dark:bg-white"></div>
+                </div>
+                <button id="stepTag3" onclick="goStep(3)"
+                    class="transition-all duration-300 text-zinc-400 dark:text-zinc-600"><i
+                        class="fa-solid fa-display mr-1"></i>03 / 簡報</button>
+            </div>
+
+            <!-- 步驟 1: 輸入區 -->
+            <section id="sectionInput"
+                class="reveal bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 shadow-sm hover:shadow-lg transition-all duration-300">
+                <h2 class="text-xl font-bold mb-1">構思您的簡報</h2>
+                <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-6">輸入文字素材並選擇視覺風格，AI 會動態設計最適切的簡報排版。</p>
+
+                <div class="space-y-5">
+                    <div>
+                        <div class="relative">
+                            <textarea id="inputContent" rows="10"
+                                class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 pb-8 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow resize-none"
+                                placeholder="輸入素材內容...（Ctrl / ⌘ + Enter 快速生成）"></textarea>
+                            <span id="charCount"
+                                class="absolute bottom-2 right-3 text-[11px] text-zinc-400 dark:text-zinc-500 tabular-nums transition-colors">0
+                                字</span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 mt-3">
+                            <span class="text-[11px] text-zinc-400 mr-1"><i
+                                    class="fa-regular fa-lightbulb mr-1"></i>試試範例：</span>
+                            <button type="button" onclick="fillSample(0)"
+                                class="chip text-xs px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"><i
+                                    class="fa-solid fa-rocket mr-1"></i>產品發表</button>
+                            <button type="button" onclick="fillSample(1)"
+                                class="chip text-xs px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"><i
+                                    class="fa-solid fa-chart-line mr-1"></i>專案報告</button>
+                            <button type="button" onclick="fillSample(2)"
+                                class="chip text-xs px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"><i
+                                    class="fa-solid fa-graduation-cap mr-1"></i>教學課程</button>
+                            <button type="button" onclick="clearInput()"
+                                class="chip text-xs px-3 py-1 rounded-full text-zinc-400 hover:text-red-500 ml-auto"><i
+                                    class="fa-solid fa-eraser mr-1"></i>清除</button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                        <div>
+                            <label
+                                class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider"><i
+                                    class="fa-solid fa-users mr-1"></i>目標受眾</label>
+                            <input type="text" id="targetAudience" value="" placeholder="目標受眾"
+                                class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow">
+                        </div>
+                        <div>
+                            <label
+                                class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider"><i
+                                    class="fa-regular fa-file-lines mr-1"></i>頁數設定</label>
+                            <select id="numPages"
+                                class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow appearance-none cursor-pointer">
+                                <option value="2" selected>2 頁 (2 Pages)</option>
+                                <option value="3">3 頁 (3 Pages)</option>
+                                <option value="4">4 頁 (4 Pages)</option>
+                                <option value="5">5 頁 (5 Pages)</option>
+                                <option value="6">6 頁 (6 Pages)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label
+                                class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider"><i
+                                    class="fa-solid fa-palette mr-1"></i>簡報風格 (AI 動態配色)</label>
+                            <select id="stylePreference"
+                                class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow appearance-none cursor-pointer">
+                                <!-- 原有熱門風格 -->
+                                <option value="蘋果極簡白 (純白底 bg-white、高對比黑字 text-zinc-900、微灰色邊框 border-zinc-200、大量留白)">極簡白
+                                    (Apple Minimalist)</option>
+                                <option value="暗黑科技風 (深黑底 bg-slate-950、文字純白 text-white、電光藍與青綠點綴 text-cyan-400)">暗黑科技
+                                    (Dark Tech)</option>
+                                <option value="專業商務藍 (淺灰底 bg-slate-50、海軍深藍標題 text-blue-900、天藍強調色 bg-blue-500)">商務風
+                                    (Corporate Navy)</option>
+                                <option value="活潑明亮撞色 (米白底 bg-amber-50/50、明亮黃/亮粉/亮橘色塊、活力輕快)">活潑撞色 (Vibrant Accent)
+                                </option>
+                                <option value="溫暖大地色 (溫暖米色底 bg-stone-100、深橄欖綠與咖啡棕 text-stone-800)">溫暖大地 (Warm Earth)
+                                </option>
+
+                                <!-- 新增的 5 種特色風格 -->
+                                <option
+                                    value="新醜潮流風 (淺黃底 bg-amber-100、粗黑線條邊框 border-4 border-black、硬邊陰影 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]、撞色高彩度卡片)">
+                                    新醜潮流 (Neo-Brutalism)</option>
+                                <option
+                                    value="賽博霓虹風 (深紫黑底 bg-zinc-950、霓虹粉與青藍漸層 text-fuchsia-400 text-cyan-300、深色發光卡片 border-purple-500/30)">
+                                    賽博霓虹 (Cyber Neon)</option>
+                                <option
+                                    value="黑金奢華風 (曜石黑底 bg-neutral-950、香檳金點綴 text-amber-300 border-amber-500/40、精緻細框線與高級質感)">
+                                    黑金奢華 (Obsidian & Gold)</option>
+                                <option
+                                    value="清新鼠尾草綠 (淺灰綠底 bg-emerald-50/50、深森林綠標題 text-emerald-950、草木綠點綴 text-emerald-600)">
+                                    森林綠調 (Sage & Forest)</option>
+                                <option
+                                    value="瑞士雜誌排版 (淺冷灰底 bg-zinc-100、巨大粗黑字 text-black、國際鮮紅標籤 bg-red-600 text-white、強烈網格對齊)">
+                                    瑞士雜誌 (Swiss Editorial)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end pt-4">
+                        <button id="btnGenerate" onclick="startGeneration()"
+                            class="ripple-btn bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black font-semibold px-6 py-2.5 rounded-lg flex items-center gap-2 transition-all hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:scale-95 disabled:opacity-70 disabled:cursor-wait disabled:hover:translate-y-0">
+                            <i id="btnIcon" class="fa-solid fa-wand-magic-sparkles"></i>
+                            <span id="btnLabel">生成排版</span>
+                            <i id="loadingSpinner" class="hidden fa-solid fa-circle-notch fa-spin"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 載入骨架屏 -->
+            <section id="sectionSkeleton"
+                class="hidden mt-6 bg-white/90 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8">
+                <div class="skeleton h-6 w-40 mb-2"></div>
+                <div class="skeleton h-3 w-64 mb-6"></div>
+                <div class="space-y-4">
+                    <div class="skeleton h-20 w-full"></div>
+                    <div class="skeleton h-20 w-full"></div>
+                    <div class="skeleton h-20 w-full"></div>
+                </div>
+            </section>
+
+            <!-- 步驟 2: AI 版面構思審查 -->
+            <section id="sectionReview"
+                class="hidden bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 shadow-sm transition-colors mt-6">
+                <div class="flex items-center justify-between mb-6 gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold mb-1">版面審查</h2>
+                        <p class="text-sm text-zinc-500 dark:text-zinc-400">確認 R Slide 分配的結構與版型，隨後進入播放模式。</p>
+                    </div>
+                    <button onclick="confirmAndPlay()"
+                        class="ripple-btn bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black text-sm font-semibold px-5 py-2 rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-95 whitespace-nowrap">
+                        <i class="fa-solid fa-play mr-1.5 text-xs"></i>進入播放器
+                    </button>
+                </div>
+                <div id="reviewContainer" class="space-y-4 stagger"></div>
+            </section>
+
+            <!-- 步驟 3: 動態播放器畫布 & 縮圖導航 -->
+            <section id="sectionPlayer" class="hidden mt-2 flex flex-col items-center w-full">
+                <div class="w-full flex items-center justify-between mb-4 px-2">
+                    <div>
+                        <h2 id="presentationTitleDisplay" class="text-lg font-bold"></h2>
+                        <div id="currentLayoutBadge" class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5"></div>
+                    </div>
+                    <button onclick="backToReview()"
+                        class="group text-xs text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-white transition-colors">
+                        <i class="fa-solid fa-arrow-left mr-1 transition-transform group-hover:-translate-x-1"></i>返回審查
+                    </button>
+                </div>
+
+                <!-- 16:9 投影片主畫布 -->
+                <div id="slideStage" class="w-full max-w-[1024px] relative group/stage">
+                    <div id="slideCanvas"
+                        class="w-full aspect-video max-w-[1024px] rounded-xl overflow-hidden shadow-md hover:shadow-2xl border border-zinc-200 dark:border-zinc-800 bg-white relative transition-all duration-500 mx-auto">
+                    </div>
+
+                    <!-- 左右懸浮箭頭 -->
+                    <button id="prevOverlay" onclick="prevSlide()" aria-label="上一頁"
+                        class="stage-ui icon-btn absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 text-white backdrop-blur flex items-center justify-center opacity-0 group-hover/stage:opacity-100 transition-opacity"><i
+                            class="fa-solid fa-chevron-left"></i></button>
+                    <button id="nextOverlay" onclick="nextSlide()" aria-label="下一頁"
+                        class="stage-ui icon-btn absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 text-white backdrop-blur flex items-center justify-center opacity-0 group-hover/stage:opacity-100 transition-opacity"><i
+                            class="fa-solid fa-chevron-right"></i></button>
+
+                    <!-- 進度條 -->
+                    <div class="stage-ui absolute left-0 right-0 bottom-0 h-1 bg-black/10 rounded-b-xl overflow-hidden">
+                        <div id="slideProgress"
+                            class="step-fill h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"
+                            style="width:0%"></div>
+                    </div>
+                </div>
+
+                <!-- 控制列 -->
+                <div
+                    class="mt-4 flex items-center gap-2 bg-white/80 dark:bg-zinc-900/80 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-full px-3 py-1.5 shadow-sm">
+                    <button id="prevBtn" onclick="prevSlide()"
+                        class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center"
+                        aria-label="上一頁"><i class="fa-solid fa-chevron-left text-xs"></i></button>
+                    <span id="slideCounter" class="text-xs font-mono tabular-nums w-14 text-center">01 / 03</span>
+                    <button id="nextBtn" onclick="nextSlide()"
+                        class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center"
+                        aria-label="下一頁"><i class="fa-solid fa-chevron-right text-xs"></i></button>
+                    <div class="w-px h-5 bg-zinc-200 dark:bg-zinc-700 mx-1"></div>
+                    <button id="autoBtn" onclick="toggleAutoplay()"
+                        class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
+                        aria-label="自動播放">
+                        <i id="autoIcon" class="fa-solid fa-play text-[10px]"></i><span id="autoLabel">自動播放</span>
+                    </button>
+                    <button onclick="toggleFullscreen()"
+                        class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
+                        aria-label="全螢幕">
+                        <i id="fsIcon" class="fa-solid fa-expand text-[11px]"></i><span id="fsLabel">全螢幕</span>
+                    </button>
+                </div>
+
+                <!-- 縮圖導航列 -->
+                <div class="w-full max-w-[1024px] mt-6 relative">
+                    <div id="thumbnailContainer" class="flex items-center gap-4 overflow-x-auto no-scrollbar py-2 px-1">
+                    </div>
+                </div>
+                <p class="text-[11px] text-zinc-400 mt-2 hidden md:block"><i
+                        class="fa-regular fa-keyboard mr-1"></i>快捷鍵：← → 換頁　F 全螢幕　空白鍵 自動播放　Home / End 首尾頁</p>
+            </section>
+        </main>
     </div>
-  </header>
 
-  <!-- 側邊欄：歷史記錄 -->
-  <aside id="sidebar" class="bg-white/95 dark:bg-zinc-900/95 backdrop-blur border-r border-zinc-200 dark:border-zinc-800 flex flex-col">
-    <div class="p-4 border-b border-zinc-100 dark:border-zinc-800">
-      <button onclick="newPresentation()" class="ripple-btn w-full bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black text-sm font-semibold py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-95">
-        <i class="fa-solid fa-plus"></i><span>新增簡報</span>
-      </button>
-    </div>
-    <div class="px-4 pt-3">
-      <div class="relative">
-        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400"></i>
-        <input id="historySearch" type="text" placeholder="搜尋歷史記錄" class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow">
-      </div>
-    </div>
-    <div class="px-4 pt-4 pb-2 flex items-center justify-between text-[11px] uppercase tracking-wider text-zinc-400 font-bold">
-      <span><i class="fa-solid fa-clock-rotate-left mr-1"></i>歷史記錄 <span id="historyCount" class="tabular-nums"></span></span>
-      <button onclick="clearHistory()" class="icon-btn hover:text-red-500 transition-colors" title="清除全部" aria-label="清除全部歷史記錄"><i class="fa-regular fa-trash-can"></i></button>
-    </div>
-    <div id="historyList" class="flex-1 overflow-y-auto no-scrollbar px-3 pb-4 space-y-2"></div>
-    <div class="p-3 border-t border-zinc-100 dark:border-zinc-800 text-[11px] text-zinc-400 flex items-center gap-1.5">
-      <i class="fa-solid fa-database"></i> 資料僅儲存於此瀏覽器
-    </div>
-  </aside>
-  <div id="sbOverlay" onclick="toggleSidebar()"></div>
-
-  <div id="mainWrap" class="flex-1 flex flex-col w-full">
-  <main class="max-w-5xl mx-auto px-6 py-10 flex-1 w-full">
-    <!-- 步驟條 -->
-    <div class="flex items-center justify-center mb-10 text-xs font-semibold tracking-wide reveal">
-      <button id="stepTag1" onclick="goStep(1)" class="transition-all duration-300 text-black dark:text-white"><i class="fa-solid fa-pen-to-square mr-1"></i>01 / 輸入</button>
-      <div class="w-8 sm:w-12 h-[2px] bg-zinc-300 dark:bg-zinc-700 mx-3 sm:mx-4 rounded overflow-hidden"><div id="stepLine1" class="step-fill h-full w-0 bg-black dark:bg-white"></div></div>
-      <button id="stepTag2" onclick="goStep(2)" class="transition-all duration-300 text-zinc-400 dark:text-zinc-600"><i class="fa-solid fa-list-check mr-1"></i>02 / 審查</button>
-      <div class="w-8 sm:w-12 h-[2px] bg-zinc-300 dark:bg-zinc-700 mx-3 sm:mx-4 rounded overflow-hidden"><div id="stepLine2" class="step-fill h-full w-0 bg-black dark:bg-white"></div></div>
-      <button id="stepTag3" onclick="goStep(3)" class="transition-all duration-300 text-zinc-400 dark:text-zinc-600"><i class="fa-solid fa-display mr-1"></i>03 / 簡報</button>
-    </div>
-
-    <!-- 步驟 1: 輸入區 -->
-    <section id="sectionInput" class="reveal bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 shadow-sm hover:shadow-lg transition-all duration-300">
-      <h2 class="text-xl font-bold mb-1">構思您的簡報</h2>
-      <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-6">輸入文字素材並選擇視覺風格，AI 會動態設計最適切的簡報排版。</p>
-
-      <div class="space-y-5">
-        <div>
-          <div class="relative">
-            <textarea id="inputContent" rows="6" class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 pb-8 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow resize-none" placeholder="輸入素材內容...（Ctrl / ⌘ + Enter 快速生成）"></textarea>
-            <span id="charCount" class="absolute bottom-2 right-3 text-[11px] text-zinc-400 dark:text-zinc-500 tabular-nums transition-colors">0 字</span>
-          </div>
-          <div class="flex flex-wrap items-center gap-2 mt-3">
-            <span class="text-[11px] text-zinc-400 mr-1"><i class="fa-regular fa-lightbulb mr-1"></i>試試範例：</span>
-            <button type="button" onclick="fillSample(0)" class="chip text-xs px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"><i class="fa-solid fa-rocket mr-1"></i>產品發表</button>
-            <button type="button" onclick="fillSample(1)" class="chip text-xs px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"><i class="fa-solid fa-chart-line mr-1"></i>專案報告</button>
-            <button type="button" onclick="fillSample(2)" class="chip text-xs px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"><i class="fa-solid fa-graduation-cap mr-1"></i>教學課程</button>
-            <button type="button" onclick="clearInput()" class="chip text-xs px-3 py-1 rounded-full text-zinc-400 hover:text-red-500 ml-auto"><i class="fa-solid fa-eraser mr-1"></i>清除</button>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-          <div>
-            <label class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider"><i class="fa-solid fa-users mr-1"></i>目標受眾</label>
-            <input type="text" id="targetAudience" value="" placeholder="目標受眾" class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow">
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider"><i class="fa-regular fa-file-lines mr-1"></i>頁數設定</label>
-            <select id="numPages" class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow appearance-none cursor-pointer">
-              <option value="2">2 頁精簡版</option>
-              <option value="3" selected>3 頁完整版</option>
-              <option value="4">4 頁深度版</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider"><i class="fa-solid fa-palette mr-1"></i>簡報風格 (AI 動態配色)</label>
-            <select id="stylePreference" class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow appearance-none cursor-pointer">
-              <option value="蘋果極簡白 (白底、高對比黑字、大量留白)">蘋果極簡白</option>
-              <option value="暗黑科技風 (深黑底色、螢光藍/綠點綴、科技感)">暗黑科技風</option>
-              <option value="專業商務藍 (淺灰/白底、深海藍色標題與強調色)">專業商務藍</option>
-              <option value="活潑明亮撞色 (米白底、黃/粉/橘等明亮色塊)">活潑明亮撞色</option>
-              <option value="溫暖大地色 (米色底、棕/墨綠色系)">溫暖大地色</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="flex justify-end pt-4">
-          <button id="btnGenerate" onclick="startGeneration()" class="ripple-btn bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black font-semibold px-6 py-2.5 rounded-lg flex items-center gap-2 transition-all hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:scale-95 disabled:opacity-70 disabled:cursor-wait disabled:hover:translate-y-0">
-            <i id="btnIcon" class="fa-solid fa-wand-magic-sparkles"></i>
-            <span id="btnLabel">生成排版</span>
-            <i id="loadingSpinner" class="hidden fa-solid fa-circle-notch fa-spin"></i>
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- 載入骨架屏 -->
-    <section id="sectionSkeleton" class="hidden mt-6 bg-white/90 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8">
-      <div class="skeleton h-6 w-40 mb-2"></div>
-      <div class="skeleton h-3 w-64 mb-6"></div>
-      <div class="space-y-4">
-        <div class="skeleton h-20 w-full"></div>
-        <div class="skeleton h-20 w-full"></div>
-        <div class="skeleton h-20 w-full"></div>
-      </div>
-    </section>
-
-    <!-- 步驟 2: AI 版面構思審查 -->
-    <section id="sectionReview" class="hidden bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 shadow-sm transition-colors mt-6">
-      <div class="flex items-center justify-between mb-6 gap-4">
-        <div>
-          <h2 class="text-xl font-bold mb-1">版面審查</h2>
-          <p class="text-sm text-zinc-500 dark:text-zinc-400">確認 R Slide 分配的結構與版型，隨後進入播放模式。</p>
-        </div>
-        <button onclick="confirmAndPlay()" class="ripple-btn bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black text-sm font-semibold px-5 py-2 rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-95 whitespace-nowrap">
-          <i class="fa-solid fa-play mr-1.5 text-xs"></i>進入播放器
-        </button>
-      </div>
-      <div id="reviewContainer" class="space-y-4 stagger"></div>
-    </section>
-
-    <!-- 步驟 3: 動態播放器畫布 & 縮圖導航 -->
-    <section id="sectionPlayer" class="hidden mt-2 flex flex-col items-center w-full">
-      <div class="w-full flex items-center justify-between mb-4 px-2">
-        <div>
-          <h2 id="presentationTitleDisplay" class="text-lg font-bold"></h2>
-          <div id="currentLayoutBadge" class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5"></div>
-        </div>
-        <button onclick="backToReview()" class="group text-xs text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-white transition-colors">
-          <i class="fa-solid fa-arrow-left mr-1 transition-transform group-hover:-translate-x-1"></i>返回審查
-        </button>
-      </div>
-
-      <!-- 16:9 投影片主畫布 -->
-      <div id="slideStage" class="w-full max-w-[1024px] relative group/stage">
-        <div id="slideCanvas" class="w-full aspect-video max-w-[1024px] rounded-xl overflow-hidden shadow-md hover:shadow-2xl border border-zinc-200 dark:border-zinc-800 bg-white relative transition-all duration-500 mx-auto">
-        </div>
-
-        <!-- 左右懸浮箭頭 -->
-        <button id="prevOverlay" onclick="prevSlide()" aria-label="上一頁" class="stage-ui icon-btn absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 text-white backdrop-blur flex items-center justify-center opacity-0 group-hover/stage:opacity-100 transition-opacity"><i class="fa-solid fa-chevron-left"></i></button>
-        <button id="nextOverlay" onclick="nextSlide()" aria-label="下一頁" class="stage-ui icon-btn absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 text-white backdrop-blur flex items-center justify-center opacity-0 group-hover/stage:opacity-100 transition-opacity"><i class="fa-solid fa-chevron-right"></i></button>
-
-        <!-- 進度條 -->
-        <div class="stage-ui absolute left-0 right-0 bottom-0 h-1 bg-black/10 rounded-b-xl overflow-hidden">
-          <div id="slideProgress" class="step-fill h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500" style="width:0%"></div>
-        </div>
-      </div>
-
-      <!-- 控制列 -->
-      <div class="mt-4 flex items-center gap-2 bg-white/80 dark:bg-zinc-900/80 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-full px-3 py-1.5 shadow-sm">
-        <button id="prevBtn" onclick="prevSlide()" class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center" aria-label="上一頁"><i class="fa-solid fa-chevron-left text-xs"></i></button>
-        <span id="slideCounter" class="text-xs font-mono tabular-nums w-14 text-center">01 / 03</span>
-        <button id="nextBtn" onclick="nextSlide()" class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center" aria-label="下一頁"><i class="fa-solid fa-chevron-right text-xs"></i></button>
-        <div class="w-px h-5 bg-zinc-200 dark:bg-zinc-700 mx-1"></div>
-        <button id="autoBtn" onclick="toggleAutoplay()" class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5" aria-label="自動播放">
-          <i id="autoIcon" class="fa-solid fa-play text-[10px]"></i><span id="autoLabel">自動播放</span>
-        </button>
-        <button onclick="toggleFullscreen()" class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5" aria-label="全螢幕">
-          <i id="fsIcon" class="fa-solid fa-expand text-[11px]"></i><span id="fsLabel">全螢幕</span>
-        </button>
-      </div>
-
-      <!-- 縮圖導航列 -->
-      <div class="w-full max-w-[1024px] mt-6 relative">
-        <div id="thumbnailContainer" class="flex items-center gap-4 overflow-x-auto no-scrollbar py-2 px-1">
-        </div>
-      </div>
-      <p class="text-[11px] text-zinc-400 mt-2 hidden md:block"><i class="fa-regular fa-keyboard mr-1"></i>快捷鍵：← → 換頁　F 全螢幕　空白鍵 自動播放　Home / End 首尾頁</p>
-    </section>
-  </main>
-  </div>
-
-  <script>
-    /* ===================== 主題 ===================== */
-    function initTheme() {
-      if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    }
-    function toggleTheme() {
-      const html = document.documentElement;
-      if (html.classList.contains('dark')) {
-        html.classList.remove('dark');
-        localStorage.setItem('theme', 'light');
-      } else {
-        html.classList.add('dark');
-        localStorage.setItem('theme', 'dark');
-      }
-      const btn = document.getElementById('themeBtn');
-      btn.classList.remove('theme-spin');
-      void btn.offsetWidth;
-      btn.classList.add('theme-spin');
-    }
-    initTheme();
-
-    /* ===================== 狀態 ===================== */
-    let currentPresentationData = null;
-    let currentSlideIdx = 0;
-    let currentHistoryId = null;
-    let autoplayTimer = null;
-    let loadingTimer = null;
-    let currentStep = 1;
-
-    /* ===================== 小工具 ===================== */
-    function esc(s) {
-      return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-    }
-    function pad(n) { return String(n).padStart(2, '0'); }
-    function animateIn(el, cls = 'reveal') {
-      el.classList.remove(cls);
-      void el.offsetWidth;
-      el.classList.add(cls);
-    }
-    function showToast(msg, type = 'info', ms = 3200) {
-      const root = document.getElementById('toastRoot');
-      const icon = {
-        info: 'fa-circle-info text-sky-400',
-        error: 'fa-triangle-exclamation text-amber-400',
-        success: 'fa-circle-check text-emerald-400'
-      }[type] || 'fa-circle-info';
-      const t = document.createElement('div');
-      t.className = 'toast';
-      t.innerHTML = `<i class="fa-solid ${icon}"></i><span>${esc(msg)}</span>`;
-      root.appendChild(t);
-      setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 320); }, ms);
-    }
-    function fmtTime(ts) {
-      const d = new Date(ts), now = new Date();
-      const hm = pad(d.getHours()) + ':' + pad(d.getMinutes());
-      if (d.toDateString() === now.toDateString()) return '今天 ' + hm;
-      return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + hm;
-    }
-    function isGenerating() { return document.getElementById('btnGenerate').disabled; }
-
-    /* ===================== 歷史記錄（localStorage） ===================== */
-    const HKEY = 'rslide_history_v1';
-    const MAX_HISTORY = 30;
-    let historyItems = loadHistory();
-
-    function loadHistory() {
-      try {
-        const list = JSON.parse(localStorage.getItem(HKEY));
-        return Array.isArray(list) ? list : [];
-      } catch (e) { return []; }
-    }
-    function saveHistory() {
-      historyItems = historyItems.slice(0, MAX_HISTORY);
-      let trimmed = false;
-      while (true) {
-        try {
-          localStorage.setItem(HKEY, JSON.stringify(historyItems));
-          if (trimmed) showToast('儲存空間不足，已移除最舊的紀錄', 'info');
-          return true;
-        } catch (e) {
-          if (historyItems.length <= 1) { showToast('瀏覽器儲存空間不足，無法儲存紀錄', 'error'); return false; }
-          historyItems.pop();
-          trimmed = true;
+    <script>
+        /* ===================== 主題 ===================== */
+        function initTheme() {
+            if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
         }
-      }
-    }
+        function toggleTheme() {
+            const html = document.documentElement;
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+            }
+            const btn = document.getElementById('themeBtn');
+            btn.classList.remove('theme-spin');
+            void btn.offsetWidth;
+            btn.classList.add('theme-spin');
+        }
+        initTheme();
 
-    function renderHistory(animate = false) {
-      const list = document.getElementById('historyList');
-      const q = document.getElementById('historySearch').value.trim().toLowerCase();
-      document.getElementById('historyCount').textContent = historyItems.length ? `(${historyItems.length})` : '';
+        /* ===================== 狀態 ===================== */
+        let currentPresentationData = null;
+        let currentSlideIdx = 0;
+        let currentHistoryId = null;
+        let autoplayTimer = null;
+        let loadingTimer = null;
+        let currentStep = 1;
 
-      const items = historyItems.filter(h =>
-        !q || (h.title || '').toLowerCase().includes(q) || (h.input?.content || '').toLowerCase().includes(q));
+        /* ===================== 小工具 ===================== */
+        function esc(s) {
+            return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+        function pad(n) { return String(n).padStart(2, '0'); }
+        function animateIn(el, cls = 'reveal') {
+            el.classList.remove(cls);
+            void el.offsetWidth;
+            el.classList.add(cls);
+        }
+        function showToast(msg, type = 'info', ms = 3200) {
+            const root = document.getElementById('toastRoot');
+            const icon = {
+                info: 'fa-circle-info text-sky-400',
+                error: 'fa-triangle-exclamation text-amber-400',
+                success: 'fa-circle-check text-emerald-400'
+            }[type] || 'fa-circle-info';
+            const t = document.createElement('div');
+            t.className = 'toast';
+            t.innerHTML = `<i class="fa-solid ${icon}"></i><span>${esc(msg)}</span>`;
+            root.appendChild(t);
+            setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 320); }, ms);
+        }
+        function fmtTime(ts) {
+            const d = new Date(ts), now = new Date();
+            const hm = pad(d.getHours()) + ':' + pad(d.getMinutes());
+            if (d.toDateString() === now.toDateString()) return '今天 ' + hm;
+            return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + hm;
+        }
+        function isGenerating() { return document.getElementById('btnGenerate').disabled; }
 
-      list.classList.toggle('stagger', animate);
+        /* ===================== 歷史記錄（localStorage） ===================== */
+        const HKEY = 'rslide_history_v1';
+        const MAX_HISTORY = 30;
+        let historyItems = loadHistory();
 
-      if (!items.length) {
-        list.innerHTML = `
+        function loadHistory() {
+            try {
+                const list = JSON.parse(localStorage.getItem(HKEY));
+                return Array.isArray(list) ? list : [];
+            } catch (e) { return []; }
+        }
+        function saveHistory() {
+            historyItems = historyItems.slice(0, MAX_HISTORY);
+            let trimmed = false;
+            while (true) {
+                try {
+                    localStorage.setItem(HKEY, JSON.stringify(historyItems));
+                    if (trimmed) showToast('儲存空間不足，已移除最舊的紀錄', 'info');
+                    return true;
+                } catch (e) {
+                    if (historyItems.length <= 1) { showToast('瀏覽器儲存空間不足，無法儲存紀錄', 'error'); return false; }
+                    historyItems.pop();
+                    trimmed = true;
+                }
+            }
+        }
+
+        function renderHistory(animate = false) {
+            const list = document.getElementById('historyList');
+            const q = document.getElementById('historySearch').value.trim().toLowerCase();
+            document.getElementById('historyCount').textContent = historyItems.length ? `(${historyItems.length})` : '';
+
+            const items = historyItems.filter(h =>
+                !q || (h.title || '').toLowerCase().includes(q) || (h.input?.content || '').toLowerCase().includes(q));
+
+            list.classList.toggle('stagger', animate);
+
+            if (!items.length) {
+                list.innerHTML = `
           <div class="text-center text-zinc-400 text-xs py-12 px-4 reveal">
             <i class="fa-regular fa-folder-open text-3xl mb-3 block"></i>
             ${historyItems.length ? '找不到符合的紀錄' : '還沒有生成紀錄<br>生成的簡報會自動儲存在這裡'}
           </div>`;
-        return;
-      }
+                return;
+            }
 
-      list.innerHTML = items.map(h => {
-        const active = h.id === currentHistoryId;
-        const style = (h.input?.style_preference || '').split(' (')[0];
-        const pages = h.data?.slides?.length || 0;
-        return `
+            list.innerHTML = items.map(h => {
+                const active = h.id === currentHistoryId;
+                const style = (h.input?.style_preference || '').split(' (')[0];
+                const pages = h.data?.slides?.length || 0;
+                return `
           <div data-id="${esc(h.id)}" data-act="open" class="hist-item group spot rounded-xl border p-3 cursor-pointer transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${active
-            ? 'border-black dark:border-white bg-zinc-50 dark:bg-zinc-800 shadow-sm'
-            : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600'}">
+                        ? 'border-black dark:border-white bg-zinc-50 dark:bg-zinc-800 shadow-sm'
+                        : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600'}">
             <div class="relative flex items-start gap-2.5">
               <div class="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-xs ${active ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'}">
                 <i class="fa-solid fa-display"></i>
@@ -489,268 +962,268 @@
               </div>
             </div>
           </div>`;
-      }).join('');
-    }
+            }).join('');
+        }
 
-    function addHistory(input, data) {
-      const entry = {
-        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        createdAt: Date.now(),
-        title: data.presentation_title || '未命名簡報',
-        input,
-        data
-      };
-      historyItems.unshift(entry);
-      currentHistoryId = entry.id;
-      saveHistory();
-      if (!historyItems.some(h => h.id === currentHistoryId)) currentHistoryId = null;
-      renderHistory(true);
-    }
+        function addHistory(input, data) {
+            const entry = {
+                id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+                createdAt: Date.now(),
+                title: data.presentation_title || '未命名簡報',
+                input,
+                data
+            };
+            historyItems.unshift(entry);
+            currentHistoryId = entry.id;
+            saveHistory();
+            if (!historyItems.some(h => h.id === currentHistoryId)) currentHistoryId = null;
+            renderHistory(true);
+        }
 
-    function openHistory(id) {
-      if (isGenerating()) { showToast('正在生成中，請稍候', 'info'); return; }
-      const h = historyItems.find(x => x.id === id);
-      if (!h || !h.data || !Array.isArray(h.data.slides)) { showToast('此紀錄資料已損毀', 'error'); return; }
-      stopAutoplay();
-      currentHistoryId = id;
-      currentPresentationData = h.data;
-      currentSlideIdx = 0;
+        function openHistory(id) {
+            if (isGenerating()) { showToast('正在生成中，請稍候', 'info'); return; }
+            const h = historyItems.find(x => x.id === id);
+            if (!h || !h.data || !Array.isArray(h.data.slides)) { showToast('此紀錄資料已損毀', 'error'); return; }
+            stopAutoplay();
+            currentHistoryId = id;
+            currentPresentationData = h.data;
+            currentSlideIdx = 0;
 
-      document.getElementById('inputContent').value = h.input?.content || '';
-      document.getElementById('targetAudience').value = h.input?.target_audience || '';
-      if (h.input?.num_pages) document.getElementById('numPages').value = String(h.input.num_pages);
-      if (h.input?.style_preference) document.getElementById('stylePreference').value = h.input.style_preference;
-      updateCount();
+            document.getElementById('inputContent').value = h.input?.content || '';
+            document.getElementById('targetAudience').value = h.input?.target_audience || '';
+            if (h.input?.num_pages) document.getElementById('numPages').value = String(h.input.num_pages);
+            if (h.input?.style_preference) document.getElementById('stylePreference').value = h.input.style_preference;
+            updateCount();
 
-      renderHistory();
-      confirmAndPlay();
-      if (window.innerWidth < 1024) setSidebar(false);
-      showToast('已切換至「' + h.title + '」', 'success', 1800);
-    }
+            renderHistory();
+            confirmAndPlay();
+            if (window.innerWidth < 1024) setSidebar(false);
+            showToast('已切換至「' + h.title + '」', 'success', 1800);
+        }
 
-    function renameHistory(id) {
-      const h = historyItems.find(x => x.id === id);
-      if (!h) return;
-      const name = prompt('重新命名', h.title);
-      if (name === null) return;
-      const t = name.trim();
-      if (!t) return;
-      h.title = t;
-      saveHistory();
-      renderHistory();
-    }
+        function renameHistory(id) {
+            const h = historyItems.find(x => x.id === id);
+            if (!h) return;
+            const name = prompt('重新命名', h.title);
+            if (name === null) return;
+            const t = name.trim();
+            if (!t) return;
+            h.title = t;
+            saveHistory();
+            renderHistory();
+        }
 
-    function deleteHistory(id, el) {
-      const finish = () => {
-        historyItems = historyItems.filter(x => x.id !== id);
-        saveHistory();
-        if (id === currentHistoryId) { currentHistoryId = null; resetWorkspace(false); }
-        renderHistory();
-      };
-      if (el) { el.classList.add('hist-out'); setTimeout(finish, 330); } else finish();
-    }
+        function deleteHistory(id, el) {
+            const finish = () => {
+                historyItems = historyItems.filter(x => x.id !== id);
+                saveHistory();
+                if (id === currentHistoryId) { currentHistoryId = null; resetWorkspace(false); }
+                renderHistory();
+            };
+            if (el) { el.classList.add('hist-out'); setTimeout(finish, 330); } else finish();
+        }
 
-    function clearHistory() {
-      if (!historyItems.length) { showToast('目前沒有歷史記錄', 'info', 1800); return; }
-      if (!confirm('確定要清除所有歷史記錄嗎？此動作無法復原。')) return;
-      historyItems = [];
-      saveHistory();
-      if (currentHistoryId) { currentHistoryId = null; }
-      renderHistory();
-      showToast('已清除所有歷史記錄', 'success', 1800);
-    }
+        function clearHistory() {
+            if (!historyItems.length) { showToast('目前沒有歷史記錄', 'info', 1800); return; }
+            if (!confirm('確定要清除所有歷史記錄嗎？此動作無法復原。')) return;
+            historyItems = [];
+            saveHistory();
+            if (currentHistoryId) { currentHistoryId = null; }
+            renderHistory();
+            showToast('已清除所有歷史記錄', 'success', 1800);
+        }
 
-    document.getElementById('historyList').addEventListener('click', e => {
-      const item = e.target.closest('.hist-item');
-      if (!item) return;
-      const id = item.dataset.id;
-      const actEl = e.target.closest('[data-act]');
-      const act = actEl ? actEl.dataset.act : 'open';
-      if (act === 'rename') { e.stopPropagation(); renameHistory(id); }
-      else if (act === 'delete') { e.stopPropagation(); deleteHistory(id, item); }
-      else openHistory(id);
-    });
-    document.getElementById('historySearch').addEventListener('input', () => renderHistory());
+        document.getElementById('historyList').addEventListener('click', e => {
+            const item = e.target.closest('.hist-item');
+            if (!item) return;
+            const id = item.dataset.id;
+            const actEl = e.target.closest('[data-act]');
+            const act = actEl ? actEl.dataset.act : 'open';
+            if (act === 'rename') { e.stopPropagation(); renameHistory(id); }
+            else if (act === 'delete') { e.stopPropagation(); deleteHistory(id, item); }
+            else openHistory(id);
+        });
+        document.getElementById('historySearch').addEventListener('input', () => renderHistory());
 
-    /* ----- 新增簡報 / 重置 ----- */
-    function resetWorkspace(clearFields = true) {
-      stopAutoplay();
-      if (document.fullscreenElement) document.exitFullscreen();
-      currentPresentationData = null;
-      currentSlideIdx = 0;
-      document.getElementById('sectionReview').classList.add('hidden');
-      document.getElementById('sectionPlayer').classList.add('hidden');
-      if (clearFields) clearInput();
-      setStep(1);
-    }
-    function newPresentation() {
-      if (isGenerating()) { showToast('正在生成中，請稍候', 'info'); return; }
-      currentHistoryId = null;
-      resetWorkspace(true);
-      renderHistory();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      const sec = document.getElementById('sectionInput');
-      animateIn(sec);
-      document.getElementById('inputContent').focus({ preventScroll: true });
-      if (window.innerWidth < 1024) setSidebar(false);
-    }
+        /* ----- 新增簡報 / 重置 ----- */
+        function resetWorkspace(clearFields = true) {
+            stopAutoplay();
+            if (document.fullscreenElement) document.exitFullscreen();
+            currentPresentationData = null;
+            currentSlideIdx = 0;
+            document.getElementById('sectionReview').classList.add('hidden');
+            document.getElementById('sectionPlayer').classList.add('hidden');
+            if (clearFields) clearInput();
+            setStep(1);
+        }
+        function newPresentation() {
+            if (isGenerating()) { showToast('正在生成中，請稍候', 'info'); return; }
+            currentHistoryId = null;
+            resetWorkspace(true);
+            renderHistory();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            const sec = document.getElementById('sectionInput');
+            animateIn(sec);
+            document.getElementById('inputContent').focus({ preventScroll: true });
+            if (window.innerWidth < 1024) setSidebar(false);
+        }
 
-    /* ----- 側邊欄開關 ----- */
-    function setSidebar(open) {
-      document.body.classList.toggle('sb-open', open);
-      document.getElementById('sbIcon').className = open && window.innerWidth < 1024 ? 'fa-solid fa-xmark' : 'fa-solid fa-bars';
-      if (window.innerWidth >= 1024) {
-        try { localStorage.setItem('rslide_sb', open ? '1' : '0'); } catch (e) {}
-      }
-    }
-    function toggleSidebar() { setSidebar(!document.body.classList.contains('sb-open')); }
-    (function initSidebar() {
-      let saved = null;
-      try { saved = localStorage.getItem('rslide_sb'); } catch (e) {}
-      setSidebar(window.innerWidth >= 1024 ? saved !== '0' : false);
-    })();
+        /* ----- 側邊欄開關 ----- */
+        function setSidebar(open) {
+            document.body.classList.toggle('sb-open', open);
+            document.getElementById('sbIcon').className = open && window.innerWidth < 1024 ? 'fa-solid fa-xmark' : 'fa-solid fa-bars';
+            if (window.innerWidth >= 1024) {
+                try { localStorage.setItem('rslide_sb', open ? '1' : '0'); } catch (e) { }
+            }
+        }
+        function toggleSidebar() { setSidebar(!document.body.classList.contains('sb-open')); }
+        (function initSidebar() {
+            let saved = null;
+            try { saved = localStorage.getItem('rslide_sb'); } catch (e) { }
+            setSidebar(window.innerWidth >= 1024 ? saved !== '0' : false);
+        })();
 
-    /* ===================== 範例與輸入互動 ===================== */
-    const SAMPLES = [
-      { text: "我們推出全新智慧手錶 Nova X：續航 7 天、支援血氧與睡眠分析、內建 AI 健康助理。目標是讓日常健康管理更簡單，預計下季開賣，首批限量 5,000 支。", audience: "科技愛好者與一般消費者" },
-      { text: "第三季專案進度：核心功能完成 85%，使用者測試回饋正面，主要風險為第三方 API 延遲。下一步將優化效能並於 11 月底上線，需追加兩名後端人力。", audience: "公司主管與跨部門團隊" },
-      { text: "什麼是機器學習？機器學習讓電腦從資料中找出規律而非手寫規則。常見類型有監督式、非監督式與強化學習，應用包含推薦系統、影像辨識與語音助理。", audience: "入門學習者" }
-    ];
-    function fillSample(i) {
-      const ta = document.getElementById('inputContent');
-      ta.value = SAMPLES[i].text;
-      document.getElementById('targetAudience').value = SAMPLES[i].audience;
-      updateCount();
-      ta.focus();
-      showToast('已填入範例內容', 'success', 1800);
-    }
-    function clearInput() {
-      document.getElementById('inputContent').value = '';
-      document.getElementById('targetAudience').value = '';
-      updateCount();
-    }
-    function updateCount() {
-      const ta = document.getElementById('inputContent');
-      const c = document.getElementById('charCount');
-      c.textContent = ta.value.length + ' 字';
-      c.classList.toggle('text-emerald-500', ta.value.length > 20);
-    }
-    document.getElementById('inputContent').addEventListener('input', updateCount);
-    document.getElementById('inputContent').addEventListener('keydown', e => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') startGeneration();
-    });
-
-    /* ===================== 步驟條 ===================== */
-    function setStep(n) {
-      currentStep = n;
-      for (let i = 1; i <= 3; i++) {
-        const el = document.getElementById('stepTag' + i);
-        const active = i === n;
-        const done = i < n;
-        el.className = 'transition-all duration-300 ' + (active
-          ? 'text-black dark:text-white scale-110'
-          : done ? 'text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white' : 'text-zinc-400 dark:text-zinc-600');
-      }
-      document.getElementById('stepLine1').style.width = n >= 2 ? '100%' : '0%';
-      document.getElementById('stepLine2').style.width = n >= 3 ? '100%' : '0%';
-    }
-    function goStep(n) {
-      if (n === 1) {
-        stopAutoplay();
-        document.getElementById('sectionPlayer').classList.add('hidden');
-        document.getElementById('sectionReview').classList.toggle('hidden', !currentPresentationData);
-        setStep(1);
-        document.getElementById('sectionInput').scrollIntoView({ behavior: 'smooth' });
-        return;
-      }
-      if (!currentPresentationData) { showToast('請先生成簡報內容', 'info'); return; }
-      if (n === 2) backToReview(); else confirmAndPlay();
-    }
-
-    /* ===================== 生成 ===================== */
-    const LOADING_MSGS = ['分析內容中…', '規劃版面結構…', 'AI 動態配色中…', '生成排版中…'];
-    function setLoading(on) {
-      const btn = document.getElementById('btnGenerate');
-      const spinner = document.getElementById('loadingSpinner');
-      const icon = document.getElementById('btnIcon');
-      const label = document.getElementById('btnLabel');
-      const skel = document.getElementById('sectionSkeleton');
-      btn.disabled = on;
-      spinner.classList.toggle('hidden', !on);
-      icon.classList.toggle('hidden', on);
-      clearInterval(loadingTimer);
-      if (on) {
-        let i = 0;
-        label.textContent = LOADING_MSGS[0];
-        loadingTimer = setInterval(() => { i = (i + 1) % LOADING_MSGS.length; label.textContent = LOADING_MSGS[i]; }, 1800);
-        document.getElementById('sectionReview').classList.add('hidden');
-        document.getElementById('sectionPlayer').classList.add('hidden');
-        skel.classList.remove('hidden');
-        animateIn(skel);
-        skel.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } else {
-        label.textContent = '生成排版';
-        skel.classList.add('hidden');
-      }
-    }
-
-    async function startGeneration() {
-      const ta = document.getElementById('inputContent');
-      const content = ta.value.trim();
-      const targetAudience = document.getElementById('targetAudience').value;
-      const numPages = parseInt(document.getElementById('numPages').value);
-      const stylePreference = document.getElementById('stylePreference').value; // 讀取選擇的風格
-
-      if (!content) {
-        ta.classList.remove('shake'); void ta.offsetWidth; ta.classList.add('shake');
-        ta.focus();
-        showToast('請輸入內容！', 'error');
-        return;
-      }
-      if (isGenerating()) return;
-
-      setLoading(true);
-
-      try {
-        const res = await fetch('/api/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content,
-            target_audience: targetAudience,
-            num_pages: numPages,
-            style_preference: stylePreference
-          })
+        /* ===================== 範例與輸入互動 ===================== */
+        const SAMPLES = [
+            { text: "我們推出全新智慧手錶 Nova X：續航 7 天、支援血氧與睡眠分析、內建 AI 健康助理。目標是讓日常健康管理更簡單，預計下季開賣，首批限量 5,000 支。", audience: "科技愛好者與一般消費者" },
+            { text: "第三季專案進度：核心功能完成 85%，使用者測試回饋正面，主要風險為第三方 API 延遲。下一步將優化效能並於 11 月底上線，需追加兩名後端人力。", audience: "公司主管與跨部門團隊" },
+            { text: "什麼是機器學習？機器學習讓電腦從資料中找出規律而非手寫規則。常見類型有監督式、非監督式與強化學習，應用包含推薦系統、影像辨識與語音助理。", audience: "入門學習者" }
+        ];
+        function fillSample(i) {
+            const ta = document.getElementById('inputContent');
+            ta.value = SAMPLES[i].text;
+            document.getElementById('targetAudience').value = SAMPLES[i].audience;
+            updateCount();
+            ta.focus();
+            showToast('已填入範例內容', 'success', 1800);
+        }
+        function clearInput() {
+            document.getElementById('inputContent').value = '';
+            document.getElementById('targetAudience').value = '';
+            updateCount();
+        }
+        function updateCount() {
+            const ta = document.getElementById('inputContent');
+            const c = document.getElementById('charCount');
+            c.textContent = ta.value.length + ' 字';
+            c.classList.toggle('text-emerald-500', ta.value.length > 20);
+        }
+        document.getElementById('inputContent').addEventListener('input', updateCount);
+        document.getElementById('inputContent').addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') startGeneration();
         });
 
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        currentPresentationData = data;
-        currentSlideIdx = 0;
-        setLoading(false);
-        addHistory({ content, target_audience: targetAudience, num_pages: numPages, style_preference: stylePreference }, data);
-        renderReviewSection();
-        showToast('版面生成完成，已存入歷史記錄', 'success', 2200);
-      } catch (err) {
-        setLoading(false);
-        showToast("生成失敗: " + err.message, 'error', 5000);
-      }
-    }
+        /* ===================== 步驟條 ===================== */
+        function setStep(n) {
+            currentStep = n;
+            for (let i = 1; i <= 3; i++) {
+                const el = document.getElementById('stepTag' + i);
+                const active = i === n;
+                const done = i < n;
+                el.className = 'transition-all duration-300 ' + (active
+                    ? 'text-black dark:text-white scale-110'
+                    : done ? 'text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white' : 'text-zinc-400 dark:text-zinc-600');
+            }
+            document.getElementById('stepLine1').style.width = n >= 2 ? '100%' : '0%';
+            document.getElementById('stepLine2').style.width = n >= 3 ? '100%' : '0%';
+        }
+        function goStep(n) {
+            if (n === 1) {
+                stopAutoplay();
+                document.getElementById('sectionPlayer').classList.add('hidden');
+                document.getElementById('sectionReview').classList.toggle('hidden', !currentPresentationData);
+                setStep(1);
+                document.getElementById('sectionInput').scrollIntoView({ behavior: 'smooth' });
+                return;
+            }
+            if (!currentPresentationData) { showToast('請先生成簡報內容', 'info'); return; }
+            if (n === 2) backToReview(); else confirmAndPlay();
+        }
 
-    function renderReviewSection() {
-      const review = document.getElementById('sectionReview');
-      review.classList.remove('hidden');
-      document.getElementById('sectionPlayer').classList.add('hidden');
-      animateIn(review);
-      setStep(2);
+        /* ===================== 生成 ===================== */
+        const LOADING_MSGS = ['分析內容中…', '規劃版面結構…', 'AI 動態配色中…', '生成排版中…'];
+        function setLoading(on) {
+            const btn = document.getElementById('btnGenerate');
+            const spinner = document.getElementById('loadingSpinner');
+            const icon = document.getElementById('btnIcon');
+            const label = document.getElementById('btnLabel');
+            const skel = document.getElementById('sectionSkeleton');
+            btn.disabled = on;
+            spinner.classList.toggle('hidden', !on);
+            icon.classList.toggle('hidden', on);
+            clearInterval(loadingTimer);
+            if (on) {
+                let i = 0;
+                label.textContent = LOADING_MSGS[0];
+                loadingTimer = setInterval(() => { i = (i + 1) % LOADING_MSGS.length; label.textContent = LOADING_MSGS[i]; }, 1800);
+                document.getElementById('sectionReview').classList.add('hidden');
+                document.getElementById('sectionPlayer').classList.add('hidden');
+                skel.classList.remove('hidden');
+                animateIn(skel);
+                skel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } else {
+                label.textContent = '生成排版';
+                skel.classList.add('hidden');
+            }
+        }
 
-      const container = document.getElementById('reviewContainer');
-      container.innerHTML = '';
+        async function startGeneration() {
+            const ta = document.getElementById('inputContent');
+            const content = ta.value.trim();
+            const targetAudience = document.getElementById('targetAudience').value;
+            const numPages = parseInt(document.getElementById('numPages').value);
+            const stylePreference = document.getElementById('stylePreference').value; // 讀取選擇的風格
 
-      currentPresentationData.slides.forEach((slide, idx) => {
-        const card = document.createElement('div');
-        card.className = "spot p-5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-600";
-        card.innerHTML = `
+            if (!content) {
+                ta.classList.remove('shake'); void ta.offsetWidth; ta.classList.add('shake');
+                ta.focus();
+                showToast('請輸入內容！', 'error');
+                return;
+            }
+            if (isGenerating()) return;
+
+            setLoading(true);
+
+            try {
+                const res = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content,
+                        target_audience: targetAudience,
+                        num_pages: numPages,
+                        style_preference: stylePreference
+                    })
+                });
+
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                currentPresentationData = data;
+                currentSlideIdx = 0;
+                setLoading(false);
+                addHistory({ content, target_audience: targetAudience, num_pages: numPages, style_preference: stylePreference }, data);
+                renderReviewSection();
+                showToast('版面生成完成，已存入歷史記錄', 'success', 2200);
+            } catch (err) {
+                setLoading(false);
+                showToast("生成失敗: " + err.message, 'error', 5000);
+            }
+        }
+
+        function renderReviewSection() {
+            const review = document.getElementById('sectionReview');
+            review.classList.remove('hidden');
+            document.getElementById('sectionPlayer').classList.add('hidden');
+            animateIn(review);
+            setStep(2);
+
+            const container = document.getElementById('reviewContainer');
+            container.innerHTML = '';
+
+            currentPresentationData.slides.forEach((slide, idx) => {
+                const card = document.createElement('div');
+                card.className = "spot p-5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-600";
+                card.innerHTML = `
           <div class="relative">
             <div class="flex items-center gap-3 mb-1">
               <span class="text-xs font-mono bg-zinc-200 dark:bg-zinc-800 px-2 py-1 rounded text-zinc-600 dark:text-zinc-300">0${esc(slide.page_number)}</span>
@@ -765,212 +1238,213 @@
             預覽此頁 <i class="fa-solid fa-arrow-right ml-1 text-xs transition-transform group-hover:translate-x-1"></i>
           </button>
         `;
-        container.appendChild(card);
-      });
+                container.appendChild(card);
+            });
 
-      review.scrollIntoView({ behavior: 'smooth' });
-    }
+            review.scrollIntoView({ behavior: 'smooth' });
+        }
 
-    function previewSingleSlide(idx) {
-      currentSlideIdx = idx;
-      confirmAndPlay();
-    }
+        function previewSingleSlide(idx) {
+            currentSlideIdx = idx;
+            confirmAndPlay();
+        }
 
-    function confirmAndPlay() {
-      const player = document.getElementById('sectionPlayer');
-      player.classList.remove('hidden');
-      document.getElementById('sectionReview').classList.add('hidden');
-      animateIn(player);
-      setStep(3);
+        function confirmAndPlay() {
+            const player = document.getElementById('sectionPlayer');
+            player.classList.remove('hidden');
+            document.getElementById('sectionReview').classList.add('hidden');
+            animateIn(player);
+            setStep(3);
 
-      document.getElementById('presentationTitleDisplay').innerText = currentPresentationData.presentation_title;
-      buildThumbnails();
-      renderSlide(currentSlideIdx, 'fade');
-      player.scrollIntoView({ behavior: 'smooth' });
-    }
+            document.getElementById('presentationTitleDisplay').innerText = currentPresentationData.presentation_title;
+            buildThumbnails();
+            renderSlide(currentSlideIdx, 'fade');
+            player.scrollIntoView({ behavior: 'smooth' });
+        }
 
-    function backToReview() {
-      stopAutoplay();
-      if (document.fullscreenElement) document.exitFullscreen();
-      renderReviewSection();
-    }
+        function backToReview() {
+            stopAutoplay();
+            if (document.fullscreenElement) document.exitFullscreen();
+            renderReviewSection();
+        }
 
-    /* ===================== 播放器 ===================== */
-    function fitSlide() {
-      const canvas = document.getElementById('slideCanvas');
-      const scaler = canvas.querySelector('.slide-scaler');
-      if (!scaler) return;
-      scaler.style.transform = `scale(${canvas.clientWidth / 1024})`;
-    }
-    new ResizeObserver(fitSlide).observe(document.getElementById('slideCanvas'));
+        /* ===================== 播放器 ===================== */
+        function fitSlide() {
+            const canvas = document.getElementById('slideCanvas');
+            const scaler = canvas.querySelector('.slide-scaler');
+            if (!scaler) return;
+            scaler.style.transform = `scale(${canvas.clientWidth / 1024})`;
+        }
+        new ResizeObserver(fitSlide).observe(document.getElementById('slideCanvas'));
 
-    function renderSlide(index, mode) {
-      const total = currentPresentationData.slides.length;
-      if (index < 0 || index >= total) return;
-      const dir = mode || (index > currentSlideIdx ? 'right' : index < currentSlideIdx ? 'left' : 'fade');
-      currentSlideIdx = index;
-      const slide = currentPresentationData.slides[index];
-      const canvas = document.getElementById('slideCanvas');
+        function renderSlide(index, mode) {
+            const total = currentPresentationData.slides.length;
+            if (index < 0 || index >= total) return;
+            const dir = mode || (index > currentSlideIdx ? 'right' : index < currentSlideIdx ? 'left' : 'fade');
+            currentSlideIdx = index;
+            const slide = currentPresentationData.slides[index];
+            const canvas = document.getElementById('slideCanvas');
 
-      const cls = dir === 'right' ? 'slide-in-right' : dir === 'left' ? 'slide-in-left' : 'slide-in-fade';
-      canvas.innerHTML = `<div class="slide-anim ${cls}"><div class="slide-scaler">${slide.html_content}</div></div>`;
-      fitSlide();
-      document.getElementById('currentLayoutBadge').innerText = slide.layout_concept;
+            const cls = dir === 'right' ? 'slide-in-right' : dir === 'left' ? 'slide-in-left' : 'slide-in-fade';
+            canvas.innerHTML = `<div class="slide-anim ${cls}"><div class="slide-scaler">${slide.html_content}</div></div>`;
+            fitSlide();
+            document.getElementById('currentLayoutBadge').innerText = slide.layout_concept;
 
-      document.getElementById('slideCounter').textContent = `${pad(index + 1)} / ${pad(total)}`;
-      document.getElementById('slideProgress').style.width = ((index + 1) / total * 100) + '%';
-      ['prevBtn', 'prevOverlay'].forEach(id => document.getElementById(id).disabled = index === 0);
-      ['nextBtn', 'nextOverlay'].forEach(id => document.getElementById(id).disabled = index === total - 1 && !autoplayTimer);
+            document.getElementById('slideCounter').textContent = `${pad(index + 1)} / ${pad(total)}`;
+            document.getElementById('slideProgress').style.width = ((index + 1) / total * 100) + '%';
+            ['prevBtn', 'prevOverlay'].forEach(id => document.getElementById(id).disabled = index === 0);
+            ['nextBtn', 'nextOverlay'].forEach(id => document.getElementById(id).disabled = index === total - 1 && !autoplayTimer);
 
-      updateThumbnails();
-    }
+            updateThumbnails();
+        }
 
-    function prevSlide() { if (currentSlideIdx > 0) renderSlide(currentSlideIdx - 1); }
-    function nextSlide() {
-      if (currentSlideIdx < currentPresentationData.slides.length - 1) renderSlide(currentSlideIdx + 1);
-    }
+        function prevSlide() { if (currentSlideIdx > 0) renderSlide(currentSlideIdx - 1); }
+        function nextSlide() {
+            if (currentSlideIdx < currentPresentationData.slides.length - 1) renderSlide(currentSlideIdx + 1);
+        }
 
-    function buildThumbnails() {
-      const container = document.getElementById('thumbnailContainer');
-      container.innerHTML = '';
-      currentPresentationData.slides.forEach((slide, idx) => {
-        const thumb = document.createElement('div');
-        thumb.className = 'thumb spot flex-shrink-0 w-40 h-24 rounded-lg border p-3 flex flex-col justify-between cursor-pointer transition-all duration-300 select-none text-left';
-        thumb.dataset.idx = idx;
-        thumb.onclick = () => renderSlide(idx);
-        thumb.innerHTML = `
+        function buildThumbnails() {
+            const container = document.getElementById('thumbnailContainer');
+            container.innerHTML = '';
+            currentPresentationData.slides.forEach((slide, idx) => {
+                const thumb = document.createElement('div');
+                thumb.className = 'thumb spot flex-shrink-0 w-40 h-24 rounded-lg border p-3 flex flex-col justify-between cursor-pointer transition-all duration-300 select-none text-left';
+                thumb.dataset.idx = idx;
+                thumb.onclick = () => renderSlide(idx);
+                thumb.innerHTML = `
           <div class="relative text-[10px] font-mono">0${idx + 1}</div>
           <div class="relative text-xs font-bold line-clamp-2 leading-snug">${esc(slide.slide_title)}</div>
         `;
-        container.appendChild(thumb);
-      });
-      animateIn(container, 'reveal');
-    }
+                container.appendChild(thumb);
+            });
+            animateIn(container, 'reveal');
+        }
 
-    function updateThumbnails() {
-      const container = document.getElementById('thumbnailContainer');
-      container.querySelectorAll('.thumb').forEach(thumb => {
-        const idx = Number(thumb.dataset.idx);
-        const isCurrent = idx === currentSlideIdx;
-        const base = 'thumb spot flex-shrink-0 w-40 h-24 rounded-lg border p-3 flex flex-col justify-between cursor-pointer transition-all duration-300 select-none text-left ';
-        thumb.className = base + (isCurrent
-          ? 'border-black dark:border-white ring-2 ring-black dark:ring-white bg-white dark:bg-zinc-800 shadow-md scale-105'
-          : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 opacity-60 hover:opacity-100');
-        thumb.children[0].className = 'relative text-[10px] font-mono ' + (isCurrent ? 'text-black dark:text-white' : 'text-zinc-500');
-        thumb.children[1].className = 'relative text-xs font-bold line-clamp-2 leading-snug ' + (isCurrent ? 'text-black dark:text-white' : 'text-zinc-600 dark:text-zinc-400');
-        if (isCurrent) thumb.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-      });
-    }
+        function updateThumbnails() {
+            const container = document.getElementById('thumbnailContainer');
+            container.querySelectorAll('.thumb').forEach(thumb => {
+                const idx = Number(thumb.dataset.idx);
+                const isCurrent = idx === currentSlideIdx;
+                const base = 'thumb spot flex-shrink-0 w-40 h-24 rounded-lg border p-3 flex flex-col justify-between cursor-pointer transition-all duration-300 select-none text-left ';
+                thumb.className = base + (isCurrent
+                    ? 'border-black dark:border-white ring-2 ring-black dark:ring-white bg-white dark:bg-zinc-800 shadow-md scale-105'
+                    : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 opacity-60 hover:opacity-100');
+                thumb.children[0].className = 'relative text-[10px] font-mono ' + (isCurrent ? 'text-black dark:text-white' : 'text-zinc-500');
+                thumb.children[1].className = 'relative text-xs font-bold line-clamp-2 leading-snug ' + (isCurrent ? 'text-black dark:text-white' : 'text-zinc-600 dark:text-zinc-400');
+                if (isCurrent) thumb.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            });
+        }
 
-    /* ----- 自動播放 ----- */
-    function toggleAutoplay() { autoplayTimer ? stopAutoplay() : startAutoplay(); }
-    function startAutoplay() {
-      if (!currentPresentationData) return;
-      autoplayTimer = setInterval(() => {
-        const last = currentPresentationData.slides.length - 1;
-        renderSlide(currentSlideIdx >= last ? 0 : currentSlideIdx + 1);
-      }, 4500);
-      document.getElementById('autoIcon').className = 'fa-solid fa-pause text-[10px] text-green-500';
-      document.getElementById('autoLabel').textContent = '播放中';
-      document.getElementById('nextBtn').disabled = false;
-      document.getElementById('nextOverlay').disabled = false;
-      showToast('自動播放已開啟', 'info', 1500);
-    }
-    function stopAutoplay() {
-      if (!autoplayTimer) return;
-      clearInterval(autoplayTimer);
-      autoplayTimer = null;
-      document.getElementById('autoIcon').className = 'fa-solid fa-play text-[10px]';
-      document.getElementById('autoLabel').textContent = '自動播放';
-    }
+        /* ----- 自動播放 ----- */
+        function toggleAutoplay() { autoplayTimer ? stopAutoplay() : startAutoplay(); }
+        function startAutoplay() {
+            if (!currentPresentationData) return;
+            autoplayTimer = setInterval(() => {
+                const last = currentPresentationData.slides.length - 1;
+                renderSlide(currentSlideIdx >= last ? 0 : currentSlideIdx + 1);
+            }, 4500);
+            document.getElementById('autoIcon').className = 'fa-solid fa-pause text-[10px] text-green-500';
+            document.getElementById('autoLabel').textContent = '播放中';
+            document.getElementById('nextBtn').disabled = false;
+            document.getElementById('nextOverlay').disabled = false;
+            showToast('自動播放已開啟', 'info', 1500);
+        }
+        function stopAutoplay() {
+            if (!autoplayTimer) return;
+            clearInterval(autoplayTimer);
+            autoplayTimer = null;
+            document.getElementById('autoIcon').className = 'fa-solid fa-play text-[10px]';
+            document.getElementById('autoLabel').textContent = '自動播放';
+        }
 
-    /* ----- 全螢幕 ----- */
-    function toggleFullscreen() {
-      const stage = document.getElementById('slideStage');
-      if (document.fullscreenElement) document.exitFullscreen();
-      else if (stage.requestFullscreen) stage.requestFullscreen().catch(() => showToast('瀏覽器不支援全螢幕', 'error'));
-      else showToast('瀏覽器不支援全螢幕', 'error');
-    }
-    let idleTimer;
-    function wakeStage() {
-      const stage = document.getElementById('slideStage');
-      stage.classList.remove('idle');
-      clearTimeout(idleTimer);
-      if (document.fullscreenElement) idleTimer = setTimeout(() => stage.classList.add('idle'), 2000);
-    }
-    document.getElementById('slideStage').addEventListener('mousemove', wakeStage);
-    document.addEventListener('fullscreenchange', () => {
-      const fs = !!document.fullscreenElement;
-      document.getElementById('fsIcon').className = 'fa-solid text-[11px] ' + (fs ? 'fa-compress' : 'fa-expand');
-      document.getElementById('fsLabel').textContent = fs ? '離開全螢幕' : '全螢幕';
-      wakeStage();
-      setTimeout(fitSlide, 50);
-    });
+        /* ----- 全螢幕 ----- */
+        function toggleFullscreen() {
+            const stage = document.getElementById('slideStage');
+            if (document.fullscreenElement) document.exitFullscreen();
+            else if (stage.requestFullscreen) stage.requestFullscreen().catch(() => showToast('瀏覽器不支援全螢幕', 'error'));
+            else showToast('瀏覽器不支援全螢幕', 'error');
+        }
+        let idleTimer;
+        function wakeStage() {
+            const stage = document.getElementById('slideStage');
+            stage.classList.remove('idle');
+            clearTimeout(idleTimer);
+            if (document.fullscreenElement) idleTimer = setTimeout(() => stage.classList.add('idle'), 2000);
+        }
+        document.getElementById('slideStage').addEventListener('mousemove', wakeStage);
+        document.addEventListener('fullscreenchange', () => {
+            const fs = !!document.fullscreenElement;
+            document.getElementById('fsIcon').className = 'fa-solid text-[11px] ' + (fs ? 'fa-compress' : 'fa-expand');
+            document.getElementById('fsLabel').textContent = fs ? '離開全螢幕' : '全螢幕';
+            wakeStage();
+            setTimeout(fitSlide, 50);
+        });
 
-    /* ===================== 全域事件 ===================== */
-    document.addEventListener('keydown', (e) => {
-      if (document.getElementById('sectionPlayer').classList.contains('hidden')) return;
-      if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
-      if (e.key === 'ArrowLeft') prevSlide();
-      else if (e.key === 'ArrowRight') nextSlide();
-      else if (e.key === 'Home') renderSlide(0);
-      else if (e.key === 'End') renderSlide(currentPresentationData.slides.length - 1);
-      else if (e.key.toLowerCase() === 'f') toggleFullscreen();
-      else if (e.key === ' ') { e.preventDefault(); toggleAutoplay(); }
-    });
+        /* ===================== 全域事件 ===================== */
+        document.addEventListener('keydown', (e) => {
+            if (document.getElementById('sectionPlayer').classList.contains('hidden')) return;
+            if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+            if (e.key === 'ArrowLeft') prevSlide();
+            else if (e.key === 'ArrowRight') nextSlide();
+            else if (e.key === 'Home') renderSlide(0);
+            else if (e.key === 'End') renderSlide(currentPresentationData.slides.length - 1);
+            else if (e.key.toLowerCase() === 'f') toggleFullscreen();
+            else if (e.key === ' ') { e.preventDefault(); toggleAutoplay(); }
+        });
 
-    // 觸控滑動
-    (function () {
-      const canvas = document.getElementById('slideCanvas');
-      let sx = 0, sy = 0;
-      canvas.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
-      canvas.addEventListener('touchend', e => {
-        const dx = e.changedTouches[0].clientX - sx;
-        const dy = e.changedTouches[0].clientY - sy;
-        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) dx < 0 ? nextSlide() : prevSlide();
-      }, { passive: true });
-    })();
+        // 觸控滑動
+        (function () {
+            const canvas = document.getElementById('slideCanvas');
+            let sx = 0, sy = 0;
+            canvas.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
+            canvas.addEventListener('touchend', e => {
+                const dx = e.changedTouches[0].clientX - sx;
+                const dy = e.changedTouches[0].clientY - sy;
+                if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) dx < 0 ? nextSlide() : prevSlide();
+            }, { passive: true });
+        })();
 
-    // 捲動：進度條 + header 陰影
-    window.addEventListener('scroll', () => {
-      const h = document.documentElement;
-      const max = h.scrollHeight - h.clientHeight;
-      document.getElementById('scrollProgress').style.width = (max > 0 ? h.scrollTop / max * 100 : 0) + '%';
-      document.getElementById('topHeader').classList.toggle('shadow-md', h.scrollTop > 8);
-    }, { passive: true });
+        // 捲動：進度條 + header 陰影
+        window.addEventListener('scroll', () => {
+            const h = document.documentElement;
+            const max = h.scrollHeight - h.clientHeight;
+            document.getElementById('scrollProgress').style.width = (max > 0 ? h.scrollTop / max * 100 : 0) + '%';
+            document.getElementById('topHeader').classList.toggle('shadow-md', h.scrollTop > 8);
+        }, { passive: true });
 
-    // 視窗大小變化時同步側邊欄圖示
-    window.addEventListener('resize', () => {
-      const open = document.body.classList.contains('sb-open');
-      document.getElementById('sbIcon').className = open && window.innerWidth < 1024 ? 'fa-solid fa-xmark' : 'fa-solid fa-bars';
-    });
+        // 視窗大小變化時同步側邊欄圖示
+        window.addEventListener('resize', () => {
+            const open = document.body.classList.contains('sb-open');
+            document.getElementById('sbIcon').className = open && window.innerWidth < 1024 ? 'fa-solid fa-xmark' : 'fa-solid fa-bars';
+        });
 
-    // 光斑跟隨滑鼠
-    document.addEventListener('pointermove', e => {
-      const el = e.target.closest && e.target.closest('.spot');
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      el.style.setProperty('--mx', (e.clientX - r.left) + 'px');
-      el.style.setProperty('--my', (e.clientY - r.top) + 'px');
-    });
+        // 光斑跟隨滑鼠
+        document.addEventListener('pointermove', e => {
+            const el = e.target.closest && e.target.closest('.spot');
+            if (!el) return;
+            const r = el.getBoundingClientRect();
+            el.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+            el.style.setProperty('--my', (e.clientY - r.top) + 'px');
+        });
 
-    // 按鈕漣漪
-    document.addEventListener('click', e => {
-      const btn = e.target.closest('.ripple-btn');
-      if (!btn || btn.disabled) return;
-      const r = btn.getBoundingClientRect();
-      const size = Math.max(r.width, r.height);
-      const s = document.createElement('span');
-      s.className = 'ripple';
-      s.style.width = s.style.height = size + 'px';
-      s.style.left = (e.clientX - r.left - size / 2) + 'px';
-      s.style.top = (e.clientY - r.top - size / 2) + 'px';
-      btn.appendChild(s);
-      setTimeout(() => s.remove(), 600);
-    });
+        // 按鈕漣漪
+        document.addEventListener('click', e => {
+            const btn = e.target.closest('.ripple-btn');
+            if (!btn || btn.disabled) return;
+            const r = btn.getBoundingClientRect();
+            const size = Math.max(r.width, r.height);
+            const s = document.createElement('span');
+            s.className = 'ripple';
+            s.style.width = s.style.height = size + 'px';
+            s.style.left = (e.clientX - r.left - size / 2) + 'px';
+            s.style.top = (e.clientY - r.top - size / 2) + 'px';
+            btn.appendChild(s);
+            setTimeout(() => s.remove(), 600);
+        });
 
-    setStep(1);
-    renderHistory(true);
-  </script>
+        setStep(1);
+        renderHistory(true);
+    </script>
 </body>
+
 </html>
