@@ -40,6 +40,16 @@ class GenerateRequest(BaseModel):
     num_pages: int = 3
     style_preference: str = "蘋果極簡白 (Apple Minimalist)"  # 新增：接收前端傳來的風格
 
+class RegenerateSlideRequest(BaseModel):
+    content: str
+    target_audience: str = "商務主管 / 技術決策者"
+    num_pages: int = 3
+    style_preference: str = "蘋果極簡白 (Apple Minimalist)"
+    presentation_title: str = "未命名簡報"
+    slide_index: int
+    slides: list[AdaptiveSlide]
+    custom_prompt: str = ""
+
 # 2. API 端點
 @app.post("/api/generate")
 async def generate_slides(req: GenerateRequest):
@@ -87,6 +97,77 @@ async def generate_slides(req: GenerateRequest):
             config=config,
         )
         data = json.loads(response.text)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/regenerate-slide")
+async def regenerate_slide(req: RegenerateSlideRequest):
+    if not req.content.strip():
+        raise HTTPException(status_code=400, detail="請提供輸入內容")
+    if not req.slides:
+        raise HTTPException(status_code=400, detail="缺少原始投影片資料")
+    if req.slide_index < 0 or req.slide_index >= len(req.slides):
+        raise HTTPException(status_code=400, detail="slide_index 超出範圍")
+
+    target_slide = req.slides[req.slide_index]
+    deck_outline = "\n".join(
+        f"- 第 {s.page_number} 頁｜{s.slide_title}｜{s.layout_concept}"
+        for s in req.slides
+    )
+
+    system_instruction = """
+    你是一位榮獲世界設計大獎的簡報架構與 UI 設計師。
+    你的任務是針對指定頁面重新產生「單一投影片」的版面與精簡內容，保持整份簡報風格一致。
+
+    【硬性規範】：
+    1. 只輸出單頁資料，不要輸出整份簡報。
+    2. 最外層必須是 <div class="w-full h-full ...">，使用 Tailwind CSS class。
+    3. 禁止使用 emoji，請使用 font-awesome 圖示。
+    4. 必須服從指定視覺風格，並避免與其他頁過度重複。
+    5. 內容需可讀、精簡，不能溢出畫面。
+    """
+
+    prompt = f"""
+    【簡報標題】：{req.presentation_title}
+    【簡報目標客群】：{req.target_audience}
+    【總頁數】：{req.num_pages}
+    【指定視覺風格】：{req.style_preference}
+    【原始素材內容】：
+    {req.content}
+
+    【整份簡報大綱（請保持一致性）】：
+    {deck_outline}
+
+    【需要重產的頁面】：
+    - 頁碼：{target_slide.page_number}
+    - 原標題：{target_slide.slide_title}
+    - 原版型概念：{target_slide.layout_concept}
+    - 原 HTML：
+    {target_slide.html_content}
+
+    【使用者額外重產需求】：
+    {req.custom_prompt.strip() if req.custom_prompt.strip() else "（無，請你自行優化此頁）"}
+
+    請重新設計這一頁，使其與原本明顯不同但仍符合整體脈絡，並回傳單一頁的 JSON。
+    注意：page_number 請維持為 {target_slide.page_number}。
+    """
+
+    try:
+        config = types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=AdaptiveSlide,
+            temperature=0.7,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            system_instruction=system_instruction
+        )
+        response = client.models.generate_content(
+            model="gemini-3.5-flash",
+            contents=prompt,
+            config=config,
+        )
+        data = json.loads(response.text)
+        data["page_number"] = target_slide.page_number
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
