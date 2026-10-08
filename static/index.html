@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Slide Agent - 智慧簡報生成工作流</title>
+  <!-- 引入 Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* 簡報專用字體與平滑捲動 */
+    body { font-family: "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif; }
+    .step-card {
+      background-color: #edf5ff;
+      border: 1.5px dashed #60a5fa;
+      border-radius: 8px;
+      padding: 12px 18px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #1e3a8a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      min-height: 48px;
+    }
+    .step-card span.highlight {
+      color: #0284c7;
+      font-weight: 900;
+      text-decoration: underline;
+      text-underline-offset: 4px;
+      margin: 0 4px;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+
+  <!-- 頂部導航列 -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">✨</span>
+        <span class="font-extrabold text-xl tracking-tight bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">AI Slide Agent</span>
+        <span class="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full border border-blue-500/30">Workflow PoC</span>
+      </div>
+      <div class="text-xs text-slate-400">Powered by Gemini 3.1 flash-lite + Tailwind CSS</div>
+    </div>
+  </header>
+
+  <!-- 主內容容器 -->
+  <main class="max-w-5xl mx-auto px-6 py-8">
+
+    <!-- 流程進度條 (Stepper) -->
+    <div class="flex items-center justify-center mb-8">
+      <div class="flex items-center gap-4 text-sm font-semibold">
+        <div id="stepTag1" class="flex items-center gap-2 text-blue-400">
+          <span class="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs">1</span>
+          輸入內容與需求
+        </div>
+        <div class="w-12 h-[2px] bg-slate-700"></div>
+        <div id="stepTag2" class="flex items-center gap-2 text-slate-500">
+          <span class="w-7 h-7 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-xs">2</span>
+          大綱人機審查 (HITL)
+        </div>
+        <div class="w-12 h-[2px] bg-slate-700"></div>
+        <div id="stepTag3" class="flex items-center gap-2 text-slate-500">
+          <span class="w-7 h-7 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center text-xs">3</span>
+          簡報預覽播放
+        </div>
+      </div>
+    </div>
+
+    <!-- 步驟 1: 輸入表單區塊 -->
+    <section id="sectionInput" class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-6 shadow-xl backdrop-blur">
+      <h2 class="text-lg font-bold text-white mb-2 flex items-center gap-2">
+        <span>📝</span> 第一步：提供素材與簡報需求
+      </h2>
+      <p class="text-xs text-slate-400 mb-4">貼上你的會議記錄、專案總結、操作 SOP 或痛點描述，Agent 將自動進行結構化意圖拆解。</p>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">簡報原始素材：</label>
+          <textarea id="inputContent" rows="6" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500 transition" placeholder="例如：商業簡報的六步驟規劃、曝光機參數修改系統..."></textarea>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">簡報對象：</label>
+            <input type="text" id="targetAudience" value="高階主管 / 業務決策者" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">預計頁數：</label>
+            <select id="numPages" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500">
+              <option value="2">2 頁精簡版</option>
+              <option value="3" selected>3 頁完整版</option>
+              <option value="4">4 頁深度版</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex justify-end pt-2">
+          <button id="btnGenerate" onclick="startGeneration()" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 py-2.5 rounded-xl shadow-lg shadow-blue-600/30 flex items-center gap-2 transition active:scale-95">
+            <span>開始 AI 結構解析</span>
+            <span id="loadingSpinner" class="hidden animate-spin">⚪</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 步驟 2: 人機協同審查區 (HITL) -->
+    <section id="sectionReview" class="hidden bg-slate-800/60 border border-slate-700/60 rounded-2xl p-6 shadow-xl backdrop-blur mt-6">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <span>🔍</span> 第二步：人機協同大綱審查 (Human-in-the-Loop)
+          </h2>
+          <p class="text-xs text-slate-400">在高成本渲染前，你可在此直接微調標題與重點，確認無誤後點擊生成。</p>
+        </div>
+        <button onclick="confirmAndPlay()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-5 py-2 rounded-xl shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition active:scale-95">
+          確認無誤，前往播放器 ▶
+        </button>
+      </div>
+
+      <div id="reviewContainer" class="space-y-4">
+        <!-- JS 動態產生各頁編輯卡片 -->
+      </div>
+    </section>
+
+    <!-- 步驟 3: 簡報預覽畫布播放器 -->
+    <section id="sectionPlayer" class="hidden mt-6 flex flex-col items-center">
+      <div class="w-full flex items-center justify-between mb-3">
+        <h2 id="presentationTitleDisplay" class="text-xl font-black text-white"></h2>
+        <button onclick="backToReview()" class="text-xs text-slate-400 hover:text-white underline">
+          ✏️ 返回修改大綱文字
+        </button>
+      </div>
+
+      <!-- 16:9 投影片主畫布 (等比縮放) -->
+      <div id="slideCanvas" class="w-full max-w-[960px] h-[540px] bg-white rounded-xl overflow-hidden shadow-2xl flex border border-slate-700 relative text-slate-800">
+        <!-- JS 動態注入投影片內容 -->
+      </div>
+
+      <!-- 下方控制列 -->
+      <div class="mt-4 flex items-center gap-4 bg-slate-800 border border-slate-700 px-5 py-2.5 rounded-full shadow-lg">
+        <button id="prevBtn" onclick="prevSlide()" class="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white px-4 py-1.5 rounded-full text-xs font-bold transition">◀ 上一頁</button>
+        <span id="pageIndicator" class="text-sm font-bold text-slate-200 min-w-[60px] text-center">1 / 1</span>
+        <button id="nextBtn" onclick="nextSlide()" class="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:text-slate-500 text-white px-4 py-1.5 rounded-full text-xs font-bold transition">下一頁 ▶</button>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    let currentPresentationData = null;
+    let currentSlideIdx = 0;
+
+    // 預設填入範例素材，方便直接點擊測試
+    document.getElementById('inputContent').value = `商業簡報製作與匯整指南
+第一頁重點：商業簡報的六步驟規劃。
+包含：與單位主管確認目標進程、內部員工分工落實、說明進度所需產出程度、修正提報方向、驗證階段產出進行匯整、上場報告。前四點為簡報規劃，後兩點為簡報製作。核心思想是「簡報本身不是重點，重點是為簡報做了什麼事情」。
+
+第二頁重點：高階主管報告技巧。
+包含：結論先行給出決策選項、清楚標示預算與風險、提供數據佐證與同業對標、明確下一步行動方案與責任歸屬。核心思想是「站在決策者的高度說話，不講細節講效益」。`;
+
+    async function startGeneration() {
+      const content = document.getElementById('inputContent').value.trim();
+      const targetAudience = document.getElementById('targetAudience').value;
+      const numPages = parseInt(document.getElementById('numPages').value);
+
+      if (!content) {
+        alert("請輸入內容！");
+        return;
+      }
+
+      const btn = document.getElementById('btnGenerate');
+      const spinner = document.getElementById('loadingSpinner');
+      btn.disabled = true;
+      spinner.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content, target_audience: targetAudience, num_pages: numPages })
+        });
+        
+        if (!res.ok) throw new Error(await res.text());
+        
+        currentPresentationData = await res.json();
+        renderReviewSection();
+      } catch (err) {
+        alert("生成失敗: " + err.message);
+      } finally {
+        btn.disabled = false;
+        spinner.classList.add('hidden');
+      }
+    }
+
+    function renderReviewSection() {
+      document.getElementById('sectionReview').classList.remove('hidden');
+      document.getElementById('sectionPlayer').classList.add('hidden');
+      
+      // 更新 Stepper 標籤顏色
+      document.getElementById('stepTag2').className = "flex items-center gap-2 text-emerald-400 font-bold";
+
+      const container = document.getElementById('reviewContainer');
+      container.innerHTML = '';
+
+      currentPresentationData.slides.forEach((slide, idx) => {
+        const card = document.createElement('div');
+        card.className = "p-4 bg-slate-900 border border-slate-700 rounded-xl space-y-3";
+        card.innerHTML = `
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span class="text-xs font-bold text-blue-400">第 ${idx + 1} 頁結構</span>
+            <input type="text" value="${slide.icon_emoji || '💡'}" class="w-10 bg-slate-800 border border-slate-700 text-center rounded text-sm" onchange="currentPresentationData.slides[${idx}].icon_emoji = this.value">
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label class="text-[11px] text-slate-400">主標題</label>
+              <input type="text" value="${slide.main_title}" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white" onchange="currentPresentationData.slides[${idx}].main_title = this.value">
+            </div>
+            <div>
+              <label class="text-[11px] text-slate-400">副標題</label>
+              <input type="text" value="${slide.sub_title}" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-white" onchange="currentPresentationData.slides[${idx}].sub_title = this.value">
+            </div>
+          </div>
+          <div>
+            <label class="text-[11px] text-amber-400">核心金句</label>
+            <input type="text" value="${slide.quote_highlight}" class="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm text-amber-200" onchange="currentPresentationData.slides[${idx}].quote_highlight = this.value">
+          </div>
+        `;
+        container.appendChild(card);
+      });
+
+      // 自動平滑捲動到步驟 2
+      document.getElementById('sectionReview').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function confirmAndPlay() {
+      document.getElementById('sectionPlayer').classList.remove('hidden');
+      document.getElementById('sectionReview').classList.add('hidden');
+      document.getElementById('stepTag3').className = "flex items-center gap-2 text-indigo-400 font-bold";
+
+      document.getElementById('presentationTitleDisplay').innerText = currentPresentationData.presentation_title;
+      currentSlideIdx = 0;
+      renderSlide(0);
+      document.getElementById('sectionPlayer').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function backToReview() {
+      document.getElementById('sectionReview').classList.remove('hidden');
+      document.getElementById('sectionPlayer').classList.add('hidden');
+    }
+
+    function renderSlide(index) {
+      const slide = currentPresentationData.slides[index];
+      const canvas = document.getElementById('slideCanvas');
+      
+      const stepsHtml = slide.steps.map(step => {
+        let content = step.text;
+        if (step.highlight_keyword && content.includes(step.highlight_keyword)) {
+          content = content.replace(
+            step.highlight_keyword, 
+            `<span class="highlight">${step.highlight_keyword}</span>`
+          );
+        }
+        return `<div class="step-card">${content}</div>`;
+      }).join('');
+
+      const groupsHtml = slide.groups.map(g => {
+        const formattedLabel = g.label.split('').join('<br>');
+        return `<div class="text-[16px] font-black text-slate-900 leading-tight">${formattedLabel}</div>`;
+      }).join('');
+
+      canvas.innerHTML = `
+        <div class="w-[260px] h-full bg-[#1e293b] text-white p-6 flex flex-col justify-between shrink-0">
+          <div>
+            <div class="text-[28px] font-extrabold leading-tight tracking-wide">${slide.main_title}</div>
+            <div class="text-[17px] text-slate-400 mt-1">${slide.sub_title}</div>
+          </div>
+          <div class="flex justify-center my-3">
+            <div class="w-[96px] h-[96px] rounded-full bg-slate-200 flex items-center justify-center text-[42px]">${slide.icon_emoji || '💡'}</div>
+          </div>
+          <div>
+            <div class="text-amber-400 text-[14px] font-bold leading-snug mb-1">${slide.quote_highlight}</div>
+            <div class="text-slate-300 text-[12px] leading-snug">${slide.quote_desc}</div>
+          </div>
+        </div>
+
+        <div class="flex-1 p-6 flex gap-4 bg-[#f8fafc]">
+          <div class="flex-1 flex flex-col justify-between">${stepsHtml}</div>
+          <div class="w-[80px] flex flex-col justify-around border-l-2 border-blue-500 pl-3">${groupsHtml}</div>
+        </div>
+      `;
+
+      document.getElementById('pageIndicator').innerText = `${index + 1} / ${currentPresentationData.slides.length}`;
+      document.getElementById('prevBtn').disabled = (index === 0);
+      document.getElementById('nextBtn').disabled = (index === currentPresentationData.slides.length - 1);
+    }
+
+    function prevSlide() {
+      if (currentSlideIdx > 0) {
+        currentSlideIdx--;
+        renderSlide(currentSlideIdx);
+      }
+    }
+
+    function nextSlide() {
+      if (currentSlideIdx < currentPresentationData.slides.length - 1) {
+        currentSlideIdx++;
+        renderSlide(currentSlideIdx);
+      }
+    }
+
+    // 鍵盤左右鍵切換投影片
+    document.addEventListener('keydown', (e) => {
+      if (document.getElementById('sectionPlayer').classList.contains('hidden')) return;
+      if (e.key === 'ArrowLeft') prevSlide();
+      if (e.key === 'ArrowRight') nextSlide();
+    });
+  </script>
+</body>
+</html>
