@@ -455,19 +455,21 @@
         }
 
         /* ---------- 其他 ---------- */
-        .theme-spin {
-            animation: spin .5s ease;
+        .theme-pop {
+            animation: themePop .4s ease;
         }
 
-        @keyframes spin {
-            from {
-                transform: rotate(-90deg) scale(.6);
-                opacity: 0;
+        @keyframes themePop {
+            0% {
+                transform: scale(.92);
             }
 
-            to {
-                transform: none;
-                opacity: 1;
+            60% {
+                transform: scale(1.04);
+            }
+
+            100% {
+                transform: scale(1);
             }
         }
 
@@ -900,9 +902,9 @@
                 localStorage.setItem('theme', 'dark');
             }
             const btn = document.getElementById('themeBtn');
-            btn.classList.remove('theme-spin');
+            btn.classList.remove('theme-pop');
             void btn.offsetWidth;
-            btn.classList.add('theme-spin');
+            btn.classList.add('theme-pop');
         }
         initTheme();
 
