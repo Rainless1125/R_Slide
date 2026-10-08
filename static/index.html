@@ -1,250 +1,215 @@
 <!DOCTYPE html>
 <html lang="zh-TW" class="light">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Slide Agent - Minimalist</title>
-
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class', // 啟用 class-based 深色模式
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['"PingFang TC"', '"Microsoft JhengHei"', '"Noto Sans TC"', 'sans-serif'],
-                    }
-                }
-            }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>R Slide - 現代簡約版</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"PingFang TC"', '"Microsoft JhengHei"', '"Noto Sans TC"', 'sans-serif'],
+          }
         }
-    </script>
-    <style>
-        /* 隱藏原生捲軸，讓縮圖區更乾淨 */
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-    </style>
+      }
+    }
+  </script>
+  <style>
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
 </head>
+<body class="bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors duration-300 min-h-screen flex flex-col">
 
-<body
-    class="bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors duration-300 min-h-screen flex flex-col">
+  <!-- 頂部導航 -->
+  <header class="border-b border-zinc-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-md sticky top-0 z-50 transition-colors duration-300">
+    <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-black dark:bg-white text-white dark:text-black rounded-md flex items-center justify-center font-black text-lg">R</div>
+        <span class="font-bold text-lg tracking-tight">R Slide</span>
+      </div>
+      
+      <button onclick="toggleTheme()" class="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors focus:outline-none" aria-label="Toggle Dark Mode">
+        <svg id="icon-moon" class="w-5 h-5 hidden dark:block text-zinc-400 hover:text-white" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path>
+        </svg>
+        <svg id="icon-sun" class="w-5 h-5 block dark:hidden text-zinc-500 hover:text-black" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"></path>
+        </svg>
+      </button>
+    </div>
+  </header>
 
-    <!-- 頂部導航 -->
-    <header
-        class="border-b border-zinc-200 dark:border-zinc-800 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-md sticky top-0 z-50 transition-colors duration-300">
-        <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div
-                    class="w-8 h-8 bg-black dark:bg-white text-white dark:text-black rounded-md flex items-center justify-center font-black text-lg">
-                    A</div>
-                <span class="font-bold text-lg tracking-tight">AI Slide Agent</span>
-            </div>
+  <main class="max-w-5xl mx-auto px-6 py-10 flex-1 w-full">
+    <!-- 步驟條 -->
+    <div class="flex items-center justify-center mb-10 text-xs font-semibold tracking-wide">
+      <div id="stepTag1" class="text-black dark:text-white">01 / 輸入</div>
+      <div class="w-8 h-[1px] bg-zinc-300 dark:bg-zinc-700 mx-4"></div>
+      <div id="stepTag2" class="text-zinc-400 dark:text-zinc-600">02 / 審查</div>
+      <div class="w-8 h-[1px] bg-zinc-300 dark:bg-zinc-700 mx-4"></div>
+      <div id="stepTag3" class="text-zinc-400 dark:text-zinc-600">03 / 簡報</div>
+    </div>
 
-            <!-- 深淺色切換按鈕 -->
-            <button onclick="toggleTheme()"
-                class="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors focus:outline-none"
-                aria-label="Toggle Dark Mode">
-                <!-- 月亮圖示 (Light Mode 顯示) -->
-                <svg id="icon-moon" class="w-5 h-5 hidden dark:block text-zinc-400 hover:text-white" fill="currentColor"
-                    viewBox="0 0 20 20">
-                    <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path>
-                </svg>
-                <!-- 太陽圖示 (Dark Mode 顯示) -->
-                <svg id="icon-sun" class="w-5 h-5 block dark:hidden text-zinc-500 hover:text-black" fill="currentColor"
-                    viewBox="0 0 20 20">
-                    <path fill-rule="evenodd"
-                        d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z"
-                        clip-rule="evenodd"></path>
-                </svg>
-            </button>
+    <!-- 步驟 1: 輸入區 -->
+    <section id="sectionInput" class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 shadow-sm transition-colors">
+      <h2 class="text-xl font-bold mb-1">構思您的 R Slide</h2>
+      <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-6">輸入文字素材並選擇視覺風格，AI 會動態設計最適切的 Tailwind 排版。</p>
+
+      <div class="space-y-5">
+        <textarea id="inputContent" rows="6" class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow resize-none" placeholder="輸入素材內容..."></textarea>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div>
+            <label class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider">目標受眾</label>
+            <input type="text" id="targetAudience" value="高階主管 / 產線技術長" class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider">頁數設定</label>
+            <select id="numPages" class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow appearance-none">
+              <option value="2">2 頁精簡版</option>
+              <option value="3" selected>3 頁完整版</option>
+              <option value="4">4 頁深度版</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider">簡報風格 (AI 動態配色)</label>
+            <select id="stylePreference" class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow appearance-none">
+              <option value="蘋果極簡白 (白底、高對比黑字、大量留白)">蘋果極簡白</option>
+              <option value="暗黑科技風 (深黑底色、螢光藍/綠點綴、科技感)">暗黑科技風</option>
+              <option value="專業商務藍 (淺灰/白底、深海藍色標題與強調色)">專業商務藍</option>
+              <option value="活潑明亮撞色 (米白底、黃/粉/橘等明亮色塊)">活潑明亮撞色</option>
+              <option value="溫暖大地色 (米色底、棕/墨綠色系)">溫暖大地色</option>
+            </select>
+          </div>
         </div>
-    </header>
 
-    <main class="max-w-5xl mx-auto px-6 py-10 flex-1 w-full">
-
-        <!-- 極簡步驟條 -->
-        <div class="flex items-center justify-center mb-10 text-xs font-semibold tracking-wide">
-            <div id="stepTag1" class="text-black dark:text-white">01 / 輸入</div>
-            <div class="w-8 h-[1px] bg-zinc-300 dark:bg-zinc-700 mx-4"></div>
-            <div id="stepTag2" class="text-zinc-400 dark:text-zinc-600">02 / 審查</div>
-            <div class="w-8 h-[1px] bg-zinc-300 dark:bg-zinc-700 mx-4"></div>
-            <div id="stepTag3" class="text-zinc-400 dark:text-zinc-600">03 / 簡報</div>
+        <div class="flex justify-end pt-4">
+          <button id="btnGenerate" onclick="startGeneration()" class="bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black font-semibold px-6 py-2.5 rounded-lg flex items-center gap-2 transition-all">
+            <span>生成排版</span>
+            <span id="loadingSpinner" class="hidden animate-spin">◒</span>
+          </button>
         </div>
+      </div>
+    </section>
 
-        <!-- 步驟 1: 輸入區 -->
-        <section id="sectionInput"
-            class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 shadow-sm transition-colors">
-            <h2 class="text-xl font-bold mb-1">構思您的簡報</h2>
-            <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-6">貼上您的文字素材，AI 將為您設計自適應的現代排版。</p>
+    <!-- 步驟 2: AI 版面構思審查 -->
+    <section id="sectionReview" class="hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 shadow-sm transition-colors mt-6">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h2 class="text-xl font-bold mb-1">版面審查</h2>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400">確認 R Slide 分配的結構與版型，隨後進入播放模式。</p>
+        </div>
+        <button onclick="confirmAndPlay()" class="bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black text-sm font-semibold px-5 py-2 rounded-lg transition-all">
+          進入播放器
+        </button>
+      </div>
+      <div id="reviewContainer" class="space-y-4"></div>
+    </section>
 
-            <div class="space-y-5">
-                <textarea id="inputContent" rows="6"
-                    class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow resize-none"
-                    placeholder="輸入素材內容..."></textarea>
+    <!-- 步驟 3: 動態播放器畫布 & 縮圖導航 -->
+    <section id="sectionPlayer" class="hidden mt-2 flex flex-col items-center w-full">
+      <div class="w-full flex items-center justify-between mb-4 px-2">
+        <div>
+          <h2 id="presentationTitleDisplay" class="text-lg font-bold"></h2>
+          <div id="currentLayoutBadge" class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5"></div>
+        </div>
+        <button onclick="backToReview()" class="text-xs text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-white transition-colors">
+          ← 返回審查
+        </button>
+      </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div>
-                        <label
-                            class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider">目標受眾</label>
-                        <input type="text" id="targetAudience" value="高階主管 / 產線技術長"
-                            class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow">
-                    </div>
-                    <div>
-                        <label
-                            class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider">頁數設定</label>
-                        <select id="numPages"
-                            class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow appearance-none">
-                            <option value="2">2 頁精簡版</option>
-                            <option value="3" selected>3 頁完整版</option>
-                            <option value="4">4 頁深度版</option>
-                        </select>
-                    </div>
-                </div>
+      <!-- 16:9 投影片主畫布 -->
+      <div id="slideCanvas" class="w-full aspect-video max-w-[1024px] rounded-xl overflow-hidden shadow-md border border-zinc-200 dark:border-zinc-800 bg-white relative transition-all duration-500">
+      </div>
 
-                <div class="flex justify-end pt-4">
-                    <button id="btnGenerate" onclick="startGeneration()"
-                        class="bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black font-semibold px-6 py-2.5 rounded-lg flex items-center gap-2 transition-all">
-                        <span>生成排版</span>
-                        <span id="loadingSpinner" class="hidden animate-spin">◒</span>
-                    </button>
-                </div>
-            </div>
-        </section>
+      <!-- 縮圖導航列 -->
+      <div class="w-full max-w-[1024px] mt-6 relative">
+        <div id="thumbnailContainer" class="flex items-center gap-4 overflow-x-auto no-scrollbar py-2 px-1">
+        </div>
+      </div>
+    </section>
+  </main>
 
-        <!-- 步驟 2: AI 版面構思審查 -->
-        <section id="sectionReview"
-            class="hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 shadow-sm transition-colors mt-6">
-            <div class="flex items-center justify-between mb-6">
-                <div>
-                    <h2 class="text-xl font-bold mb-1">版面審查</h2>
-                    <p class="text-sm text-zinc-500 dark:text-zinc-400">確認 AI 分配的結構與版型，隨後進入播放模式。</p>
-                </div>
-                <button onclick="confirmAndPlay()"
-                    class="bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black text-sm font-semibold px-5 py-2 rounded-lg transition-all">
-                    進入播放器
-                </button>
-            </div>
+  <script>
+    function initTheme() {
+      if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+    function toggleTheme() {
+      const html = document.documentElement;
+      if (html.classList.contains('dark')) {
+        html.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+      } else {
+        html.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+      }
+    }
+    initTheme();
 
-            <div id="reviewContainer" class="space-y-4">
-                <!-- JS 動態插入 -->
-            </div>
-        </section>
+    let currentPresentationData = null;
+    let currentSlideIdx = 0;
 
-        <!-- 步驟 3: 動態播放器畫布 & 縮圖導航 -->
-        <section id="sectionPlayer" class="hidden mt-2 flex flex-col items-center w-full">
-            <div class="w-full flex items-center justify-between mb-4 px-2">
-                <div>
-                    <h2 id="presentationTitleDisplay" class="text-lg font-bold"></h2>
-                    <div id="currentLayoutBadge" class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5"></div>
-                </div>
-                <button onclick="backToReview()"
-                    class="text-xs text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-white transition-colors">
-                    ← 返回審查
-                </button>
-            </div>
+    document.getElementById('inputContent').value = `曝光機生產參數批次修改網頁系統\n\n第一頁：現狀痛點與高額風險。\n曝光機是高科技半導體/面板產線最昂貴的核心設備。過去修改 XML 參數皆為現場手動調整，流程繁雜且容易出錯。一旦參數誤植將導致整批產品直接報廢，帶來百萬級嚴重虧損。\n\n第二頁：跨世代架構解決方案與安全機制。\n分別針對舊機型開發全端網頁批次修改系統。\n核心防護包含三道防線：1. 變更前自動鏡像備份、2. 邊界數值計算防呆、3. 異常發生秒級回滾。\n\n第三頁：專案成果與量化效益。\n1. 換線調整工時縮短 85%。\n2. 人為誤操作報廢率降為 0%。\n3. 達到 100% 變更稽核軌跡追蹤。`;
 
-            <!-- 16:9 投影片主畫布 -->
-            <div id="slideCanvas"
-                class="w-full aspect-video max-w-[1024px] rounded-xl overflow-hidden shadow-md border border-zinc-200 dark:border-zinc-800 bg-white relative transition-all duration-500">
-                <!-- AI 生成的 HTML 將注入此處 -->
-            </div>
+    async function startGeneration() {
+      const content = document.getElementById('inputContent').value.trim();
+      const targetAudience = document.getElementById('targetAudience').value;
+      const numPages = parseInt(document.getElementById('numPages').value);
+      const stylePreference = document.getElementById('stylePreference').value; // 讀取選擇的風格
 
-            <!-- 現代縮圖導航列 (Thumbnail Strip) -->
-            <div class="w-full max-w-[1024px] mt-6 relative">
-                <div id="thumbnailContainer" class="flex items-center gap-4 overflow-x-auto no-scrollbar py-2 px-1">
-                    <!-- JS 動態產生縮圖卡片 -->
-                </div>
-            </div>
-        </section>
+      if (!content) return alert("請輸入內容！");
 
-    </main>
+      const btn = document.getElementById('btnGenerate');
+      const spinner = document.getElementById('loadingSpinner');
+      btn.disabled = true;
+      spinner.classList.remove('hidden');
 
-    <script>
-        // --- 深淺色模式 (Dark Mode) 邏輯 ---
-        function initTheme() {
-            // 讀取 LocalStorage 或系統偏好
-            if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-        }
+      try {
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            content, 
+            target_audience: targetAudience, 
+            num_pages: numPages,
+            style_preference: stylePreference 
+          })
+        });
+        
+        if (!res.ok) throw new Error(await res.text());
+        currentPresentationData = await res.json();
+        renderReviewSection();
+      } catch (err) {
+        alert("生成失敗: " + err.message);
+      } finally {
+        btn.disabled = false;
+        spinner.classList.add('hidden');
+      }
+    }
 
-        function toggleTheme() {
-            const html = document.documentElement;
-            if (html.classList.contains('dark')) {
-                html.classList.remove('dark');
-                localStorage.setItem('theme', 'light');
-            } else {
-                html.classList.add('dark');
-                localStorage.setItem('theme', 'dark');
-            }
-        }
+    function renderReviewSection() {
+      document.getElementById('sectionReview').classList.remove('hidden');
+      document.getElementById('sectionPlayer').classList.add('hidden');
+      
+      document.getElementById('stepTag1').className = "text-zinc-400 dark:text-zinc-600";
+      document.getElementById('stepTag2').className = "text-black dark:text-white";
+      document.getElementById('stepTag3').className = "text-zinc-400 dark:text-zinc-600";
 
-        // 初始化執行一次
-        initTheme();
+      const container = document.getElementById('reviewContainer');
+      container.innerHTML = '';
 
-
-        // --- 簡報生成與控制邏輯 ---
-        let currentPresentationData = null;
-        let currentSlideIdx = 0;
-
-        // 測試範例內容
-        document.getElementById('inputContent').value = `曝光機生產參數批次修改網頁系統\n\n第一頁：現狀痛點與高額風險。\n曝光機是高科技半導體/面板產線最昂貴的核心設備。過去修改 XML 參數皆為現場手動調整，流程繁雜且容易出錯。一旦參數誤植將導致整批產品直接報廢，帶來百萬級嚴重虧損。\n\n第二頁：跨世代架構解決方案與安全機制。\n分別針對舊機型開發全端網頁批次修改系統。\n核心防護包含三道防線：1. 變更前自動鏡像備份、2. 邊界數值計算防呆、3. 異常發生秒級回滾。\n\n第三頁：專案成果與量化效益。\n1. 換線調整工時縮短 85%。\n2. 人為誤操作報廢率降為 0%。\n3. 達到 100% 變更稽核軌跡追蹤。`;
-
-        async function startGeneration() {
-            const content = document.getElementById('inputContent').value.trim();
-            const targetAudience = document.getElementById('targetAudience').value;
-            const numPages = parseInt(document.getElementById('numPages').value);
-
-            if (!content) return alert("請輸入內容！");
-
-            const btn = document.getElementById('btnGenerate');
-            const spinner = document.getElementById('loadingSpinner');
-            btn.disabled = true;
-            spinner.classList.remove('hidden');
-
-            try {
-                const res = await fetch('/api/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content, target_audience: targetAudience, num_pages: numPages })
-                });
-
-                if (!res.ok) throw new Error(await res.text());
-                currentPresentationData = await res.json();
-                renderReviewSection();
-            } catch (err) {
-                alert("生成失敗: " + err.message);
-            } finally {
-                btn.disabled = false;
-                spinner.classList.add('hidden');
-            }
-        }
-
-        function renderReviewSection() {
-            document.getElementById('sectionReview').classList.remove('hidden');
-            document.getElementById('sectionPlayer').classList.add('hidden');
-
-            // 更新步驟條狀態
-            document.getElementById('stepTag1').className = "text-zinc-400 dark:text-zinc-600";
-            document.getElementById('stepTag2').className = "text-black dark:text-white";
-            document.getElementById('stepTag3').className = "text-zinc-400 dark:text-zinc-600";
-
-            const container = document.getElementById('reviewContainer');
-            container.innerHTML = '';
-
-            currentPresentationData.slides.forEach((slide, idx) => {
-                const card = document.createElement('div');
-                card.className = "p-5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors";
-                card.innerHTML = `
+      currentPresentationData.slides.forEach((slide, idx) => {
+        const card = document.createElement('div');
+        card.className = "p-5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors";
+        card.innerHTML = `
           <div>
             <div class="flex items-center gap-3 mb-1">
               <span class="text-xs font-mono bg-zinc-200 dark:bg-zinc-800 px-2 py-1 rounded text-zinc-600 dark:text-zinc-300">0${slide.page_number}</span>
@@ -259,87 +224,80 @@
             預覽此頁 →
           </button>
         `;
-                container.appendChild(card);
-            });
+        container.appendChild(card);
+      });
 
-            document.getElementById('sectionReview').scrollIntoView({ behavior: 'smooth' });
-        }
+      document.getElementById('sectionReview').scrollIntoView({ behavior: 'smooth' });
+    }
 
-        function previewSingleSlide(idx) {
-            currentSlideIdx = idx;
-            confirmAndPlay();
-        }
+    function previewSingleSlide(idx) {
+      currentSlideIdx = idx;
+      confirmAndPlay();
+    }
 
-        function confirmAndPlay() {
-            document.getElementById('sectionPlayer').classList.remove('hidden');
-            document.getElementById('sectionReview').classList.add('hidden');
+    function confirmAndPlay() {
+      document.getElementById('sectionPlayer').classList.remove('hidden');
+      document.getElementById('sectionReview').classList.add('hidden');
+      
+      document.getElementById('stepTag2').className = "text-zinc-400 dark:text-zinc-600";
+      document.getElementById('stepTag3').className = "text-black dark:text-white";
 
-            // 更新步驟條狀態
-            document.getElementById('stepTag2').className = "text-zinc-400 dark:text-zinc-600";
-            document.getElementById('stepTag3').className = "text-black dark:text-white";
+      document.getElementById('presentationTitleDisplay').innerText = currentPresentationData.presentation_title;
+      renderSlide(currentSlideIdx);
+      document.getElementById('sectionPlayer').scrollIntoView({ behavior: 'smooth' });
+    }
 
-            document.getElementById('presentationTitleDisplay').innerText = currentPresentationData.presentation_title;
-            renderSlide(currentSlideIdx);
-            document.getElementById('sectionPlayer').scrollIntoView({ behavior: 'smooth' });
-        }
+    function backToReview() {
+      document.getElementById('sectionReview').classList.remove('hidden');
+      document.getElementById('sectionPlayer').classList.add('hidden');
+      document.getElementById('stepTag2').className = "text-black dark:text-white";
+      document.getElementById('stepTag3').className = "text-zinc-400 dark:text-zinc-600";
+    }
 
-        function backToReview() {
-            document.getElementById('sectionReview').classList.remove('hidden');
-            document.getElementById('sectionPlayer').classList.add('hidden');
-            document.getElementById('stepTag2').className = "text-black dark:text-white";
-            document.getElementById('stepTag3').className = "text-zinc-400 dark:text-zinc-600";
-        }
+    function renderSlide(index) {
+      currentSlideIdx = index;
+      const slide = currentPresentationData.slides[index];
+      const canvas = document.getElementById('slideCanvas');
+      
+      canvas.innerHTML = slide.html_content;
+      document.getElementById('currentLayoutBadge').innerText = slide.layout_concept;
 
-        function renderSlide(index) {
-            currentSlideIdx = index;
-            const slide = currentPresentationData.slides[index];
-            const canvas = document.getElementById('slideCanvas');
+      renderThumbnails();
+    }
 
-            // 注入 HTML
-            canvas.innerHTML = slide.html_content;
-            document.getElementById('currentLayoutBadge').innerText = slide.layout_concept;
+    function renderThumbnails() {
+      const container = document.getElementById('thumbnailContainer');
+      container.innerHTML = '';
 
-            // 渲染下方的縮圖導航
-            renderThumbnails();
-        }
+      currentPresentationData.slides.forEach((slide, idx) => {
+        const isCurrent = (idx === currentSlideIdx);
+        
+        const baseClasses = "flex-shrink-0 w-40 h-24 rounded-lg border p-3 flex flex-col justify-between cursor-pointer transition-all duration-300 select-none text-left";
+        const stateClasses = isCurrent 
+          ? "border-black dark:border-white ring-2 ring-black dark:ring-white bg-white dark:bg-zinc-800 shadow-sm" 
+          : "border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 opacity-60 hover:opacity-100";
 
-        // --- 核心更新：渲染縮圖導航列 ---
-        function renderThumbnails() {
-            const container = document.getElementById('thumbnailContainer');
-            container.innerHTML = '';
+        const thumb = document.createElement('div');
+        thumb.className = `${baseClasses} ${stateClasses}`;
+        thumb.onclick = () => renderSlide(idx);
 
-            currentPresentationData.slides.forEach((slide, idx) => {
-                const isCurrent = (idx === currentSlideIdx);
-
-                // 縮圖卡片的外觀邏輯 (高亮當前頁)
-                const baseClasses = "flex-shrink-0 w-40 h-24 rounded-lg border p-3 flex flex-col justify-between cursor-pointer transition-all duration-300 select-none text-left";
-                const stateClasses = isCurrent
-                    ? "border-black dark:border-white ring-2 ring-black dark:ring-white bg-white dark:bg-zinc-800 shadow-sm" // 啟用狀態
-                    : "border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 opacity-60 hover:opacity-100"; // 未啟用狀態
-
-                const thumb = document.createElement('div');
-                thumb.className = `${baseClasses} ${stateClasses}`;
-                thumb.onclick = () => renderSlide(idx);
-
-                thumb.innerHTML = `
+        thumb.innerHTML = `
           <div class="text-[10px] font-mono ${isCurrent ? 'text-black dark:text-white' : 'text-zinc-500'}">0${idx + 1}</div>
           <div class="text-xs font-bold line-clamp-2 leading-snug ${isCurrent ? 'text-black dark:text-white' : 'text-zinc-600 dark:text-zinc-400'}">${slide.slide_title}</div>
         `;
-                container.appendChild(thumb);
-            });
-        }
+        container.appendChild(thumb);
+      });
+    }
 
-        // 依然保留鍵盤左右鍵切換功能，提供最佳體驗
-        document.addEventListener('keydown', (e) => {
-            if (document.getElementById('sectionPlayer').classList.contains('hidden')) return;
-            if (e.key === 'ArrowLeft' && currentSlideIdx > 0) {
-                renderSlide(currentSlideIdx - 1);
-            }
-            if (e.key === 'ArrowRight' && currentSlideIdx < currentPresentationData.slides.length - 1) {
-                renderSlide(currentSlideIdx + 1);
-            }
-        });
-    </script>
+    document.addEventListener('keydown', (e) => {
+      if (document.getElementById('sectionPlayer').classList.contains('hidden')) return;
+      if (e.key === 'ArrowLeft' && currentSlideIdx > 0) {
+        renderSlide(currentSlideIdx - 1);
+      }
+      if (e.key === 'ArrowRight' && currentSlideIdx < currentPresentationData.slides.length - 1) {
+        renderSlide(currentSlideIdx + 1);
+      }
+    });
+  </script>
 </body>
-
 </html>
