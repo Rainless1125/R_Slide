@@ -510,6 +510,14 @@
             cursor: not-allowed;
         }
 
+        .stage-nav-btn:hover:not(:disabled) {
+            transform: translateY(-50%) scale(1.06);
+        }
+
+        .stage-nav-btn:active:not(:disabled) {
+            transform: translateY(-50%) scale(.94);
+        }
+
         .chip {
             transition: transform .2s, background-color .2s, border-color .2s;
         }
@@ -782,10 +790,10 @@
 
                     <!-- 左右懸浮箭頭 -->
                     <button id="prevOverlay" onclick="prevSlide()" aria-label="上一頁"
-                        class="stage-ui icon-btn absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 text-white backdrop-blur flex items-center justify-center opacity-0 group-hover/stage:opacity-100 transition-opacity"><i
+                        class="stage-ui icon-btn stage-nav-btn absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 text-white backdrop-blur flex items-center justify-center opacity-0 group-hover/stage:opacity-100 transition-opacity"><i
                             class="fa-solid fa-chevron-left"></i></button>
                     <button id="nextOverlay" onclick="nextSlide()" aria-label="下一頁"
-                        class="stage-ui icon-btn absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 text-white backdrop-blur flex items-center justify-center opacity-0 group-hover/stage:opacity-100 transition-opacity"><i
+                        class="stage-ui icon-btn stage-nav-btn absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 hover:bg-black/70 text-white backdrop-blur flex items-center justify-center opacity-0 group-hover/stage:opacity-100 transition-opacity"><i
                             class="fa-solid fa-chevron-right"></i></button>
 
                     <!-- 進度條 -->
