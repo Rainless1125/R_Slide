@@ -8,65 +8,85 @@ from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
 
-# Load API key from .env file
+# ----------------------------------------------------
+# 讀取 .env 環境變數並防呆檢查
+# ----------------------------------------------------
 load_dotenv()
 MY_GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
+if not MY_GEMINI_API_KEY:
+    raise ValueError("找不到 GEMINI_API_KEY，請確認專案根目錄下已建立 .env 檔案並設定 GEMINI_API_KEY！")
+
 client = genai.Client(api_key=MY_GEMINI_API_KEY)
-app = FastAPI(title="AI Slide Generator")
+app = FastAPI(title="AI Adaptive Slide Agent")
 
-# 1. 定義簡報資料結構
-class SlideStep(BaseModel):
-    text: str = Field(description="步驟或內文文字")
-    highlight_keyword: str = Field(description="需要特別加亮標示的關鍵字")
+# ----------------------------------------------------
+# Pydantic 資料模型定義（支援 AI 自適應自由排版）
+# ----------------------------------------------------
+class AdaptiveSlide(BaseModel):
+    page_number: int = Field(description="頁碼 (1, 2, 3...)")
+    layout_concept: str = Field(description="採用的版型概念說明，例如：'三欄數據指標比較'、'左側深色對比卡片'、'時間軸步驟流程'")
+    slide_title: str = Field(description="此頁的核心大綱標題，供審核用")
+    html_content: str = Field(
+        description="""
+        這一頁投影片的完整 HTML 代碼 (純 HTML + Tailwind CSS class)。
+        必須以 <div class="w-full h-full p-8 flex ..."> 作為最外層容器，確保填滿 16:9 畫布。
+        風格需現代、高階商務、對齊工整，可自由運用 Grid、Flex、卡片、漸層、Badge 或 Highlight 標籤。
+        """
+    )
 
-class SlideGroup(BaseModel):
-    label: str = Field(description="分組標籤名稱，例如：'簡報規劃'")
-    step_count: int = Field(description="此分組涵蓋幾個步驟")
-
-class SlideCard(BaseModel):
-    main_title: str = Field(description="左側主標題")
-    sub_title: str = Field(description="左側副標題")
-    icon_emoji: str = Field(description="代表核心概念的 Emoji 圖示，如 '🔄', '💡', '⚙️'")
-    quote_highlight: str = Field(description="左側重點金句")
-    quote_desc: str = Field(description="金句補充說明")
-    steps: list[SlideStep] = Field(description="右側卡片步驟清單，約 4~6 個步驟")
-    groups: list[SlideGroup] = Field(description="右側右端的分組結構")
-
-class WebPresentation(BaseModel):
-    presentation_title: str = Field(description="整份簡報的總標題")
-    slides: list[SlideCard] = Field(description="多頁投影片清單")
+class AdaptivePresentation(BaseModel):
+    presentation_title: str = Field(description="整份簡報的大標題")
+    slides: list[AdaptiveSlide] = Field(description="動態排版的多頁投影片清單")
 
 class GenerateRequest(BaseModel):
     content: str
-    target_audience: str = "一般商務主管"
-    num_pages: int = 2
+    target_audience: str = "商務主管 / 技術決策者"
+    num_pages: int = 3
 
-# 2. API 端點：呼叫 Gemini 生成簡報結構
+# ----------------------------------------------------
+# API 端點
+# ----------------------------------------------------
 @app.post("/api/generate")
 async def generate_slides(req: GenerateRequest):
     if not req.content.strip():
         raise HTTPException(status_code=400, detail="請提供輸入內容")
     
-    prompt = f"""
-    你是一位高階商業顧問與簡報視覺架構師。請根據以下內容，規劃一份 {req.num_pages} 頁精美的資訊圖表型簡報。
+    system_instruction = """
+    你是一位榮獲世界設計大獎的簡報架構與 UI 設計師。
+    你的任務是將使用者提供的原始內容，規劃為多頁「版面各異、針對內容最適化」的現代簡報。
     
-    【目標簡報對象】：{req.target_audience}
-    【輸入內容】：
+    【設計核心準則】：
+    1. 拒絕單一死板模板：
+       - 若內容是數據/成效，請設計為「巨大數字 (Big Numbers) + KPI 資訊卡片」。
+       - 若內容是流程/SOP，請設計為「橫向流程步驟卡 (Step Cards) 或 時間軸 (Timeline)」。
+       - 若內容是優缺點/方案比較，請設計為「左右對稱對比欄位 (Comparison Columns)」。
+       - 若內容是觀念/引言，請設計為「高對比幾何背景 + 重點金句大字排版」。
+    2. 畫布規格約束：
+       - 最外層必須為 <div class="w-full h-full ...">，請使用 padding (如 p-8 或 p-10) 保持邊距。
+       - 內容文字必須自適應，嚴格防止內容超出容器 (避免 vertical overflow)。
+       - 僅輸出 Tailwind CSS class，字型支援現代中文。配色可採用深藍 (slate-900)、純白底、深灰搭配活力點綴色 (如 blue-600, amber-500, emerald-500)。
+    """
+
+    prompt = f"""
+    【簡報目標客群】：{req.target_audience}
+    【預計生成頁數】：{req.num_pages} 頁
+    【原始素材內容】：
     {req.content}
     
-    每一頁請依據「使用者輸入內容」自由拆解產生出漂亮美觀的簡報圖片，請使用font-awesome圖示，並搭配適當的顏色與排版，確保每頁都具有視覺吸引力。
+    請深入理解內容，為每一頁構思最能凸顯該主題的獨特版面與視覺架構。
     """
     
     try:
         config = types.GenerateContentConfig(
             response_mime_type="application/json",
-            response_schema=WebPresentation,
-            temperature=0.2,
+            response_schema=AdaptivePresentation,
+            temperature=0.3,
             thinking_config=types.ThinkingConfig(thinking_budget=0),
+            system_instruction=system_instruction
         )
         response = client.models.generate_content(
-            model="gemini-3.1-flash-lite",
+            model="gemini-3.5-flash",
             contents=prompt,
             config=config,
         )
@@ -75,7 +95,7 @@ async def generate_slides(req: GenerateRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# 3. 掛載前端靜態檔案
+# 掛載前端靜態檔案
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
