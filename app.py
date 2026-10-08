@@ -59,6 +59,7 @@ async def generate_slides(req: GenerateRequest):
        - 最外層必須為 <div class="w-full h-full ...">，使用 padding (如 p-8 或 p-12) 保持邊距。
        - 內容文字必須自適應，嚴格防止超出容器。
        - 僅輸出 Tailwind CSS class。
+       - 禁止使用emoji，請一律使用font-awesome圖示。
        - 【重要】你必須絕對服從使用者指定的「視覺風格」。如果要求明亮風，請多用 bg-white/bg-slate-50；如果要求科技風，才使用深色底 bg-slate-900 搭配螢光點綴色。
     """
 
