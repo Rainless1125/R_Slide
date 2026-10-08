@@ -765,10 +765,20 @@
                         <h2 class="text-xl font-bold mb-1">版面審查</h2>
                         <p class="text-sm text-zinc-500 dark:text-zinc-400">確認 R Slide 分配的結構與版型，隨後進入播放模式。</p>
                     </div>
-                    <button onclick="confirmAndPlay()"
-                        class="ripple-btn bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black text-sm font-semibold px-5 py-2 rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-95 whitespace-nowrap">
-                        <i class="fa-solid fa-play mr-1.5 text-xs"></i>進入播放器
-                    </button>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button data-undo onclick="undo()" title="撤銷 (Ctrl+Z)"
+                            class="icon-btn text-xs px-3 py-2 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent font-semibold flex items-center gap-1.5 whitespace-nowrap">
+                            <i class="fa-solid fa-rotate-left text-[11px]"></i><span>撤銷</span>
+                        </button>
+                        <button data-redo onclick="redo()" title="重做 (Ctrl+Shift+Z)"
+                            class="icon-btn text-xs px-3 py-2 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent font-semibold flex items-center gap-1.5 whitespace-nowrap">
+                            <i class="fa-solid fa-rotate-right text-[11px]"></i><span>重做</span>
+                        </button>
+                        <button onclick="confirmAndPlay()"
+                            class="ripple-btn bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black text-sm font-semibold px-5 py-2 rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-95 whitespace-nowrap">
+                            <i class="fa-solid fa-play mr-1.5 text-xs"></i>進入播放器
+                        </button>
+                    </div>
                 </div>
                 <div id="reviewContainer" class="space-y-4 stagger"></div>
             </section>
@@ -834,6 +844,15 @@
                         aria-label="重產此頁">
                         <i id="regenCurrentIcon" class="fa-solid fa-arrows-rotate text-[11px]"></i><span
                             id="regenCurrentLabel">重產此頁</span>
+                    </button>
+                    <div class="w-px h-5 bg-zinc-200 dark:bg-zinc-700 mx-1"></div>
+                    <button data-undo onclick="undo()" aria-label="撤銷" title="撤銷 (Ctrl+Z)"
+                        class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent text-xs font-semibold flex items-center gap-1.5">
+                        <i class="fa-solid fa-rotate-left text-[11px]"></i><span>撤銷</span>
+                    </button>
+                    <button data-redo onclick="redo()" aria-label="重做" title="重做 (Ctrl+Shift+Z)"
+                        class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent text-xs font-semibold flex items-center gap-1.5">
+                        <i class="fa-solid fa-rotate-right text-[11px]"></i><span>重做</span>
                     </button>
                 </div>
 
@@ -1064,6 +1083,7 @@
             currentHistoryId = id;
             currentPresentationData = h.data;
             currentSlideIdx = 0;
+            resetUndo();
 
             document.getElementById('inputContent').value = h.input?.content || '';
             document.getElementById('targetAudience').value = h.input?.target_audience || '';
@@ -1127,6 +1147,7 @@
             if (document.fullscreenElement) document.exitFullscreen();
             currentPresentationData = null;
             currentSlideIdx = 0;
+            resetUndo();
             document.getElementById('sectionReview').classList.add('hidden');
             document.getElementById('sectionPlayer').classList.add('hidden');
             if (clearFields) clearInput();
@@ -1276,6 +1297,7 @@
                 const data = await res.json();
                 currentPresentationData = data;
                 currentSlideIdx = 0;
+                resetUndo();
                 setLoading(false);
                 addHistory({ content, target_audience: targetAudience, num_pages: numPages, style_preference: stylePreference }, data);
                 renderReviewSection();
@@ -1424,6 +1446,7 @@
             }
 
             regeneratingSlideIdx = idx;
+            updateUndoButtons();
             setReviewRegenerateState(idx, true);
             setCurrentRegenerateState(true);
             const modalConfirmBtn = document.getElementById('regenModalConfirmBtn');
@@ -1467,6 +1490,7 @@
 
                 const newSlide = await res.json();
                 const oldSlide = currentPresentationData.slides[idx];
+                pushUndoSnapshot();
                 currentPresentationData.slides[idx] = {
                     ...oldSlide,
                     ...newSlide,
@@ -1491,11 +1515,79 @@
                 setReviewRegenerateState(idx, false);
                 setCurrentRegenerateState(false);
                 regeneratingSlideIdx = null;
+                updateUndoButtons();
                 modalConfirmBtn.disabled = false;
                 modalCancelBtn.disabled = false;
                 modalConfirmIcon.className = 'fa-solid fa-arrows-rotate text-[11px]';
                 modalConfirmLabel.textContent = '確認重產';
             }
+        }
+
+        /* ===================== 撤銷／重做 ===================== */
+        const UNDO_LIMIT = 50;
+        let undoStack = [];
+        let redoStack = [];
+
+        function cloneSlides() {
+            return JSON.parse(JSON.stringify(currentPresentationData.slides));
+        }
+
+        function resetUndo() {
+            undoStack = [];
+            redoStack = [];
+            updateUndoButtons();
+        }
+
+        // 修改簡報前呼叫，記下修改前的版本
+        function pushUndoSnapshot() {
+            undoStack.push(cloneSlides());
+            if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+            redoStack = [];
+            updateUndoButtons();
+        }
+
+        function canEditSlides() {
+            if (!currentPresentationData) return false;
+            if (regeneratingSlideIdx !== null || isGenerating()) {
+                showToast('請等待目前的生成完成後再撤銷／重做', 'info', 2200);
+                return false;
+            }
+            return true;
+        }
+
+        function applySlides(slides) {
+            currentPresentationData.slides = slides;
+            currentSlideIdx = Math.min(currentSlideIdx, slides.length - 1);
+            syncCurrentPresentationToHistory();
+
+            const inPlayer = !document.getElementById('sectionPlayer').classList.contains('hidden');
+            const inReview = !document.getElementById('sectionReview').classList.contains('hidden');
+            if (inPlayer) {
+                buildThumbnails();
+                renderSlide(currentSlideIdx, 'fade');
+            }
+            if (inReview) renderReviewSection();
+            updateUndoButtons();
+        }
+
+        function undo() {
+            if (!canEditSlides() || !undoStack.length) return;
+            redoStack.push(cloneSlides());
+            applySlides(undoStack.pop());
+            showToast('已撤銷上一步變更', 'info', 1800);
+        }
+
+        function redo() {
+            if (!canEditSlides() || !redoStack.length) return;
+            undoStack.push(cloneSlides());
+            applySlides(redoStack.pop());
+            showToast('已重做', 'info', 1800);
+        }
+
+        function updateUndoButtons() {
+            const busy = regeneratingSlideIdx !== null;
+            document.querySelectorAll('[data-undo]').forEach(b => b.disabled = busy || !undoStack.length);
+            document.querySelectorAll('[data-redo]').forEach(b => b.disabled = busy || !redoStack.length);
         }
 
         /* ===================== 播放器 ===================== */
@@ -1617,8 +1709,14 @@
                 closeRegenerateModal();
                 return;
             }
+            const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+            if ((e.ctrlKey || e.metaKey) && !e.altKey && !typing && currentPresentationData) {
+                const k = e.key.toLowerCase();
+                if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
+                if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo(); return; }
+            }
             if (document.getElementById('sectionPlayer').classList.contains('hidden')) return;
-            if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+            if (typing) return;
             if (e.key === 'ArrowLeft') prevSlide();
             else if (e.key === 'ArrowRight') nextSlide();
             else if (e.key === 'Home') renderSlide(0);
