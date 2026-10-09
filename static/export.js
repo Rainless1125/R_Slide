@@ -146,13 +146,13 @@ const EXPORT_TEMPLATE = `<!DOCTYPE html>
 if (window.tailwind) tailwind.config = { theme: { extend: { fontFamily: { sans: ['"PingFang TC"', '"Microsoft JhengHei"', '"Noto Sans TC"', 'sans-serif'] } } } };
 <\/script>
 <style>
-html,body{margin:0;height:100%}
-body{font-family:"PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif;background:#f4f4f5;color:#18181b;display:flex;flex-direction:column;align-items:center;padding:16px;gap:14px}
+html,body{margin:0}
+body{box-sizing:border-box;min-height:100vh;font-family:"PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif;background:#f4f4f5;color:#18181b;display:flex;flex-direction:column;align-items:center;padding:16px;gap:14px}
 @media (prefers-color-scheme:dark){body{background:#09090b;color:#f4f4f5}.bar{background:#18181b!important;border-color:#27272a!important}.bar button:hover{background:#27272a!important}.thumb{background:#18181b!important;border-color:#27272a!important}.thumb.on{border-color:#f4f4f5!important}}
 .ex-title{font-size:18px;margin:4px 0 0;text-align:center}
-#stage{position:relative;width:100%;max-width:1024px}
+#stage{position:relative;width:100%;max-width:min(1024px,max(480px,calc((100vh - 330px)*16/9)))}
 #canvas{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#fff;color:#18181b;border-radius:12px;border:1px solid #e4e4e7;box-shadow:0 4px 16px rgba(0,0,0,.12)}
-#stage:fullscreen{background:#000;display:flex;align-items:center;justify-content:center}
+#stage:fullscreen{max-width:none;background:#000;display:flex;align-items:center;justify-content:center}
 #stage:fullscreen #canvas{width:min(100vw,calc(100vh*16/9));border-radius:0;border:0;box-shadow:none}
 #stage:fullscreen .ui{display:none}
 .slide-anim{width:100%;height:100%}
@@ -168,19 +168,19 @@ body{font-family:"PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif;ba
 .stagger>*{animation:fadeUp .55s cubic-bezier(.2,.8,.2,1) both}
 .stagger>*:nth-child(1){animation-delay:.04s}.stagger>*:nth-child(2){animation-delay:.10s}.stagger>*:nth-child(3){animation-delay:.16s}.stagger>*:nth-child(4){animation-delay:.22s}.stagger>*:nth-child(5){animation-delay:.28s}.stagger>*:nth-child(n+6){animation-delay:.34s}
 #progress{position:absolute;left:0;bottom:0;height:4px;width:0;background:linear-gradient(90deg,#3b82f6,#a855f7,#ec4899);transition:width .4s}
-.bar{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #e4e4e7;border-radius:999px;padding:6px 12px}
+.bar{flex:none;display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #e4e4e7;border-radius:999px;padding:6px 12px}
 .bar button{border:0;background:transparent;color:inherit;font:inherit;font-size:12px;font-weight:600;height:32px;min-width:32px;padding:0 10px;border-radius:999px;cursor:pointer}
 .bar button:hover:not(:disabled){background:#f4f4f5}
 .bar button:disabled{opacity:.4;cursor:not-allowed}
 #counter{font:12px ui-monospace,monospace;width:60px;text-align:center}
-#thumbs{display:flex;gap:12px;width:100%;max-width:1024px;overflow-x:auto;padding:6px 4px;scrollbar-width:none}
+#thumbs{flex:none;display:flex;gap:12px;width:100%;max-width:1024px;overflow-x:auto;padding:6px 4px;scrollbar-width:none}
 #thumbs::-webkit-scrollbar{display:none}
 .thumb{flex:0 0 160px;height:96px;padding:12px;text-align:left;background:#fafafa;border:1px solid #e4e4e7;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;opacity:.6;transition:all .3s;color:inherit;font:inherit}
 .thumb:hover{opacity:1}
 .thumb.on{opacity:1;border-color:#18181b;box-shadow:0 0 0 2px #18181b;transform:scale(1.05)}
 .thumb i{font:normal 10px ui-monospace,monospace}
 .thumb b{font-size:12px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.hint{font-size:11px;color:#a1a1aa;margin:0}
+.hint{flex:none;font-size:11px;color:#a1a1aa;margin:0}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 </style>
 </head>
