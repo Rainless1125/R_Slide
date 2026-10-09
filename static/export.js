@@ -146,11 +146,10 @@ const EXPORT_TEMPLATE = `<!DOCTYPE html>
 if (window.tailwind) tailwind.config = { theme: { extend: { fontFamily: { sans: ['"PingFang TC"', '"Microsoft JhengHei"', '"Noto Sans TC"', 'sans-serif'] } } } };
 <\/script>
 <style>
-*{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{font-family:"PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif;background:#f4f4f5;color:#18181b;display:flex;flex-direction:column;align-items:center;padding:16px;gap:14px}
 @media (prefers-color-scheme:dark){body{background:#09090b;color:#f4f4f5}.bar{background:#18181b!important;border-color:#27272a!important}.bar button:hover{background:#27272a!important}.thumb{background:#18181b!important;border-color:#27272a!important}.thumb.on{border-color:#f4f4f5!important}}
-h1{font-size:18px;margin:4px 0 0;text-align:center}
+.ex-title{font-size:18px;margin:4px 0 0;text-align:center}
 #stage{position:relative;width:100%;max-width:1024px}
 #canvas{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#fff;color:#18181b;border-radius:12px;border:1px solid #e4e4e7;box-shadow:0 4px 16px rgba(0,0,0,.12)}
 #stage:fullscreen{background:#000;display:flex;align-items:center;justify-content:center}
@@ -186,7 +185,7 @@ h1{font-size:18px;margin:4px 0 0;text-align:center}
 </style>
 </head>
 <body>
-<h1>{{TITLE}}</h1>
+<h1 class="ex-title">{{TITLE}}</h1>
 <div id="stage">
   <div id="canvas"></div>
   <div class="ui" id="progress"></div>
