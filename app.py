@@ -57,7 +57,7 @@ def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
             {"role": "user", "content": prompt},
         ],
         response_format=schema,
-        temperature=temperature,
+        # 部分 OpenAI 模型（如推理類）只接受預設 temperature，故不傳入
     )
     message = completion.choices[0].message
     if message.refusal:
