@@ -65,7 +65,7 @@ uvicorn app:app --host 0.0.0.0 --port 8000
 | 前端資源 | 介面載入 Tailwind CDN 與 Font Awesome CDN,使用者瀏覽器需可連外。 |
 | 匯出 HTML | 目前為 CDN 版;離線版(內嵌 Tailwind / Font Awesome / 字型)尚在規劃中。 |
 
-若需要完全內網 / 離線運作,需自行改接內部 LLM 端點並自架前端靜態資源,見 Roadmap。
+若需要完全內網 / 離線運作,需自行改接內部 LLM 端點並自架前端靜態資源,。
 
 ## 專案結構
 
@@ -75,29 +75,3 @@ static/index.html 前端介面
 static/export.js  匯出與 HTML 清理邏輯
 .env_example      環境變數範本
 ```
-
-## API
-
-| Method | Path | 說明 |
-|--------|------|------|
-| GET | `/api/models` | 取得各平台是否可用及模型清單 |
-| POST | `/api/generate` | 依內容產生整份簡報 |
-| POST | `/api/regenerate-slide` | 重新產生指定的單頁 |
-
-啟動後可於 `/docs` 查看互動式 API 文件。
-
-## Roadmap
-
-- [ ] Dockerfile / docker-compose
-- [ ] 離線版匯出(內嵌 Tailwind、Font Awesome、字型)
-- [ ] 前端資源本地化,支援完全內網環境
-- [ ] 支援自訂 OpenAI 相容端點(Ollama、vLLM 等本地模型)
-- [ ] 內建基本驗證機制
-
-## 貢獻
-
-歡迎 Issue 與 Pull Request。
-
-## 授權
-
-<!-- TODO: 選定授權並新增 LICENSE 檔(例如 MIT / Apache-2.0 / AGPL-3.0) -->
