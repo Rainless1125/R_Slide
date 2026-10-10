@@ -7,15 +7,63 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
+from openai import OpenAI
 
 load_dotenv()
 MY_GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+MY_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-if not MY_GEMINI_API_KEY:
-    raise ValueError("找不到 GEMINI_API_KEY，請確認專案根目錄下已建立 .env 檔案並設定 GEMINI_API_KEY！")
+if not MY_GEMINI_API_KEY and not MY_OPENAI_API_KEY:
+    raise ValueError("找不到 API Key，請在 .env 檔案中至少設定 GEMINI_API_KEY 或 OPENAI_API_KEY！")
 
-client = genai.Client(api_key=MY_GEMINI_API_KEY)
+gemini_client = genai.Client(api_key=MY_GEMINI_API_KEY) if MY_GEMINI_API_KEY else None
+openai_client = OpenAI(api_key=MY_OPENAI_API_KEY) if MY_OPENAI_API_KEY else None
 app = FastAPI(title="R Slide")
+
+# 各平台可選模型（第一個為預設）
+MODEL_CATALOG = {
+    "gemini": ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.5-pro"],
+    "openai": ["gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini", "gpt-4o"],
+}
+
+
+def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
+             schema: type[BaseModel], temperature: float) -> dict:
+    """依平台呼叫 LLM，回傳符合 schema 的 dict。"""
+    provider = (provider or "gemini").lower()
+    if provider not in MODEL_CATALOG:
+        raise HTTPException(status_code=400, detail=f"不支援的平台: {provider}")
+    model = model or MODEL_CATALOG[provider][0]
+
+    if provider == "gemini":
+        if gemini_client is None:
+            raise HTTPException(status_code=400, detail="未設定 GEMINI_API_KEY")
+        config = types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=schema,
+            temperature=temperature,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            system_instruction=system_instruction
+        )
+        response = gemini_client.models.generate_content(model=model, contents=prompt, config=config)
+        return json.loads(response.text)
+
+    if openai_client is None:
+        raise HTTPException(status_code=400, detail="未設定 OPENAI_API_KEY")
+    completion = openai_client.beta.chat.completions.parse(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": prompt},
+        ],
+        response_format=schema,
+        temperature=temperature,
+    )
+    message = completion.choices[0].message
+    if message.refusal:
+        raise HTTPException(status_code=502, detail=f"模型拒絕回應: {message.refusal}")
+    return message.parsed.model_dump()
+
 
 # 1. Pydantic 模型定義
 class AdaptiveSlide(BaseModel):
@@ -39,6 +87,8 @@ class GenerateRequest(BaseModel):
     target_audience: str = "商務主管 / 技術決策者"
     num_pages: int = 3
     style_preference: str = "蘋果極簡白 (Apple Minimalist)"  # 新增：接收前端傳來的風格
+    provider: str = "gemini"
+    model: str = ""
 
 class RegenerateSlideRequest(BaseModel):
     content: str
@@ -49,8 +99,17 @@ class RegenerateSlideRequest(BaseModel):
     slide_index: int
     slides: list[AdaptiveSlide]
     custom_prompt: str = ""
+    provider: str = "gemini"
+    model: str = ""
 
 # 2. API 端點
+@app.get("/api/models")
+async def list_models():
+    return {
+        "gemini": {"available": gemini_client is not None, "models": MODEL_CATALOG["gemini"]},
+        "openai": {"available": openai_client is not None, "models": MODEL_CATALOG["openai"]},
+    }
+
 @app.post("/api/generate")
 async def generate_slides(req: GenerateRequest):
     if not req.content.strip():
@@ -84,20 +143,9 @@ async def generate_slides(req: GenerateRequest):
     """
     
     try:
-        config = types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=AdaptivePresentation,
-            temperature=0.6,  # 微調至 0.6 讓版型與配色發揮更多創意
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
-            system_instruction=system_instruction
-        )
-        response = client.models.generate_content(
-            model="gemini-3.8-flash",
-            contents=prompt,
-            config=config,
-        )
-        data = json.loads(response.text)
-        return data
+        return call_llm(req.provider, req.model, system_instruction, prompt, AdaptivePresentation, 0.6)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -154,21 +202,11 @@ async def regenerate_slide(req: RegenerateSlideRequest):
     """
 
     try:
-        config = types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=AdaptiveSlide,
-            temperature=0.7,
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
-            system_instruction=system_instruction
-        )
-        response = client.models.generate_content(
-            model="gemini-3.5-flash",
-            contents=prompt,
-            config=config,
-        )
-        data = json.loads(response.text)
+        data = call_llm(req.provider, req.model, system_instruction, prompt, AdaptiveSlide, 0.7)
         data["page_number"] = target_slide.page_number
         return data
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

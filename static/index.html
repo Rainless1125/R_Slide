@@ -694,7 +694,18 @@
             <!-- 步驟 1: 輸入區 -->
             <section id="sectionInput"
                 class="reveal bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 shadow-sm hover:shadow-lg transition-all duration-300">
-                <h2 class="text-xl font-bold mb-1">構思您的簡報</h2>
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-1">
+                    <h2 class="text-xl font-bold">構思您的簡報</h2>
+                    <div class="flex items-center gap-2">
+                        <select id="providerSelect" onchange="onProviderChange()" aria-label="AI 平台"
+                            class="bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white">
+                            <option value="gemini">Gemini</option>
+                            <option value="openai">OpenAI</option>
+                        </select>
+                        <select id="modelSelect" onchange="saveModelPref()" aria-label="模型名稱"
+                            class="bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white"></select>
+                    </div>
+                </div>
                 <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-6">輸入文字素材並選擇視覺風格，AI 會動態設計最適切的簡報排版。</p>
 
                 <div class="space-y-5">
@@ -1324,6 +1335,58 @@
             }
         }
 
+        let modelCatalog = {
+            gemini: { models: ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'] },
+            openai: { models: ['gpt-4.1-mini', 'gpt-4.1', 'gpt-4o-mini', 'gpt-4o'] }
+        };
+
+        function populateModels(preferred) {
+            const provider = document.getElementById('providerSelect').value;
+            const sel = document.getElementById('modelSelect');
+            const models = modelCatalog[provider]?.models || [];
+            sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+            if (preferred && models.includes(preferred)) sel.value = preferred;
+        }
+
+        function onProviderChange() { populateModels(); saveModelPref(); }
+
+        function saveModelPref() {
+            try {
+                localStorage.setItem('rslide_llm', JSON.stringify({
+                    provider: document.getElementById('providerSelect').value,
+                    model: document.getElementById('modelSelect').value
+                }));
+            } catch (e) { }
+        }
+
+        function getLlmChoice() {
+            return {
+                provider: document.getElementById('providerSelect').value,
+                model: document.getElementById('modelSelect').value
+            };
+        }
+
+        async function initModelSelectors() {
+            try {
+                const res = await fetch('/api/models');
+                if (res.ok) {
+                    const data = await res.json();
+                    for (const k of Object.keys(data)) modelCatalog[k] = data[k];
+                    const providerSel = document.getElementById('providerSelect');
+                    for (const opt of providerSel.options) {
+                        if (data[opt.value] && !data[opt.value].available) { opt.disabled = true; opt.textContent += '（未設定金鑰）'; }
+                    }
+                }
+            } catch (e) { }
+            let saved = {};
+            try { saved = JSON.parse(localStorage.getItem('rslide_llm') || '{}'); } catch (e) { }
+            const providerSel = document.getElementById('providerSelect');
+            const opt = [...providerSel.options].find(o => o.value === saved.provider && !o.disabled);
+            providerSel.value = opt ? opt.value : ([...providerSel.options].find(o => !o.disabled)?.value || 'gemini');
+            populateModels(saved.model);
+        }
+        initModelSelectors();
+
         async function startGeneration() {
             const ta = document.getElementById('inputContent');
             const content = ta.value.trim();
@@ -1350,7 +1413,8 @@
                         content,
                         target_audience: targetAudience,
                         num_pages: numPages,
-                        style_preference: stylePreference
+                        style_preference: stylePreference,
+                        ...getLlmChoice()
                     })
                 });
 
@@ -1535,7 +1599,8 @@
                         presentation_title: currentPresentationData.presentation_title || '未命名簡報',
                         slide_index: idx,
                         slides: currentPresentationData.slides,
-                        custom_prompt: customPrompt
+                        custom_prompt: customPrompt,
+                        ...getLlmChoice()
                     })
                 });
 
