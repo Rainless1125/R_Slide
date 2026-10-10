@@ -22,8 +22,8 @@ app = FastAPI(title="R Slide")
 
 # 各平台可選模型（第一個為預設）
 MODEL_CATALOG = {
-    "gemini": ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.5-pro"],
-    "openai": ["gpt-4.1-mini", "gpt-4.1", "gpt-4o-mini", "gpt-4o"],
+    "gemini": ["gemini-3.5-flash", "gemini-3.7-flash", "gemini-3.8-flash"],
+    "openai": ["gpt-6-luna"],
 }
 
 
