@@ -65,7 +65,7 @@ uvicorn app:app --host 0.0.0.0 --port 8000
 | 前端資源 | 介面載入 Tailwind CDN 與 Font Awesome CDN,使用者瀏覽器需可連外。 |
 | 匯出 HTML | 目前為 CDN 版;離線版(內嵌 Tailwind / Font Awesome / 字型)尚在規劃中。 |
 
-若需要完全內網 / 離線運作,需自行改接內部 LLM 端點並自架前端靜態資源,。
+若需要完全內網 / 離線運作,需自行改接內部 LLM 端點並自架前端靜態資源。
 
 ## 專案結構
 
