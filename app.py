@@ -1,13 +1,17 @@
 import os
 import json
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
 from openai import OpenAI
+from starlette.datastructures import UploadFile
+
+from extract import MAX_UPLOAD_BYTES, ExtractError, extract_text
 
 load_dotenv()
 MY_GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -155,6 +159,33 @@ def generate_slides(req: GenerateRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/extract")
+async def extract_file(request: Request):
+    """抽取上傳檔案的文字，供前端填入輸入框。檔案不會被保存。"""
+    # 解析 multipart 前先以 Content-Length 擋下過大的請求（預留 64KB 給表單邊界等額外資料）
+    length = request.headers.get("content-length")
+    if not length or not length.isdigit():
+        raise HTTPException(status_code=411, detail="缺少 Content-Length")
+    if int(length) > MAX_UPLOAD_BYTES + 64 * 1024:
+        raise HTTPException(status_code=413, detail=f"檔案過大（上限 {MAX_UPLOAD_BYTES // 1024 // 1024} MB）")
+
+    form = await request.form(max_files=1, max_fields=1)
+    try:
+        upload = form.get("file")
+        if not isinstance(upload, UploadFile):
+            raise HTTPException(status_code=400, detail="請選擇要上傳的檔案")
+        data = await upload.read(MAX_UPLOAD_BYTES + 1)
+        filename = upload.filename or ""
+    finally:
+        await form.close()
+
+    try:
+        return await run_in_threadpool(extract_text, filename, data, MAX_CONTENT_CHARS)
+    except ExtractError as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=400, detail="無法解析此檔案，請確認檔案未損毀")
 
 @app.post("/api/regenerate-slide")
 def regenerate_slide(req: RegenerateSlideRequest):
