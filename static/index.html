@@ -632,49 +632,6 @@
             background: rgba(0, 0, 0, .06);
         }
 
-        /* ---------- 風格卡片 ---------- */
-        .style-card {
-            border: 1px solid rgb(228 228 231);
-            border-radius: .75rem;
-            padding: .5rem;
-            text-align: left;
-            transition: transform .2s, border-color .2s, box-shadow .2s;
-        }
-
-        .dark .style-card {
-            border-color: rgb(39 39 42);
-        }
-
-        .style-card:hover {
-            transform: translateY(-2px);
-        }
-
-        .style-card[aria-checked="true"] {
-            border-color: #000;
-            box-shadow: 0 0 0 2px #000;
-        }
-
-        .dark .style-card[aria-checked="true"] {
-            border-color: #fff;
-            box-shadow: 0 0 0 2px #fff;
-        }
-
-        .style-swatch {
-            height: 2.25rem;
-            border-radius: .5rem;
-            display: flex;
-            align-items: flex-end;
-            gap: 3px;
-            padding: 4px;
-            border: 1px solid rgba(128, 128, 128, .25);
-        }
-
-        .style-swatch i {
-            display: block;
-            height: 6px;
-            border-radius: 3px;
-        }
-
         @media (prefers-reduced-motion: reduce) {
 
             *,
@@ -852,11 +809,16 @@
                                 <option value="6">6 頁 (6 Pages)</option>
                             </select>
                         </div>
-                        <div class="md:col-span-3">
+                        <div>
                             <label
                                 class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider"><i
                                     class="fa-solid fa-palette mr-1"></i>簡報風格 (AI 動態配色)</label>
-                            <div id="styleCards" role="radiogroup" aria-label="簡報風格" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"></div>
+                            <div id="styleDropdown" class="relative">
+                                <button type="button" id="styleBtn" aria-haspopup="listbox" aria-expanded="false"
+                                    class="w-full flex items-center justify-between gap-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-left focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow"></button>
+                                <ul id="styleList" role="listbox" aria-label="簡報風格"
+                                    class="hidden absolute z-30 left-0 right-0 mt-1 max-h-72 overflow-y-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1"></ul>
+                            </div>
                             <select id="stylePreference" class="hidden" tabindex="-1" aria-hidden="true">
                                 <!-- 原有熱門風格 -->
                                 <option value="蘋果極簡白 (純白底 bg-white、高對比黑字 text-zinc-900、微灰色邊框 border-zinc-200、大量留白)">極簡白
@@ -1451,29 +1413,50 @@
             ['#ecfdf5', '#022c22', '#059669', '#6ee7b7'],
             ['#f4f4f5', '#000000', '#dc2626', '#a1a1aa']
         ];
+        // 文字後方顯示示意色塊（底色 + 三個強調色）
+        function swatchHtml(i) {
+            const [bg, a, b, c] = STYLE_SWATCHES[i] || ['#fff', '#000', '#888', '#bbb'];
+            const dot = col => `<span class="inline-block w-3 h-3 rounded-full border border-black/15 dark:border-white/25" style="background:${col}"></span>`;
+            return `<span class="inline-flex items-center gap-1 shrink-0" aria-hidden="true">${dot(bg)}${dot(a)}${dot(b)}${dot(c)}</span>`;
+        }
+        function styleLabel(opt) { return opt.textContent.replace(/\s+/g, ' ').trim(); }
         function initStyleCards() {
             const sel = document.getElementById('stylePreference');
-            const box = document.getElementById('styleCards');
+            const list = document.getElementById('styleList');
+            const btn = document.getElementById('styleBtn');
+            const setOpen = open => {
+                list.classList.toggle('hidden', !open);
+                btn.setAttribute('aria-expanded', String(open));
+                if (open) list.querySelector('[aria-selected=true]')?.scrollIntoView({ block: 'nearest' });
+            };
             [...sel.options].forEach((opt, i) => {
-                const [bg, a, b, c] = STYLE_SWATCHES[i] || ['#fff', '#000', '#888', '#bbb'];
-                const card = document.createElement('button');
-                card.type = 'button';
-                card.setAttribute('role', 'radio');
-                card.dataset.value = opt.value;
-                card.className = 'style-card bg-white dark:bg-zinc-900';
-                card.innerHTML = `
-          <div class="style-swatch" style="background:${bg}">
-            <i style="width:38%;background:${a}"></i><i style="width:22%;background:${b}"></i><i style="width:14%;background:${c}"></i>
-          </div>
-          <div class="text-xs font-semibold mt-2 leading-tight">${esc(opt.textContent.replace(/\s+/g, ' ').trim())}</div>`;
-                card.onclick = () => { sel.value = opt.value; syncStyleCards(); saveDraft(); };
-                box.appendChild(card);
+                const li = document.createElement('li');
+                li.setAttribute('role', 'option');
+                li.dataset.value = opt.value;
+                li.className = 'flex items-center justify-between gap-3 px-4 py-2 text-sm cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 aria-selected:font-bold aria-selected:bg-zinc-100 dark:aria-selected:bg-zinc-800';
+                li.innerHTML = `<span class="truncate">${esc(styleLabel(opt))}</span>${swatchHtml(i)}`;
+                li.onclick = () => { sel.value = opt.value; syncStyleCards(); setOpen(false); saveDraft(); btn.focus(); };
+                list.appendChild(li);
+            });
+            btn.onclick = () => setOpen(list.classList.contains('hidden'));
+            document.addEventListener('click', e => { if (!e.target.closest('#styleDropdown')) setOpen(false); });
+            document.getElementById('styleDropdown').addEventListener('keydown', e => {
+                if (e.key === 'Escape') { setOpen(false); btn.focus(); return; }
+                if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+                e.preventDefault();
+                const n = sel.options.length;
+                sel.selectedIndex = (sel.selectedIndex + (e.key === 'ArrowDown' ? 1 : n - 1)) % n;
+                syncStyleCards(); saveDraft();
+                setOpen(true);
             });
             syncStyleCards();
         }
         function syncStyleCards() {
-            const v = document.getElementById('stylePreference').value;
-            document.querySelectorAll('#styleCards .style-card').forEach(c => c.setAttribute('aria-checked', String(c.dataset.value === v)));
+            const sel = document.getElementById('stylePreference');
+            const i = sel.selectedIndex;
+            document.getElementById('styleBtn').innerHTML =
+                `<span class="truncate">${esc(styleLabel(sel.options[i]))}</span><span class="flex items-center gap-2 shrink-0">${swatchHtml(i)}<i class="fa-solid fa-chevron-down text-[10px] text-zinc-400"></i></span>`;
+            document.querySelectorAll('#styleList [role=option]').forEach(li => li.setAttribute('aria-selected', String(li.dataset.value === sel.value)));
         }
 
         const DRAFT_KEY = 'rslide_draft';
@@ -1958,6 +1941,7 @@
             scaler.style.transform = `scale(${canvas.clientWidth / 1024})`;
         }
         new ResizeObserver(fitSlide).observe(document.getElementById('slideCanvas'));
+        window.addEventListener('resize', () => fitPlayerThumbs());
 
         function renderSlide(index, mode) {
             const total = currentPresentationData.slides.length;
@@ -1990,16 +1974,29 @@
             container.innerHTML = '';
             currentPresentationData.slides.forEach((slide, idx) => {
                 const thumb = document.createElement('div');
-                thumb.className = 'thumb spot flex-shrink-0 w-40 h-24 rounded-lg border p-3 flex flex-col justify-between cursor-pointer transition-all duration-300 select-none text-left';
+                thumb.className = THUMB_BASE;
                 thumb.dataset.idx = idx;
+                thumb.title = slide.slide_title;
+                thumb.setAttribute('role', 'button');
+                thumb.tabIndex = 0;
+                thumb.setAttribute('aria-label', `第 ${idx + 1} 頁：${slide.slide_title}`);
                 thumb.onclick = () => renderSlide(idx);
+                thumb.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); renderSlide(idx); } };
                 thumb.innerHTML = `
-          <div class="relative text-[10px] font-mono">0${idx + 1}</div>
-          <div class="relative text-xs font-bold line-clamp-2 leading-snug">${esc(slide.slide_title)}</div>
+          <span class="absolute left-1.5 top-1.5 z-10 text-[10px] font-mono px-1.5 py-px rounded bg-black/65 text-white">${pad(idx + 1)}</span>
+          <div class="rv-thumb !border-0 !rounded-none !cursor-pointer"><div class="slide-scaler">${slide.html_content}</div></div>
         `;
                 container.appendChild(thumb);
             });
+            fitPlayerThumbs();
             animateIn(container, 'reveal');
+        }
+        const THUMB_BASE = 'thumb relative flex-shrink-0 w-44 rounded-lg border overflow-hidden cursor-pointer transition-all duration-300 select-none ';
+        function fitPlayerThumbs() {
+            document.querySelectorAll('#thumbnailContainer .rv-thumb').forEach(box => {
+                const sc = box.querySelector('.slide-scaler');
+                if (sc && box.clientWidth) sc.style.transform = `scale(${box.clientWidth / 1024})`;
+            });
         }
 
         function updateThumbnails() {
@@ -2007,12 +2004,9 @@
             container.querySelectorAll('.thumb').forEach(thumb => {
                 const idx = Number(thumb.dataset.idx);
                 const isCurrent = idx === currentSlideIdx;
-                const base = 'thumb spot flex-shrink-0 w-40 h-24 rounded-lg border p-3 flex flex-col justify-between cursor-pointer transition-all duration-300 select-none text-left ';
-                thumb.className = base + (isCurrent
-                    ? 'border-black dark:border-white ring-2 ring-black dark:ring-white bg-white dark:bg-zinc-800 shadow-md scale-105'
-                    : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 opacity-60 hover:opacity-100');
-                thumb.children[0].className = 'relative text-[10px] font-mono ' + (isCurrent ? 'text-black dark:text-white' : 'text-zinc-500');
-                thumb.children[1].className = 'relative text-xs font-bold line-clamp-2 leading-snug ' + (isCurrent ? 'text-black dark:text-white' : 'text-zinc-600 dark:text-zinc-400');
+                thumb.className = THUMB_BASE + (isCurrent
+                    ? 'border-black dark:border-white ring-2 ring-black dark:ring-white shadow-md scale-105'
+                    : 'border-zinc-200 dark:border-zinc-800 opacity-60 hover:opacity-100');
                 if (isCurrent) thumb.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
             });
         }
