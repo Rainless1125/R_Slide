@@ -869,14 +869,14 @@
                         R</div>
                     <div class="flex flex-col leading-tight">
                         <span class="font-bold text-lg tracking-tight">R Slide</span>
-                        <span class="text-xs text-zinc-500 dark:text-zinc-400 font-medium">Rapid & Responsive AI
+                        <span class="hidden sm:block text-xs text-zinc-500 dark:text-zinc-400 font-medium">Rapid & Responsive AI
                             Presentation Engine</span>
                     </div>
                 </div>
             </div>
 
             <button id="themeBtn" onclick="toggleTheme()"
-                class="icon-btn h-9 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-2 text-sm font-semibold text-zinc-600 dark:text-zinc-300 focus:outline-none"
+                class="icon-btn h-9 px-3 shrink-0 whitespace-nowrap rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-2 text-sm font-semibold text-zinc-600 dark:text-zinc-300 focus:outline-none"
                 aria-label="切換深色／淺色模式" title="切換深色／淺色模式">
                 <i class="fa-solid fa-moon hidden dark:inline text-zinc-400 hover:text-white"></i>
                 <i class="fa-solid fa-sun inline dark:hidden text-zinc-500 hover:text-amber-500"></i>
@@ -1064,7 +1064,7 @@
 
             <!-- 載入骨架屏 -->
             <section id="sectionSkeleton" aria-hidden="true"
-                class="hidden mt-6 bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 shadow-sm">
+                class="hidden mt-6 bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 sm:p-8 shadow-sm">
                 <div class="flex items-center justify-between mb-6 gap-4">
                     <div>
                         <div class="skeleton h-6 w-28 mb-2"></div>
@@ -1081,13 +1081,13 @@
 
             <!-- 步驟 2: AI 版面構思審查 -->
             <section id="sectionReview"
-                class="hidden bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 shadow-sm transition-colors mt-6">
-                <div class="flex items-center justify-between mb-6 gap-4">
-                    <div>
+                class="hidden bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 sm:p-8 shadow-sm transition-colors mt-6">
+                <div class="flex flex-wrap items-center justify-between mb-6 gap-4">
+                    <div class="min-w-0 basis-56 flex-1">
                         <h2 class="text-xl font-bold mb-1">版面審查</h2>
                         <p class="text-sm text-zinc-500 dark:text-zinc-400">確認 R Slide 分配的結構與版型，隨後進入播放模式。</p>
                     </div>
-                    <div class="flex items-center gap-2 shrink-0">
+                    <div class="flex flex-wrap items-center gap-2">
                         <button data-undo onclick="undo()" title="撤銷 (Ctrl+Z)"
                             class="icon-btn text-xs px-3 py-2 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent font-semibold flex items-center gap-1.5 whitespace-nowrap">
                             <i class="fa-solid fa-rotate-left text-[11px]"></i><span>撤銷</span>
@@ -1142,7 +1142,7 @@
 
                 <!-- 控制列 -->
                 <div
-                    class="mt-4 flex items-center gap-2 bg-white/80 dark:bg-zinc-900/80 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-full px-3 py-1.5 shadow-sm">
+                    class="mt-4 max-w-full flex flex-wrap items-center justify-center gap-x-1 gap-y-1 sm:gap-2 bg-white/80 dark:bg-zinc-900/80 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-3xl sm:rounded-full px-3 py-1.5 shadow-sm">
                     <button id="prevBtn" onclick="prevSlide()"
                         class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center"
                         aria-label="上一頁"><i class="fa-solid fa-chevron-left text-xs"></i></button>
@@ -1154,37 +1154,37 @@
                     <button id="autoBtn" onclick="toggleAutoplay()"
                         class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
                         aria-label="自動播放">
-                        <i id="autoIcon" class="fa-solid fa-play text-[10px]"></i><span id="autoLabel">自動播放</span>
+                        <i id="autoIcon" class="fa-solid fa-play text-[10px]"></i><span class="hidden sm:inline" id="autoLabel">自動播放</span>
                     </button>
                     <button onclick="toggleFullscreen()"
                         class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
                         aria-label="全螢幕">
-                        <i id="fsIcon" class="fa-solid fa-expand text-[11px]"></i><span id="fsLabel">全螢幕</span>
+                        <i id="fsIcon" class="fa-solid fa-expand text-[11px]"></i><span class="hidden sm:inline" id="fsLabel">全螢幕</span>
                     </button>
                     <button id="editBtn" onclick="toggleEditMode()" aria-pressed="false"
                         class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
                         aria-label="編輯文字" title="直接點投影片上的文字修改（不呼叫 AI）">
-                        <i id="editIcon" class="fa-solid fa-pen-to-square text-[11px]"></i><span id="editLabel">編輯文字</span>
+                        <i id="editIcon" class="fa-solid fa-pen-to-square text-[11px]"></i><span class="hidden sm:inline" id="editLabel">編輯文字</span>
                     </button>
                     <button id="regenCurrentBtn" onclick="regenerateCurrentSlide()"
                         class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
                         aria-label="重產此頁">
-                        <i id="regenCurrentIcon" class="fa-solid fa-arrows-rotate text-[11px]"></i><span
+                        <i id="regenCurrentIcon" class="fa-solid fa-arrows-rotate text-[11px]"></i><span class="hidden sm:inline"
                             id="regenCurrentLabel">重產此頁</span>
                     </button>
                     <button onclick="exportPresentationHtml()"
                         class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
                         aria-label="匯出 HTML" title="匯出為單一 HTML 檔">
-                        <i class="fa-solid fa-file-export text-[11px]"></i><span>匯出 HTML</span>
+                        <i class="fa-solid fa-file-export text-[11px]"></i><span class="hidden sm:inline">匯出 HTML</span>
                     </button>
                     <div class="w-px h-5 bg-zinc-200 dark:bg-zinc-700 mx-1"></div>
                     <button data-undo onclick="undo()" aria-label="撤銷" title="撤銷 (Ctrl+Z)"
                         class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent text-xs font-semibold flex items-center gap-1.5">
-                        <i class="fa-solid fa-rotate-left text-[11px]"></i><span>撤銷</span>
+                        <i class="fa-solid fa-rotate-left text-[11px]"></i><span class="hidden sm:inline">撤銷</span>
                     </button>
                     <button data-redo onclick="redo()" aria-label="重做" title="重做 (Ctrl+Shift+Z)"
                         class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent text-xs font-semibold flex items-center gap-1.5">
-                        <i class="fa-solid fa-rotate-right text-[11px]"></i><span>重做</span>
+                        <i class="fa-solid fa-rotate-right text-[11px]"></i><span class="hidden sm:inline">重做</span>
                     </button>
                 </div>
 
