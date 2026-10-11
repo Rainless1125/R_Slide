@@ -82,10 +82,14 @@ class AdaptivePresentation(BaseModel):
     presentation_title: str = Field(description="整份簡報的大標題")
     slides: list[AdaptiveSlide] = Field(description="動態排版的多頁投影片清單")
 
+MAX_CONTENT_CHARS = 50_000
+MAX_PAGES = 20
+
+
 class GenerateRequest(BaseModel):
     content: str
     target_audience: str = "商務主管 / 技術決策者"
-    num_pages: int = 3
+    num_pages: int = Field(3, ge=0, le=MAX_PAGES)  # 0 = 由 AI 決定
     style_preference: str = "蘋果極簡白 (Apple Minimalist)"  # 新增：接收前端傳來的風格
     provider: str = "gemini"
     model: str = ""
@@ -93,7 +97,7 @@ class GenerateRequest(BaseModel):
 class RegenerateSlideRequest(BaseModel):
     content: str
     target_audience: str = "商務主管 / 技術決策者"
-    num_pages: int = 3
+    num_pages: int = Field(3, ge=0, le=MAX_PAGES)
     style_preference: str = "蘋果極簡白 (Apple Minimalist)"
     presentation_title: str = "未命名簡報"
     slide_index: int
@@ -111,9 +115,11 @@ async def list_models():
     }
 
 @app.post("/api/generate")
-async def generate_slides(req: GenerateRequest):
+def generate_slides(req: GenerateRequest):
     if not req.content.strip():
         raise HTTPException(status_code=400, detail="請提供輸入內容")
+    if len(req.content) > MAX_CONTENT_CHARS:
+        raise HTTPException(status_code=400, detail=f"內容過長（上限 {MAX_CONTENT_CHARS} 字）")
     
     system_instruction = """
     你是一位榮獲世界設計大獎的簡報架構與 UI 設計師。
@@ -151,9 +157,11 @@ async def generate_slides(req: GenerateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/regenerate-slide")
-async def regenerate_slide(req: RegenerateSlideRequest):
+def regenerate_slide(req: RegenerateSlideRequest):
     if not req.content.strip():
         raise HTTPException(status_code=400, detail="請提供輸入內容")
+    if len(req.content) > MAX_CONTENT_CHARS:
+        raise HTTPException(status_code=400, detail=f"內容過長（上限 {MAX_CONTENT_CHARS} 字）")
     if not req.slides:
         raise HTTPException(status_code=400, detail="缺少原始投影片資料")
     if req.slide_index < 0 or req.slide_index >= len(req.slides):
@@ -212,6 +220,10 @@ async def regenerate_slide(req: RegenerateSlideRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    return FileResponse("static/favicon.svg", media_type="image/svg+xml")
 
 @app.get("/")
 async def root():
