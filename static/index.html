@@ -916,15 +916,20 @@
             </section>
 
             <!-- 載入骨架屏 -->
-            <section id="sectionSkeleton"
-                class="hidden mt-6 bg-white/90 dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8">
-                <div class="skeleton h-6 w-40 mb-2"></div>
-                <div class="skeleton h-3 w-64 mb-6"></div>
-                <div class="space-y-4">
-                    <div class="skeleton h-20 w-full"></div>
-                    <div class="skeleton h-20 w-full"></div>
-                    <div class="skeleton h-20 w-full"></div>
+            <section id="sectionSkeleton" aria-hidden="true"
+                class="hidden mt-6 bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 shadow-sm">
+                <div class="flex items-center justify-between mb-6 gap-4">
+                    <div>
+                        <div class="skeleton h-6 w-28 mb-2"></div>
+                        <div class="skeleton h-3 w-64 max-w-full"></div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <div class="skeleton h-8 w-16 rounded-full hidden sm:block"></div>
+                        <div class="skeleton h-8 w-16 rounded-full hidden sm:block"></div>
+                        <div class="skeleton h-9 w-28 rounded-lg"></div>
+                    </div>
                 </div>
+                <div id="skeletonGrid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5"></div>
             </section>
 
             <!-- 步驟 2: AI 版面構思審查 -->
@@ -1576,6 +1581,21 @@
         }
 
         /* ===================== 生成 ===================== */
+        // 骨架屏：卡片結構與「版面審查」一致（縮圖 + 標題 + 版型 + 兩顆按鈕 + 操作列）
+        function buildSkeletonCards() {
+            const n = parseInt(document.getElementById('numPages').value) || 6; // 0 = 由 AI 決定
+            const card = `
+          <div class="p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 rounded-xl flex flex-col gap-3">
+            <div class="skeleton w-full rounded-xl" style="aspect-ratio:16/9"></div>
+            <div class="px-1">
+              <div class="flex items-center gap-2 mb-2"><div class="skeleton h-5 w-8"></div><div class="skeleton h-4 flex-1"></div></div>
+              <div class="skeleton h-3 w-3/4"></div>
+            </div>
+            <div class="flex items-center gap-2 px-1"><div class="skeleton h-8 flex-1 rounded-full"></div><div class="skeleton h-8 flex-1 rounded-full"></div></div>
+            <div class="flex items-center justify-between px-1 pb-1"><div class="skeleton h-6 w-6 rounded-full"></div><div class="skeleton h-6 w-6 rounded-full"></div><div class="skeleton h-6 w-14 rounded-full"></div><div class="skeleton h-6 w-14 rounded-full"></div></div>
+          </div>`;
+            document.getElementById('skeletonGrid').innerHTML = card.repeat(Math.min(Math.max(n, 1), 6));
+        }
         const LOADING_MSGS = ['分析內容中…', '規劃版面結構…', 'AI 動態配色中…', '生成排版中…'];
         function setLoading(on) {
             const btn = document.getElementById('btnGenerate');
@@ -1593,6 +1613,7 @@
                 loadingTimer = setInterval(() => { i = (i + 1) % LOADING_MSGS.length; label.textContent = LOADING_MSGS[i]; }, 1800);
                 document.getElementById('sectionReview').classList.add('hidden');
                 document.getElementById('sectionPlayer').classList.add('hidden');
+                buildSkeletonCards();
                 skel.classList.remove('hidden');
                 animateIn(skel);
                 skel.scrollIntoView({ behavior: 'smooth', block: 'center' });
