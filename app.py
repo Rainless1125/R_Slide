@@ -4,13 +4,14 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
 from openai import OpenAI
 from starlette.datastructures import UploadFile
 
+from exporter import ExportError, build_pptx
 from extract import MAX_UPLOAD_BYTES, ExtractError, extract_text
 
 load_dotenv()
@@ -209,6 +210,33 @@ async def extract_file(request: Request):
         raise HTTPException(status_code=e.status_code, detail=str(e))
     except Exception:
         raise HTTPException(status_code=400, detail="無法解析此檔案，請確認檔案未損毀")
+
+MAX_EXPORT_BODY_BYTES = 40 * 1024 * 1024
+PPTX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+@app.post("/api/export/pptx")
+async def export_pptx(request: Request):
+    """將前端渲染好的投影片圖片組成 PPTX 並直接回傳，不保存檔案。"""
+    length = request.headers.get("content-length")
+    if not length or not length.isdigit():
+        raise HTTPException(status_code=411, detail="缺少 Content-Length")
+    if int(length) > MAX_EXPORT_BODY_BYTES:
+        raise HTTPException(status_code=413, detail="簡報內容過大，無法匯出")
+    try:
+        payload = await request.json()
+        title = str(payload.get("title") or "未命名簡報")[:200]
+        slides = payload.get("slides")
+        if not isinstance(slides, list) or not all(isinstance(s, dict) for s in slides):
+            raise ValueError
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="匯出資料格式不正確")
+
+    try:
+        data = await run_in_threadpool(build_pptx, title, slides)
+    except ExportError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return Response(content=data, media_type=PPTX_MEDIA_TYPE,
+                    headers={"Content-Disposition": 'attachment; filename="presentation.pptx"'})
 
 @app.post("/api/regenerate-slide")
 def regenerate_slide(req: RegenerateSlideRequest):

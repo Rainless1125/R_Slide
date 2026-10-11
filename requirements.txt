@@ -6,3 +6,4 @@ openai
 python-multipart
 pypdf
 python-docx
+python-pptx

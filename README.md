@@ -1,6 +1,6 @@
 # R Slide
 
-> Rapid & Responsive AI Presentation Engine — 貼上文字內容,由 LLM 自動規劃版面並產生可編輯、可匯出的 HTML 簡報。可自行部署於自己的伺服器或內網。
+> Rapid & Responsive AI Presentation Engine — 貼上文字內容,由 LLM 自動規劃版面並產生可編輯的簡報,可匯出為 PDF、PowerPoint 或 HTML。可自行部署於自己的伺服器或內網。
 
 <!-- TODO: 補上 badges(License / Python 版本 / Docker)與畫面截圖或 GIF -->
 <!-- ![Demo](docs/demo.gif) -->
@@ -12,7 +12,7 @@
 - **多模型支援**:Gemini 與 OpenAI 可切換,只需設定其中一個 API Key。
 - **視覺風格可指定**:例如「蘋果極簡白」、科技深色風等,以 Tailwind CSS 實踐。
 - **單頁重新生成**:不滿意某一頁時,可附加需求單獨重產,並維持整份簡報一致。
-- **匯出單一 HTML**:匯出時會清理 AI 產生的內容(移除 script、事件屬性、外部資源白名單)。
+- **匯出 PDF / PPTX / HTML**:PDF 與 PPTX 的每一頁為 2 倍解析度的圖片,外觀與畫面一致,但文字無法再編輯;HTML 為可直接播放的單一檔案,匯出時會清理 AI 產生的內容(移除 script、事件屬性、外部資源白名單)。
 - **輕量部署**:後端為單一 FastAPI 服務,前端為靜態檔案,無需資料庫。
 
 ## 快速開始
@@ -58,10 +58,10 @@ python app.py
 uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
-並置於 Nginx / Caddy 等反向代理之後啟用 HTTPS。若使用 Nginx,其預設上傳上限為 1 MB,需調高才能匯入較大的檔案:
+並置於 Nginx / Caddy 等反向代理之後啟用 HTTPS。若使用 Nginx,其預設上傳上限為 1 MB,需調高才能匯入較大的檔案或匯出 PPTX:
 
 ```nginx
-client_max_body_size 11m;
+client_max_body_size 40m;   # 檔案匯入上限 10 MB;匯出 PPTX 時整份簡報的圖片上限 40 MB
 ```
 
 > **注意**:本服務目前沒有登入驗證。對外開放前請自行在反向代理層加上驗證(Basic Auth、SSO 等),避免 API Key 額度被他人使用。
@@ -75,6 +75,8 @@ client_max_body_size 11m;
 | 檔案匯入 | 伺服器只抽取文字回傳給瀏覽器,不保存檔案;超過 1 MB 的檔案在解析期間會暫存於系統暫存目錄,處理完即刪除。抽取過程不會連外。 |
 | LLM 呼叫 | 輸入內容會送往 Gemini / OpenAI API,伺服器需可連外至這些服務。 |
 | 前端資源 | 介面載入 Tailwind CDN 與 Font Awesome CDN,使用者瀏覽器需可連外。 |
+| 匯出 PDF | 在瀏覽器端完成,不經過伺服器;第一次匯出時會從 cdnjs 載入 html-to-image 與 jsPDF。 |
+| 匯出 PPTX | 每頁圖片由瀏覽器渲染後送到伺服器組成 PPTX,伺服器不保存;同樣需從 cdnjs 載入 html-to-image。 |
 | 匯出 HTML | 目前為 CDN 版;離線版(內嵌 Tailwind / Font Awesome / 字型)尚在規劃中。 |
 
 若需要完全內網 / 離線運作,需自行改接內部 LLM 端點並自架前端靜態資源。
@@ -82,10 +84,11 @@ client_max_body_size 11m;
 ## 專案結構
 
 ```
-app.py            FastAPI 後端(/api/generate、/api/regenerate-slide、/api/extract、/api/models)
+app.py            FastAPI 後端(/api/generate、/api/regenerate-slide、/api/extract、/api/export/pptx、/api/models)
 extract.py        上傳檔案的文字抽取(PDF / DOCX / Markdown / TXT)
+exporter.py       將投影片圖片組成 PPTX(/api/export/pptx)
 static/index.html 前端介面
-static/export.js  匯出與 HTML 清理邏輯
+static/export.js  匯出(HTML / PDF / PPTX)與 HTML 清理邏輯
 .env_example      環境變數範本
 tests/            後端測試
 ```
