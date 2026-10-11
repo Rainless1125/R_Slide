@@ -11,6 +11,7 @@ from google.genai import types
 from openai import OpenAI
 from starlette.datastructures import UploadFile
 
+from charts import CHART_RULES, ChartSpec, normalize_charts
 from exporter import ExportError, build_pptx
 from extract import MAX_UPLOAD_BYTES, ExtractError, extract_text
 
@@ -81,8 +82,15 @@ class AdaptiveSlide(BaseModel):
         畫布固定為 1024×576 px，超出部分會被裁掉。
         必須以 <div class="w-full h-full overflow-hidden flex flex-col p-10 ..."> 作為最外層容器，主要內容區使用 flex-1 min-h-0。
         請嚴格依據使用者指定的【視覺風格】來配置 Tailwind 顏色 (包含 bg-xxx, text-xxx, border-xxx 等)，切勿千篇一律使用深色。
+        需要圖表時放入 <div data-rs-chart="索引"></div> 佔位容器，資料寫在 charts。
         """
     )
+    charts: list[ChartSpec] = Field(description="此頁的圖表資料，依 data-rs-chart 索引對應；沒有圖表時為空陣列")
+
+
+class SlideInput(AdaptiveSlide):
+    """前端送回的投影片：舊版歷史紀錄沒有 charts，且圖表資料已在前端正規化過，因此放寬驗證。"""
+    charts: list[dict] = Field(default_factory=list)
 
 class AdaptivePresentation(BaseModel):
     presentation_title: str = Field(description="整份簡報的大標題")
@@ -131,7 +139,7 @@ class RegenerateSlideRequest(BaseModel):
     style_preference: str = "蘋果極簡白 (Apple Minimalist)"
     presentation_title: str = "未命名簡報"
     slide_index: int
-    slides: list[AdaptiveSlide]
+    slides: list[SlideInput]
     custom_prompt: str = ""
     provider: str = "gemini"
     model: str = ""
@@ -160,11 +168,12 @@ def generate_slides(req: GenerateRequest):
        - 若內容是數據/成效，請設計為「巨大數字 (Big Numbers) + KPI 資訊卡片」。
        - 若內容是流程/SOP，請設計為「橫向流程步驟卡 (Step Cards) 或 時間軸 (Timeline)」。
        - 若內容是優缺點/方案比較，請設計為「左右對稱對比欄位 (Comparison Columns)」。
+       - 若內容有可比較的數值（趨勢、占比、排名），請搭配圖表呈現（見下方【圖表】規則）。
     2. 視覺與配色規範：
        - 僅輸出 Tailwind CSS class。
        - 禁止使用emoji，請一律使用font-awesome圖示。
        - 【重要】你必須絕對服從使用者指定的「視覺風格」。如果要求明亮風，請多用 bg-white/bg-slate-50；如果要求科技風，才使用深色底 bg-slate-900 搭配螢光點綴色。
-    """ + SLIDE_LAYOUT_RULES
+    """ + SLIDE_LAYOUT_RULES + CHART_RULES
 
     pages_hint = f"{req.num_pages} 頁" if req.num_pages > 0 else "由你依內容多寡與重點自行決定（建議 3~8 頁）"
     prompt = f"""
@@ -178,7 +187,10 @@ def generate_slides(req: GenerateRequest):
     """
     
     try:
-        return call_llm(req.provider, req.model, system_instruction, prompt, AdaptivePresentation, 0.6)
+        data = call_llm(req.provider, req.model, system_instruction, prompt, AdaptivePresentation, 0.6)
+        for slide in data.get("slides") or []:
+            slide["charts"] = normalize_charts(slide.get("charts"))
+        return data
     except HTTPException:
         raise
     except Exception as e:
@@ -265,7 +277,9 @@ def regenerate_slide(req: RegenerateSlideRequest):
     3. 禁止使用 emoji，請使用 font-awesome 圖示。
     4. 必須服從指定視覺風格，並避免與其他頁過度重複。
     5. 使用者的額外需求若會讓內容超出畫面（例如要求加入更多內容），請以精簡文字的方式達成，不可違反版面尺寸限制。
-    """ + SLIDE_LAYOUT_RULES
+    6. 原 HTML 中 <img data-rs-img src="rs-img:數字"> 是使用者上傳的圖片：除非使用者要求移除，否則請保留該 <img> 標籤與 src 原樣，
+       可調整它的位置與大小。原 HTML 中的 data-rs-chart 容器內容已省略，圖表資料請參考【原圖表資料】。
+    """ + SLIDE_LAYOUT_RULES + CHART_RULES
 
     prompt = f"""
     【簡報標題】：{req.presentation_title}
@@ -284,6 +298,8 @@ def regenerate_slide(req: RegenerateSlideRequest):
     - 原版型概念：{target_slide.layout_concept}
     - 原 HTML：
     {target_slide.html_content}
+    - 原圖表資料（JSON，可沿用、修改或刪除）：
+    {json.dumps(target_slide.charts, ensure_ascii=False) if target_slide.charts else "（無）"}
 
     【使用者額外重產需求】：
     {req.custom_prompt.strip() if req.custom_prompt.strip() else "（無，請你自行優化此頁）"}
@@ -295,6 +311,7 @@ def regenerate_slide(req: RegenerateSlideRequest):
     try:
         data = call_llm(req.provider, req.model, system_instruction, prompt, AdaptiveSlide, 0.7)
         data["page_number"] = target_slide.page_number
+        data["charts"] = normalize_charts(data.get("charts"))
         return data
     except HTTPException:
         raise
