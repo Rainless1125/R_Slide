@@ -182,6 +182,8 @@ body{box-sizing:border-box;min-height:100vh;font-family:"PingFang TC","Microsoft
 .thumb.on{opacity:1;border-color:#18181b;box-shadow:0 0 0 2px #18181b;transform:scale(1.05)}
 .thumb i{position:absolute;left:6px;top:6px;z-index:1;padding:1px 6px;border-radius:4px;background:rgba(0,0,0,.65);color:#fff;font:normal 10px ui-monospace,monospace}
 .hint{flex:none;font-size:11px;color:#a1a1aa;margin:0}
+.ex-footer{flex:none;margin:auto 0 0;padding:8px 0 4px;font-size:11px;letter-spacing:.04em;color:#a1a1aa;text-align:center;user-select:none}
+@media (prefers-color-scheme:dark){.ex-footer{color:#52525b}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 </style>
 </head>
@@ -200,6 +202,7 @@ body{box-sizing:border-box;min-height:100vh;font-family:"PingFang TC","Microsoft
 </div>
 <div id="thumbs"></div>
 <p class="hint">快捷鍵：← → 換頁　F 全螢幕　空白鍵 自動播放　Home / End 首尾頁</p>
+<footer class="ex-footer"><i class="fa-solid fa-chalkboard" style="margin-right:4px"></i>R_Slide　·　<i class="fa-brands fa-github" style="margin-right:4px"></i>Rainless1125/R_Slide</footer>
 <script>
 (function () {
   var SLIDES = {{SLIDES_JSON}};
