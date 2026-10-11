@@ -1286,6 +1286,11 @@
                         aria-label="編輯投影片" title="直接修改投影片上的文字、圖片與圖表（不呼叫 AI）">
                         <i id="editIcon" class="fa-solid fa-pen-to-square text-[11px]"></i><span class="hidden sm:inline" id="editLabel">編輯</span>
                     </button>
+                    <button onclick="insertTextBox()" data-edit-only
+                        class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
+                        aria-label="插入文字" title="插入可自由移動的文字方塊">
+                        <i class="fa-solid fa-font text-[11px]"></i><span class="hidden xl:inline">插入文字</span>
+                    </button>
                     <button onclick="pickSlideImage()" data-edit-only
                         class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
                         aria-label="插入圖片" title="插入圖片（也可直接把圖片拖到投影片上）">
@@ -2645,7 +2650,7 @@
             document.getElementById('editLabel').textContent = editMode ? '完成編輯' : '編輯';
             document.getElementById('editIcon').className = 'fa-solid text-[11px] ' + (editMode ? 'fa-check' : 'fa-pen-to-square');
             document.querySelectorAll('[data-edit-only]').forEach(b => { b.classList.toggle('hidden', !editMode); b.classList.toggle('flex', editMode); });
-            if (editMode) { prepareEditing(); showToast('單擊選取元素、雙擊編輯文字；圖片與圖表可拖曳移動、拉角落縮放（Esc 取消選取，可撤銷）', 'info', 4000); }
+            if (editMode) { prepareEditing(); showToast('單擊選取元素、雙擊編輯文字；插入的文字、圖片與圖表可拖曳移動、拉角落縮放（Esc 取消選取，可撤銷）', 'info', 4000); }
         }
 
         // 把畫面上的修改寫回資料（一次編輯 = 一個撤銷步驟）
@@ -2716,6 +2721,11 @@
             editingEl = null;
             el.removeAttribute('contenteditable');
             el.removeAttribute('spellcheck');
+            // 插入後沒有輸入任何文字的文字方塊直接移除（不留下撤銷步驟）
+            if (el.hasAttribute('data-rs-text') && !el.textContent.trim()) {
+                if (selectedEl === el) clearSelection();
+                el.remove();
+            }
             commitSlideEdit();
         }
 
@@ -3061,14 +3071,13 @@
             return doc.body.innerHTML;
         }
 
-        // 浮動物件的定位基準：投影片最外層容器（LLM 依規範產生 w-full h-full 的單一根元素）
+        // 浮動物件放在投影片最外層容器（LLM 依規範產生 w-full h-full 的單一根元素）內；
+        // 定位基準是 .slide-scaler（position: relative，與根元素同為 1024×576），匯出時也相同
         function slideRoot() {
             const scaler = getScaler();
             if (!scaler) return null;
             const root = scaler.firstElementChild;
-            if (!root || scaler.children.length !== 1) return scaler;
-            if (getComputedStyle(root).position === 'static') root.style.position = 'relative';
-            return root;
+            return root && scaler.children.length === 1 ? root : scaler;
         }
         function slideScale() { return document.getElementById('slideCanvas').clientWidth / SLIDE_W; }
 
@@ -3180,6 +3189,32 @@
             if (f) { e.preventDefault(); insertSlideImage(f); }
         });
 
+        /* ----- 插入文字方塊 ----- */
+        // 與圖片相同的浮動物件，可拖曳移動、拉角落調整寬度；格式（字級、粗細、對齊、顏色）沿用浮動工具列
+        function insertTextBox() {
+            if (!editMode || !currentPresentationData) return;
+            const root = slideRoot();
+            if (!root) return;
+            stopTextEdit();
+            const w = 360;
+            const el = document.createElement('div');
+            el.setAttribute('data-rs-text', '');
+            el.setAttribute('data-rs-float', '');
+            el.className = 'text-2xl font-semibold leading-snug';
+            el.textContent = '輸入文字';
+            setFloatRect(el, (SLIDE_W - w) / 2, SLIDE_H / 2 - 24, w, null);
+            el.style.zIndex = '10';
+            el.style.whiteSpace = 'pre-wrap';
+            root.appendChild(el);
+            startTextEdit(el, 0, 0);
+            // 預設文字全選，直接輸入即可取代
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+
         /* ----- 浮動物件：移動與縮放 ----- */
         function setFloatRect(el, x, y, w, h) {
             Object.assign(el.style, { position: 'absolute', left: Math.round(x) + 'px', top: Math.round(y) + 'px', width: Math.round(w) + 'px' });
@@ -3243,8 +3278,10 @@
                 let nw = Math.max(MIN, w + (west ? -dx : dx));
                 let nh = Math.max(MIN, h + (north ? -dy : dy));
                 if (d.keepRatio) nh = nw * h / w;
+                const autoH = d.keepRatio || d.el.hasAttribute('data-rs-text');   // 文字方塊只調寬度，高度隨文字
+                if (autoH && !d.keepRatio) nh = h;
                 // 從左 / 上方的控制點縮放時，對側固定不動
-                setFloatRect(d.el, west ? x + w - nw : x, north ? y + h - nh : y, nw, d.keepRatio ? null : nh);
+                setFloatRect(d.el, west ? x + w - nw : x, north ? y + h - nh : y, nw, autoH ? null : nh);
             }
             positionToolbar();
         }
@@ -3253,7 +3290,8 @@
             const d = floatDrag;
             floatDrag = null;
             if (!d || !d.moved) return;
-            suppressNextClick = true;
+            suppressNextClick = true;                 // 只吞掉緊接在放開滑鼠後的那次 click
+            setTimeout(() => { suppressNextClick = false; }, 0);
             if (d.handle && d.el.hasAttribute('data-rs-chart')) rerenderChart(d.el);  // 依新尺寸重畫，文字不變形
             commitSlideEdit();
             refreshToolbar();
