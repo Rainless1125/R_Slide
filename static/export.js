@@ -310,13 +310,151 @@ function exportPresentationHtml() {
     }
     const title = currentPresentationData.presentation_title || '未命名簡報';
     const html = buildExportHtml(title, currentPresentationData.slides);
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    _exportDownload(new Blob([html], { type: 'text/html;charset=utf-8' }), title, 'html');
+    showToast('已匯出 HTML', 'success', 1800);
+}
+
+function _exportDownload(blob, title, ext) {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = (title.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 60) || 'presentation') + '.html';
+    a.download = (title.replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 60) || 'presentation') + '.' + ext;
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    showToast('已匯出 HTML', 'success', 1800);
+}
+
+/* ===================== 匯出 PDF / PPTX ===================== */
+// 在畫面外以 1024×576 逐頁渲染並轉成 2 倍解析度的 JPEG，
+// PDF 在瀏覽器端用 jsPDF 組成；PPTX 交給後端 /api/export/pptx（python-pptx）組成。
+// 每頁都是一張圖片，外觀與畫面一致，但匯出後文字無法再編輯。
+const EXPORT_W = 1024, EXPORT_H = 576;
+const EXPORT_LIBS = {
+    htmlToImage: {
+        url: 'https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js',
+        integrity: 'sha512-7tWCgq9tTYS/QkGVyKrtLpqAoMV9XIUxoou+sPUypsaZx56cYR/qio84fPK9EvJJtKvJEwt7vkn6je5UVzGevw==',
+        global: 'htmlToImage'
+    },
+    jspdf: {
+        url: 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+        integrity: 'sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA==',
+        global: 'jspdf'
+    }
+};
+const _exportLibLoading = {};
+let _exportBusy = false;
+
+// 第一次匯出時才載入函式庫，不影響一般使用的載入速度
+function _exportLoadLib(name) {
+    const lib = EXPORT_LIBS[name];
+    if (window[lib.global]) return Promise.resolve(window[lib.global]);
+    if (!_exportLibLoading[name]) {
+        _exportLibLoading[name] = new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = lib.url;
+            s.integrity = lib.integrity;
+            s.crossOrigin = 'anonymous';
+            s.referrerPolicy = 'no-referrer';
+            s.onload = () => resolve(window[lib.global]);
+            s.onerror = () => {
+                delete _exportLibLoading[name];
+                s.remove();
+                reject(new Error('無法載入匯出元件，請確認網路可連線至 cdnjs.cloudflare.com'));
+            };
+            document.head.appendChild(s);
+        });
+    }
+    return _exportLibLoading[name];
+}
+
+async function _exportRenderSlides(slides, onProgress) {
+    const h2i = await _exportLoadLib('htmlToImage');
+    const host = document.createElement('div');
+    host.setAttribute('aria-hidden', 'true');
+    host.style.cssText = `position:fixed;left:-${EXPORT_W * 4}px;top:0;width:${EXPORT_W}px;height:${EXPORT_H}px;overflow:hidden;pointer-events:none`;
+    document.body.appendChild(host);
+    try {
+        await document.fonts.ready;
+        let fontEmbedCSS;
+        const images = [];
+        for (let i = 0; i < slides.length; i++) {
+            onProgress(i + 1, slides.length);
+            // 與 HTML 匯出相同：白底、預設深灰字
+            const frame = document.createElement('div');
+            frame.style.cssText = `width:${EXPORT_W}px;height:${EXPORT_H}px;overflow:hidden;background:#fff;color:#18181b`;
+            frame.innerHTML = '<div class="slide-scaler">' + slides[i].html_content + '</div>';
+            host.replaceChildren(frame);
+            // 等 Tailwind CDN 產生新 class 的樣式（背景分頁中 requestAnimationFrame 不會觸發，因此用 setTimeout）
+            await new Promise(r => setTimeout(r, 80));
+            // 字型（Font Awesome 圖示等）只需內嵌一次，之後各頁共用
+            if (fontEmbedCSS === undefined) fontEmbedCSS = await h2i.getFontEmbedCSS(frame).catch(() => '');
+            images.push(await h2i.toJpeg(frame, {
+                width: EXPORT_W, height: EXPORT_H, pixelRatio: 2, quality: 0.92,
+                backgroundColor: '#ffffff', fontEmbedCSS
+            }));
+        }
+        return images;
+    } finally {
+        host.remove();
+    }
+}
+
+function _exportSetBusy(busy, label) {
+    _exportBusy = busy;
+    const btn = document.getElementById('exportBtn');
+    if (!btn) return;
+    btn.disabled = busy;
+    document.getElementById('exportIcon').className = 'text-[11px] fa-solid ' + (busy ? 'fa-circle-notch fa-spin' : 'fa-file-export');
+    document.getElementById('exportLabel').textContent = busy ? label : '匯出';
+}
+
+async function _exportRun(kind, build) {
+    if (!currentPresentationData || !Array.isArray(currentPresentationData.slides) || !currentPresentationData.slides.length) {
+        showToast('沒有可匯出的簡報', 'error');
+        return;
+    }
+    if (_exportBusy) return;
+    if (typeof toggleEditMode === 'function') toggleEditMode(false); // 先把編輯中的文字寫回資料
+    if (typeof stopAutoplay === 'function') stopAutoplay();
+    const title = currentPresentationData.presentation_title || '未命名簡報';
+    const slides = currentPresentationData.slides.slice();
+    _exportSetBusy(true, '準備中…');
+    try {
+        const images = await _exportRenderSlides(slides, (i, n) => _exportSetBusy(true, `轉換中 ${i}/${n}`));
+        _exportSetBusy(true, `產生 ${kind}…`);
+        const blob = await build(images, title, slides);
+        _exportDownload(blob, title, kind.toLowerCase());
+        showToast(`已匯出 ${kind}`, 'success', 1800);
+    } catch (err) {
+        showToast(typeof friendlyError === 'function' ? friendlyError(err) : String(err?.message || err), 'error', 6000);
+    } finally {
+        _exportSetBusy(false);
+    }
+}
+
+function exportPresentationPdf() {
+    return _exportRun('PDF', async (images, title) => {
+        const { jsPDF } = await _exportLoadLib('jspdf');
+        // 1024×576 px 以 72dpi 換算為 768×432 pt（16:9）
+        const W = 768, H = 432;
+        const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: [W, H], compress: true });
+        images.forEach((img, i) => {
+            if (i) pdf.addPage([W, H], 'landscape');
+            pdf.addImage(img, 'JPEG', 0, 0, W, H, undefined, 'FAST');
+        });
+        pdf.setProperties({ title, creator: 'R Slide' });
+        return pdf.output('blob');
+    });
+}
+
+function exportPresentationPptx() {
+    return _exportRun('PPTX', async (images, title, slides) => {
+        const res = await fetch('/api/export/pptx', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, slides: slides.map((s, i) => ({ title: s.slide_title, image: images[i] })) })
+        });
+        if (!res.ok) throw await readApiError(res);
+        return res.blob();
+    });
 }

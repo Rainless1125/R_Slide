@@ -2,4 +2,5 @@
 run.bat
 __pycache__
 __pycache__/app.cpython-313.pyc
-.venv.pytest_cache
+.venv
+.pytest_cache
