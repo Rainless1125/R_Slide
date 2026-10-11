@@ -582,6 +582,57 @@
             transform: translateY(-3px);
         }
 
+        /* ---------- 行內文字編輯 ---------- */
+        #slideCanvas.editing [contenteditable] {
+            cursor: text;
+            outline: 1px dashed transparent;
+            outline-offset: 2px;
+            transition: outline-color .15s;
+        }
+
+        #slideCanvas.editing [contenteditable]:hover {
+            outline-color: rgba(59, 130, 246, .75);
+        }
+
+        #slideCanvas.editing [contenteditable]:focus {
+            outline: 2px solid #3b82f6;
+            border-radius: 2px;
+        }
+
+        #editBtn[aria-pressed="true"] {
+            background: #3b82f6;
+            color: #fff;
+        }
+
+        .slide-title-edit {
+            cursor: text;
+            border-radius: 4px;
+            outline: 1px dashed transparent;
+            outline-offset: 2px;
+        }
+
+        .slide-title-edit:hover {
+            outline-color: rgba(59, 130, 246, .6);
+        }
+
+        .slide-title-edit:focus {
+            outline: 2px solid #3b82f6;
+            text-overflow: clip;
+        }
+
+        .drag-handle {
+            cursor: grab;
+        }
+
+        .rv-card.drag-over {
+            outline: 2px dashed #3b82f6;
+            outline-offset: 2px;
+        }
+
+        .rv-card.dragging {
+            opacity: .45;
+        }
+
         /* ---------- Toast 動作按鈕 ---------- */
         .toast-action {
             margin-left: .5rem;
@@ -957,6 +1008,11 @@
                         class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
                         aria-label="全螢幕">
                         <i id="fsIcon" class="fa-solid fa-expand text-[11px]"></i><span id="fsLabel">全螢幕</span>
+                    </button>
+                    <button id="editBtn" onclick="toggleEditMode()" aria-pressed="false"
+                        class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
+                        aria-label="編輯文字" title="直接點投影片上的文字修改（不呼叫 AI）">
+                        <i id="editIcon" class="fa-solid fa-pen-to-square text-[11px]"></i><span id="editLabel">編輯文字</span>
                     </button>
                     <button id="regenCurrentBtn" onclick="regenerateCurrentSlide()"
                         class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
@@ -1645,11 +1701,11 @@
             }
         }
 
-        function renderReviewSection() {
+        function renderReviewSection(quiet = false) {
             const review = document.getElementById('sectionReview');
             review.classList.remove('hidden');
             document.getElementById('sectionPlayer').classList.add('hidden');
-            animateIn(review);
+            if (!quiet) animateIn(review);
             setStep(2);
 
             const container = document.getElementById('reviewContainer');
@@ -1657,15 +1713,19 @@
 
             currentPresentationData.slides.forEach((slide, idx) => {
                 const card = document.createElement('div');
-                card.className = "spot p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 rounded-xl flex flex-col gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-600";
+                card.className = "rv-card spot p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 rounded-xl flex flex-col gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-600";
                 card.innerHTML = `
           <div class="rv-thumb" role="button" tabindex="0" onclick="previewSingleSlide(${idx})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();previewSingleSlide(${idx})}" aria-label="預覽第 ${idx + 1} 頁：${esc(slide.slide_title)}" title="點擊放大預覽">
             <div class="slide-scaler">${slide.html_content}</div>
           </div>
           <div class="relative min-w-0 px-1">
             <div class="flex items-center gap-2 mb-1">
+              <span class="drag-handle text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 px-0.5" draggable="true" title="拖曳調整頁序" aria-hidden="true"
+                ondragstart="onSlideDragStart(event, ${idx})" ondragend="onSlideDragEnd()"><i class="fa-solid fa-grip-vertical text-[11px]"></i></span>
               <span class="text-xs font-mono bg-zinc-200 dark:bg-zinc-800 px-2 py-0.5 rounded text-zinc-600 dark:text-zinc-300">${pad(idx + 1)}</span>
-              <span class="font-bold text-sm truncate" title="${esc(slide.slide_title)}">${esc(slide.slide_title)}</span>
+              <span class="slide-title-edit font-bold text-sm truncate min-w-0 flex-1" contenteditable="plaintext-only" spellcheck="false" title="點擊可修改標題"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}else if(event.key==='Escape'){this.textContent=currentPresentationData.slides[${idx}].slide_title;this.blur()}"
+                onblur="commitSlideTitle(${idx}, this)">${esc(slide.slide_title)}</span>
             </div>
             <div class="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1 min-w-0">
               <span class="inline-block w-2 h-2 shrink-0 rounded-full bg-green-500 pulse-dot"></span>
@@ -1682,13 +1742,27 @@
               <span id="regenSlideLabel-${idx}">重產此頁</span>
             </button>
           </div>
+          <div class="flex items-center justify-between gap-1 px-1 pb-1 text-zinc-500 dark:text-zinc-400">
+            <button onclick="moveSlide(${idx}, ${idx - 1})" ${idx === 0 ? 'disabled' : ''} class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center" title="前移" aria-label="前移"><i class="fa-solid fa-arrow-left text-[11px]"></i></button>
+            <button onclick="moveSlide(${idx}, ${idx + 1})" ${idx === currentPresentationData.slides.length - 1 ? 'disabled' : ''} class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center" title="後移" aria-label="後移"><i class="fa-solid fa-arrow-right text-[11px]"></i></button>
+            <button onclick="duplicateSlide(${idx})" class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5" title="複製此頁" aria-label="複製此頁"><i class="fa-regular fa-clone text-[11px]"></i><span>複製</span></button>
+            <button onclick="deleteSlide(${idx})" ${currentPresentationData.slides.length <= 1 ? 'disabled' : ''} class="icon-btn h-8 px-3 rounded-full hover:bg-red-50 hover:text-red-500 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed text-xs font-semibold flex items-center gap-1.5" title="刪除此頁" aria-label="刪除此頁"><i class="fa-regular fa-trash-can text-[11px]"></i><span>刪除</span></button>
+          </div>
         `;
+                card.dataset.idx = idx;
+                card.addEventListener('dragover', e => { if (dragSlideIdx !== null) { e.preventDefault(); card.classList.add('drag-over'); } });
+                card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+                card.addEventListener('drop', e => {
+                    e.preventDefault();
+                    card.classList.remove('drag-over');
+                    if (dragSlideIdx !== null) moveSlide(dragSlideIdx, idx);
+                });
                 container.appendChild(card);
             });
             fitReviewThumbs();
             if (regeneratingSlideIdx !== null) setReviewRegenerateState(regeneratingSlideIdx, true);
 
-            review.scrollIntoView({ behavior: 'smooth' });
+            if (!quiet) review.scrollIntoView({ behavior: 'smooth' });
         }
 
         // 縮圖寬度不固定（隨視窗變動），依容器寬度等比縮放 1024px 的投影片
@@ -1720,6 +1794,7 @@
 
         function backToReview() {
             stopAutoplay();
+            toggleEditMode(false);
             if (document.fullscreenElement) document.exitFullscreen();
             renderReviewSection();
         }
@@ -1849,7 +1924,7 @@
                     if (idx === currentSlideIdx) renderSlide(idx, 'fade');
                     else updateThumbnails();
                 }
-                if (inReview) renderReviewSection();
+                if (inReview) renderReviewSection(true);
                 if (modalOpen) closeRegenerateModal(true);
                 showToast(`第 ${idx + 1} 頁已重產完成`, 'success', 2200);
             } catch (err) {
@@ -1909,7 +1984,7 @@
                 buildThumbnails();
                 renderSlide(currentSlideIdx, 'fade');
             }
-            if (inReview) renderReviewSection();
+            if (inReview) renderReviewSection(true);
             updateUndoButtons();
         }
 
@@ -1931,6 +2006,163 @@
             const busy = regeneratingSlideIdx !== null;
             document.querySelectorAll('[data-undo]').forEach(b => b.disabled = busy || !undoStack.length);
             document.querySelectorAll('[data-redo]').forEach(b => b.disabled = busy || !redoStack.length);
+        }
+
+        /* ===================== 行內文字編輯 ===================== */
+        let editMode = false;
+        const PLAINTEXT_EDIT = (() => { const d = document.createElement('div'); try { d.contentEditable = 'plaintext-only'; } catch (e) { } return d.contentEditable === 'plaintext-only'; })();
+
+        // 序列化投影片 DOM：移除編輯用屬性，得到可存回 html_content 的字串
+        function serializeScaler(scaler) {
+            const c = scaler.cloneNode(true);
+            c.querySelectorAll('[contenteditable],[spellcheck]').forEach(el => { el.removeAttribute('contenteditable'); el.removeAttribute('spellcheck'); });
+            return c.innerHTML;
+        }
+
+        // 把「直接含有文字」的元素變成可編輯（略過 SVG 內部與 script/style）
+        function markEditable() {
+            const scaler = document.querySelector('#slideCanvas .slide-scaler');
+            if (!scaler) return;
+            scaler.dataset.base = serializeScaler(scaler);
+            scaler.querySelectorAll('*').forEach(el => {
+                if (/^(SCRIPT|STYLE)$/i.test(el.tagName) || el.closest('svg')) return;
+                if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) return;
+                el.setAttribute('contenteditable', PLAINTEXT_EDIT ? 'plaintext-only' : 'true');
+                el.setAttribute('spellcheck', 'false');
+            });
+        }
+
+        function unmarkEditable() {
+            document.querySelectorAll('#slideCanvas [contenteditable]').forEach(el => { el.removeAttribute('contenteditable'); el.removeAttribute('spellcheck'); });
+        }
+
+        function toggleEditMode(force) {
+            const want = typeof force === 'boolean' ? force : !editMode;
+            if (want === editMode) return;
+            if (want) {
+                if (!currentPresentationData || regeneratingSlideIdx !== null) return;
+                stopAutoplay();
+            } else {
+                commitSlideEdit();
+            }
+            editMode = want;
+            const canvas = document.getElementById('slideCanvas');
+            canvas.classList.toggle('editing', editMode);
+            const btn = document.getElementById('editBtn');
+            btn.setAttribute('aria-pressed', String(editMode));
+            document.getElementById('editLabel').textContent = editMode ? '完成編輯' : '編輯文字';
+            document.getElementById('editIcon').className = 'fa-solid text-[11px] ' + (editMode ? 'fa-check' : 'fa-pen-to-square');
+            if (editMode) { markEditable(); showToast('點投影片上的文字即可直接修改（Esc 結束，可撤銷）', 'info', 3000); }
+            else unmarkEditable();
+        }
+
+        // 把畫面上的修改寫回資料（一次編輯 = 一個撤銷步驟）
+        function commitSlideEdit() {
+            const scaler = document.querySelector('#slideCanvas .slide-scaler');
+            const slide = currentPresentationData?.slides?.[currentSlideIdx];
+            if (!scaler || !slide || scaler.dataset.base === undefined) return;
+            const html = serializeScaler(scaler);
+            if (html === scaler.dataset.base) return;
+            pushUndoSnapshot();
+            slide.html_content = html;
+            scaler.dataset.base = html;
+            const thumbScaler = document.querySelector(`#thumbnailContainer .thumb[data-idx="${currentSlideIdx}"] .slide-scaler`);
+            if (thumbScaler) thumbScaler.innerHTML = html;
+            syncCurrentPresentationToHistory();
+        }
+        document.getElementById('slideCanvas').addEventListener('focusout', () => { if (editMode) commitSlideEdit(); });
+        document.getElementById('slideCanvas').addEventListener('keydown', e => {
+            // 編輯中避免 Enter 觸發外層按鈕行為；貼上一律純文字
+            if (editMode && e.key === 'Enter' && !PLAINTEXT_EDIT) { e.preventDefault(); document.execCommand('insertLineBreak'); }
+        });
+        document.getElementById('slideCanvas').addEventListener('paste', e => {
+            if (!editMode || PLAINTEXT_EDIT) return;
+            e.preventDefault();
+            document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text/plain'));
+        });
+
+        /* ===================== 頁面管理：標題、排序、複製、刪除 ===================== */
+        let dragSlideIdx = null;
+
+        function slideOpsAllowed() {
+            if (!currentPresentationData) return false;
+            if (regeneratingSlideIdx !== null || isGenerating()) {
+                showToast('請等待目前的生成完成後再調整頁面', 'info', 2200);
+                return false;
+            }
+            return true;
+        }
+
+        // 修改頁面順序／數量後：重新編號、同步歷史記錄、重畫審查頁
+        function finishSlideOps(keepSlide) {
+            const slides = currentPresentationData.slides;
+            slides.forEach((s, i) => { s.page_number = i + 1; });
+            const at = keepSlide ? slides.indexOf(keepSlide) : -1;
+            currentSlideIdx = at >= 0 ? at : Math.min(currentSlideIdx, slides.length - 1);
+            syncCurrentPresentationToHistory();
+            renderReviewSection(true);
+            updateUndoButtons();
+        }
+
+        function moveSlide(from, to) {
+            if (!slideOpsAllowed()) return;
+            const slides = currentPresentationData.slides;
+            if (from === to || from < 0 || to < 0 || from >= slides.length || to >= slides.length) return;
+            pushUndoSnapshot();
+            const keep = slides[currentSlideIdx];
+            const [moved] = slides.splice(from, 1);
+            slides.splice(to, 0, moved);
+            finishSlideOps(keep);
+        }
+
+        function duplicateSlide(idx) {
+            if (!slideOpsAllowed()) return;
+            const slides = currentPresentationData.slides;
+            if (idx < 0 || idx >= slides.length) return;
+            pushUndoSnapshot();
+            const keep = slides[currentSlideIdx];
+            slides.splice(idx + 1, 0, JSON.parse(JSON.stringify(slides[idx])));
+            finishSlideOps(keep);
+            showToast(`已複製第 ${idx + 1} 頁`, 'success', 1800);
+        }
+
+        function deleteSlide(idx) {
+            if (!slideOpsAllowed()) return;
+            const slides = currentPresentationData.slides;
+            if (slides.length <= 1) { showToast('至少要保留一頁', 'info', 2000); return; }
+            if (idx < 0 || idx >= slides.length) return;
+            pushUndoSnapshot();
+            const keep = slides[currentSlideIdx] === slides[idx] ? null : slides[currentSlideIdx];
+            slides.splice(idx, 1);
+            if (!keep) currentSlideIdx = Math.min(idx, slides.length - 1);
+            finishSlideOps(keep);
+            showToast(`已刪除第 ${idx + 1} 頁`, 'info', 5000, { label: '復原', onClick: undo });
+        }
+
+        function commitSlideTitle(idx, el) {
+            const slide = currentPresentationData?.slides?.[idx];
+            if (!slide) return;
+            const title = el.textContent.replace(/\s+/g, ' ').trim();
+            if (!title) { el.textContent = slide.slide_title; return; }
+            el.textContent = title;
+            if (title === slide.slide_title) return;
+            pushUndoSnapshot();
+            slide.slide_title = title;
+            el.title = title;
+            syncCurrentPresentationToHistory();
+        }
+
+        function onSlideDragStart(e, idx) {
+            if (!slideOpsAllowed()) { e.preventDefault(); return; }
+            dragSlideIdx = idx;
+            const card = e.target.closest('.rv-card');
+            if (card) { e.dataTransfer.setDragImage(card, 24, 24); card.classList.add('dragging'); }
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', String(idx));
+        }
+        function onSlideDragEnd() {
+            dragSlideIdx = null;
+            document.querySelectorAll('.rv-card').forEach(c => c.classList.remove('dragging', 'drag-over'));
         }
 
         /* ===================== 播放器 ===================== */
@@ -1955,6 +2187,7 @@
             canvas.innerHTML = `<div class="slide-anim ${cls}"><div class="slide-scaler">${slide.html_content}</div></div>`;
             fitSlide();
             document.getElementById('currentLayoutBadge').innerText = slide.layout_concept;
+            if (editMode) markEditable();
 
             document.getElementById('slideCounter').textContent = `${pad(index + 1)} / ${pad(total)}`;
             document.getElementById('slideProgress').style.width = ((index + 1) / total * 100) + '%';
@@ -2014,6 +2247,7 @@
         /* ----- 自動播放 ----- */
         function toggleAutoplay() { autoplayTimer ? stopAutoplay() : startAutoplay(); }
         function startAutoplay() {
+            toggleEditMode(false);
             if (!currentPresentationData) return;
             autoplayTimer = setInterval(() => {
                 const last = currentPresentationData.slides.length - 1;
@@ -2052,6 +2286,7 @@
             const fs = !!document.fullscreenElement;
             document.getElementById('fsIcon').className = 'fa-solid text-[11px] ' + (fs ? 'fa-compress' : 'fa-expand');
             document.getElementById('fsLabel').textContent = fs ? '離開全螢幕' : '全螢幕';
+            if (fs) toggleEditMode(false);
             wakeStage();
             setTimeout(fitSlide, 50);
         });
@@ -2063,7 +2298,8 @@
                 closeRegenerateModal();
                 return;
             }
-            const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+            const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || !!e.target.isContentEditable;
+            if (e.key === 'Escape' && e.target.isContentEditable && e.target.closest('#slideCanvas')) { e.target.blur(); return; }
             if ((e.ctrlKey || e.metaKey) && !e.altKey && !typing && currentPresentationData) {
                 const k = e.key.toLowerCase();
                 if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
