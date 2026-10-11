@@ -1766,13 +1766,17 @@
         }
 
         // 縮圖寬度不固定（隨視窗變動），依容器寬度等比縮放 1024px 的投影片
-        function fitReviewThumbs() {
-            document.querySelectorAll('#reviewContainer .rv-thumb').forEach(box => {
+        // Tailwind CDN 會在元素插入「之後」才產生 class 樣式，建立當下量到的寬度可能不對，
+        // 因此用 ResizeObserver 監看每個縮圖，寬度一變就重算縮放。
+        const thumbFitRO = new ResizeObserver(entries => {
+            entries.forEach(({ target: box }) => {
                 const scaler = box.querySelector('.slide-scaler');
                 if (scaler && box.clientWidth) scaler.style.transform = `scale(${box.clientWidth / 1024})`;
             });
+        });
+        function fitReviewThumbs() {
+            document.querySelectorAll('#reviewContainer .rv-thumb').forEach(box => thumbFitRO.observe(box));
         }
-        new ResizeObserver(fitReviewThumbs).observe(document.getElementById('reviewContainer'));
 
         function previewSingleSlide(idx) {
             currentSlideIdx = idx;
@@ -2173,7 +2177,6 @@
             scaler.style.transform = `scale(${canvas.clientWidth / 1024})`;
         }
         new ResizeObserver(fitSlide).observe(document.getElementById('slideCanvas'));
-        window.addEventListener('resize', () => fitPlayerThumbs());
 
         function renderSlide(index, mode) {
             const total = currentPresentationData.slides.length;
@@ -2226,10 +2229,7 @@
         }
         const THUMB_BASE = 'thumb relative flex-shrink-0 w-44 rounded-lg border overflow-hidden cursor-pointer transition-all duration-300 select-none ';
         function fitPlayerThumbs() {
-            document.querySelectorAll('#thumbnailContainer .rv-thumb').forEach(box => {
-                const sc = box.querySelector('.slide-scaler');
-                if (sc && box.clientWidth) sc.style.transform = `scale(${box.clientWidth / 1024})`;
-            });
+            document.querySelectorAll('#thumbnailContainer .rv-thumb').forEach(box => thumbFitRO.observe(box));
         }
 
         function updateThumbnails() {
