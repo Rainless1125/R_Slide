@@ -283,6 +283,7 @@
         }
 
         .slide-scaler {
+            position: relative;
             width: 1024px;
             height: 576px;
             transform-origin: top left;
@@ -797,6 +798,64 @@
             color: #fff;
         }
 
+        /* ---------- 圖片 / 圖表：可拖曳移動、拖曳控制點縮放 ---------- */
+        #slideCanvas.editing [data-rs-float] {
+            cursor: move !important;
+            -webkit-user-drag: none;
+            user-select: none;
+        }
+
+        #slideCanvas.editing [data-rs-chart] svg * {
+            cursor: inherit !important;
+            outline: none !important;
+        }
+
+        #slideCanvas.drop-target {
+            outline: 3px dashed #3b82f6;
+            outline-offset: 3px;
+        }
+
+        #floatBox {
+            position: fixed;
+            z-index: 54;
+            display: none;
+            pointer-events: none;
+        }
+
+        #floatBox.open {
+            display: block;
+        }
+
+        #floatBox .fh {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            margin: -6px 0 0 -6px;
+            border-radius: 3px;
+            border: 2px solid #3b82f6;
+            background: #fff;
+            pointer-events: auto;
+            touch-action: none;
+        }
+
+        #floatBox .fh[data-h="nw"] { left: 0; top: 0; cursor: nwse-resize; }
+        #floatBox .fh[data-h="ne"] { left: 100%; top: 0; cursor: nesw-resize; }
+        #floatBox .fh[data-h="sw"] { left: 0; top: 100%; cursor: nesw-resize; }
+        #floatBox .fh[data-h="se"] { left: 100%; top: 100%; cursor: nwse-resize; }
+
+        #floatBox .fsize {
+            position: absolute;
+            left: 50%;
+            top: 100%;
+            transform: translate(-50%, 10px);
+            padding: 1px 6px;
+            border-radius: 4px;
+            background: #3b82f6;
+            color: #fff;
+            font: 10px ui-monospace, monospace;
+            white-space: nowrap;
+        }
+
         .slide-title-edit {
             cursor: text;
             border-radius: 4px;
@@ -1224,9 +1283,20 @@
                     </button>
                     <button id="editBtn" onclick="toggleEditMode()" aria-pressed="false"
                         class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
-                        aria-label="編輯文字" title="直接點投影片上的文字修改（不呼叫 AI）">
-                        <i id="editIcon" class="fa-solid fa-pen-to-square text-[11px]"></i><span class="hidden sm:inline" id="editLabel">編輯文字</span>
+                        aria-label="編輯投影片" title="直接修改投影片上的文字、圖片與圖表（不呼叫 AI）">
+                        <i id="editIcon" class="fa-solid fa-pen-to-square text-[11px]"></i><span class="hidden sm:inline" id="editLabel">編輯</span>
                     </button>
+                    <button onclick="pickSlideImage()" data-edit-only
+                        class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
+                        aria-label="插入圖片" title="插入圖片（也可直接把圖片拖到投影片上）">
+                        <i class="fa-regular fa-image text-[11px]"></i><span class="hidden xl:inline">插入圖片</span>
+                    </button>
+                    <button onclick="openChartEditor(null)" data-edit-only
+                        class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
+                        aria-label="插入圖表" title="輸入數據插入圖表">
+                        <i class="fa-solid fa-chart-column text-[11px]"></i><span class="hidden xl:inline">插入圖表</span>
+                    </button>
+                    <input id="slideImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" class="hidden">
                     <button id="regenCurrentBtn" onclick="regenerateCurrentSlide()"
                         class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
                         aria-label="重產此頁">
@@ -1316,7 +1386,71 @@
         </div>
     </div>
 
-    <script src="/static/export.js?v=4"></script>
+    <!-- 圖表資料 Modal -->
+    <div id="chartModal" role="dialog" aria-modal="true" aria-labelledby="chartModalTitle"
+        class="hidden fixed inset-0 z-[90] bg-black/45 backdrop-blur-sm p-4 flex items-center justify-center">
+        <div
+            class="w-full max-w-4xl max-h-[92vh] overflow-y-auto rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-5 sm:p-6">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <h3 id="chartModalTitle" class="text-base sm:text-lg font-bold">插入圖表</h3>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">圖表會畫成靜態向量圖，匯出 PDF / PPTX / HTML 都能保留。</p>
+                </div>
+                <button onclick="closeChartEditor()" class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    aria-label="關閉圖表視窗">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="mt-4 grid md:grid-cols-2 gap-5">
+                <div class="flex flex-col gap-3 min-w-0">
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">類型
+                            <select id="chartType" class="mt-1 w-full h-9 px-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100">
+                                <option value="bar">直條圖</option>
+                                <option value="horizontal_bar">橫條圖</option>
+                                <option value="line">折線圖</option>
+                                <option value="pie">圓餅圖</option>
+                                <option value="doughnut">環圈圖</option>
+                            </select>
+                        </label>
+                        <label class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">單位（選填）
+                            <input id="chartUnit" maxlength="12" placeholder="%、億元、萬人" class="mt-1 w-full h-9 px-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100">
+                        </label>
+                    </div>
+                    <label class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">標題（選填）
+                        <input id="chartTitle" maxlength="40" class="mt-1 w-full h-9 px-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100">
+                    </label>
+                    <label class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">數據
+                        <textarea id="chartData" rows="8" spellcheck="false"
+                            class="mt-1 w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-sm font-mono text-zinc-900 dark:text-zinc-100 resize-y"></textarea>
+                    </label>
+                    <p class="text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400 -mt-1">
+                        第一列為「類別, 系列名稱…」，之後每列為「標籤, 數值…」。可直接貼上 Excel 表格（以 Tab 分隔，數字可含千分位）。圓餅 / 環圈圖只使用第一個數值欄。</p>
+                    <label class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">顏色（選填，以逗號分隔的 HEX 色碼）
+                        <input id="chartColors" placeholder="#2563eb, #f97316" class="mt-1 w-full h-9 px-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm font-mono text-zinc-900 dark:text-zinc-100">
+                    </label>
+                </div>
+                <div class="min-w-0">
+                    <div class="text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-1">預覽</div>
+                    <div id="chartPreview" class="w-full aspect-[16/10] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white text-zinc-800 p-4"></div>
+                    <p id="chartError" class="hidden mt-2 text-xs text-red-500" role="alert"></p>
+                </div>
+            </div>
+            <div class="mt-5 flex items-center justify-end gap-2">
+                <button onclick="closeChartEditor()"
+                    class="icon-btn h-9 px-4 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-sm font-semibold">
+                    取消
+                </button>
+                <button id="chartApplyBtn" onclick="applyChartEditor()"
+                    class="icon-btn h-9 px-4 rounded-full bg-black text-white dark:bg-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 text-sm font-semibold flex items-center gap-2">
+                    <i class="fa-solid fa-check text-[11px]"></i><span id="chartApplyLabel">插入圖表</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/charts.js?v=1"></script>
+    <script src="/static/export.js?v=5"></script>
     <script>
         /* ===================== 主題 ===================== */
         function initTheme() {
@@ -2142,6 +2276,7 @@
 
                 if (!res.ok) throw await readApiError(res);
                 const data = sanitizePresentation(await res.json());
+                await bakeSlideCharts(data.slides);
                 currentPresentationData = data;
                 currentSlideIdx = 0;
                 resetUndo();
@@ -2347,6 +2482,8 @@
             }
 
             try {
+                // 上傳的圖片（data URL）與已畫好的圖表 SVG 不送給 LLM：省 token，回來後再換回原圖
+                const slim = slimSlidesForLlm(currentPresentationData.slides);
                 const res = await fetch('/api/regenerate-slide', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -2357,7 +2494,7 @@
                         style_preference: input.style_preference || '',
                         presentation_title: currentPresentationData.presentation_title || '未命名簡報',
                         slide_index: idx,
-                        slides: currentPresentationData.slides,
+                        slides: slim.slides,
                         custom_prompt: customPrompt,
                         ...getLlmChoice()
                     })
@@ -2366,6 +2503,8 @@
                 if (!res.ok) throw await readApiError(res);
 
                 const newSlide = sanitizeSlide(await res.json());
+                newSlide.html_content = restoreSlideImages(newSlide.html_content, slim.images);
+                await bakeSlideCharts([newSlide]);
                 const oldSlide = currentPresentationData.slides[idx];
                 pushUndoSnapshot();
                 currentPresentationData.slides[idx] = {
@@ -2503,19 +2642,21 @@
             canvas.classList.toggle('editing', editMode);
             const btn = document.getElementById('editBtn');
             btn.setAttribute('aria-pressed', String(editMode));
-            document.getElementById('editLabel').textContent = editMode ? '完成編輯' : '編輯文字';
+            document.getElementById('editLabel').textContent = editMode ? '完成編輯' : '編輯';
             document.getElementById('editIcon').className = 'fa-solid text-[11px] ' + (editMode ? 'fa-check' : 'fa-pen-to-square');
-            if (editMode) { prepareEditing(); showToast('單擊選取元素、雙擊編輯文字（Esc 取消選取，可撤銷）', 'info', 3500); }
+            document.querySelectorAll('[data-edit-only]').forEach(b => { b.classList.toggle('hidden', !editMode); b.classList.toggle('flex', editMode); });
+            if (editMode) { prepareEditing(); showToast('單擊選取元素、雙擊編輯文字；圖片與圖表可拖曳移動、拉角落縮放（Esc 取消選取，可撤銷）', 'info', 4000); }
         }
 
         // 把畫面上的修改寫回資料（一次編輯 = 一個撤銷步驟）
-        function commitSlideEdit() {
+        // withUndo=false：呼叫端已自行 pushUndoSnapshot（例如同時修改了 slide.charts）
+        function commitSlideEdit(withUndo = true) {
             const scaler = getScaler();
             const slide = currentPresentationData?.slides?.[currentSlideIdx];
             if (!scaler || !slide || scaler.dataset.base === undefined) return;
             const html = serializeScaler(scaler);
-            if (html === scaler.dataset.base) return;
-            pushUndoSnapshot();
+            if (html === scaler.dataset.base) { if (!withUndo) syncCurrentPresentationToHistory(); return; }
+            if (withUndo) pushUndoSnapshot();
             slide.html_content = html;
             scaler.dataset.base = html;
             const thumbScaler = document.querySelector(`#thumbnailContainer .thumb[data-idx="${currentSlideIdx}"] .slide-scaler`);
@@ -2545,6 +2686,7 @@
             fmtRO.disconnect();
             hidePalette();
             document.getElementById('fmtToolbar')?.classList.remove('open');
+            document.getElementById('floatBox')?.classList.remove('open');
         }
 
         function startTextEdit(el, x, y) {
@@ -2588,6 +2730,8 @@
             if (editingEl) stopTextEdit();
             const svg = t.closest('svg');
             if (svg && svg !== t && scaler.contains(svg)) t = svg;   // SVG 內部以整個圖形為單位
+            const obj = t.closest('[data-rs-chart],[data-rs-float]');
+            if (obj && scaler.contains(obj)) t = obj;                // 圖表 / 浮動圖片以整個容器為單位
             selectElement(t);
         });
         slideCanvasEl.addEventListener('dblclick', e => {
@@ -2710,6 +2854,18 @@
                 const el = selectedEl;
                 const c = el.cloneNode(true);
                 [c, ...c.querySelectorAll(EDIT_ATTRS.map(a => `[${a}]`).join(','))].forEach(n => EDIT_ATTRS.forEach(a => n.removeAttribute(a)));
+                // 複製出的圖表使用自己的一份資料，之後各自編輯互不影響
+                const slide = currentPresentationData.slides[currentSlideIdx];
+                [c, ...c.querySelectorAll('[data-rs-chart]')].filter(n => n.hasAttribute('data-rs-chart')).forEach(n => {
+                    const spec = slide.charts?.[Number(n.getAttribute('data-rs-chart'))];
+                    if (!spec) return;
+                    slide.charts.push(JSON.parse(JSON.stringify(spec)));
+                    n.setAttribute('data-rs-chart', String(slide.charts.length - 1));
+                });
+                if (c.hasAttribute('data-rs-float')) {      // 浮動物件錯開位置，避免完全疊在原物件上
+                    c.style.left = (parseFloat(c.style.left) || 0) + 24 + 'px';
+                    c.style.top = (parseFloat(c.style.top) || 0) + 24 + 'px';
+                }
                 el.after(c);
                 selectElement(c);
             },
@@ -2763,6 +2919,8 @@
           <span class="sep"></span>
           <select id="fmtRadius" title="圓角" aria-label="圓角"><option value="__custom" disabled hidden>圓角</option>${RADII.map(r => `<option value="${r[0]}">圓角：${r[1]}</option>`).join('')}</select>
           <span class="sep"></span>
+          ${btn('chart', '<i class="fa-solid fa-chart-column text-[11px]"></i><span>圖表資料</span>', '編輯圖表資料', 'chart-only')}
+          <span class="sep chart-only"></span>
           ${btn('duplicate', '<i class="fa-regular fa-clone text-[11px]"></i>', '複製元素')}
           ${btn('moveUp', '<i class="fa-solid fa-arrow-up text-[11px]"></i>', '同層上移（往前）')}
           ${btn('moveDown', '<i class="fa-solid fa-arrow-down text-[11px]"></i>', '同層下移（往後）')}
@@ -2787,7 +2945,8 @@
                 const b = e.target.closest('[data-fmt]');
                 if (!b || b.disabled) return;
                 const id = b.dataset.fmt;
-                if (id.startsWith('align-')) runFmt('align', id.slice(6));
+                if (id === 'chart') openChartEditor(selectedEl);
+                else if (id.startsWith('align-')) runFmt('align', id.slice(6));
                 else if (id === 'pal-text' || id === 'pal-bg') togglePalette(id === 'pal-text' ? 'text' : 'bg', b);
                 else runFmt(id);
             });
@@ -2842,11 +3001,14 @@
             tb.querySelector('[data-fmt="remove"]').disabled = root;
             tb.querySelector('[data-fmt="moveUp"]').disabled = root || !el.previousElementSibling;
             tb.querySelector('[data-fmt="moveDown"]').disabled = root || !el.nextElementSibling;
+            const isChart = el.hasAttribute('data-rs-chart');
+            tb.querySelectorAll('.chart-only').forEach(n => n.style.display = isChart ? '' : 'none');
             positionToolbar();
         }
 
         // 工具列固定在視窗座標：優先放在元素上方，放不下就改放下方
         function positionToolbar() {
+            positionFloatBox();
             const tb = document.getElementById('fmtToolbar');
             if (!tb || !selectedEl || !tb.classList.contains('open')) return;
             const r = selectedEl.getBoundingClientRect();
@@ -2865,6 +3027,385 @@
         document.addEventListener('mousedown', e => {
             if (!e.target.closest('#fmtPalette') && !e.target.closest('[data-fmt^="pal-"]')) hidePalette();
         });
+
+        /* ===================== 圖片與圖表 ===================== */
+        // 圖片以 data URL 內嵌在 html_content（不經伺服器、不需外部資源，sanitizeSlideHtml 本來就允許 data:image/png|jpeg）；
+        // 圖表為 static/charts.js 畫出的靜態 SVG，資料存在 slide.charts，容器以 data-rs-chart 指向索引。
+        // 使用者插入的圖片 / 圖表為絕對定位的「浮動物件」（data-rs-float），可拖曳移動、拉角落縮放。
+        const IMG_MAX_INPUT = 15 * 1024 * 1024;
+        const IMG_MAX_SIDE = 1600;
+        const IMG_MAX_DATA_URL = 3 * 1024 * 1024;
+        const SLIDE_W = 1024, SLIDE_H = 576;
+
+        // 重產單頁時送給 LLM 的版本：圖片換成 rs-img:N 代號、圖表容器清空
+        function slimSlidesForLlm(slides) {
+            const images = [];
+            const out = slides.map(s => {
+                const doc = new DOMParser().parseFromString(`<!DOCTYPE html><html><body>${s.html_content || ''}</body></html>`, 'text/html');
+                doc.querySelectorAll('[data-rs-chart]').forEach(el => { el.innerHTML = ''; });
+                doc.querySelectorAll('img[src^="data:"]').forEach(img => {
+                    images.push(img.getAttribute('src'));
+                    img.setAttribute('src', 'rs-img:' + (images.length - 1));
+                    img.setAttribute('data-rs-img', '');
+                });
+                return { ...s, html_content: doc.body.innerHTML, charts: s.charts || [] };
+            });
+            return { slides: out, images };
+        }
+        function restoreSlideImages(html, images) {
+            if (!/rs-img:/.test(html || '')) return html;
+            const doc = new DOMParser().parseFromString(`<!DOCTYPE html><html><body>${html}</body></html>`, 'text/html');
+            doc.querySelectorAll('img[src^="rs-img:"]').forEach(img => {
+                img.setAttribute('src', images[Number(img.getAttribute('src').slice(7))] || EXPORT_PLACEHOLDER_IMG);
+            });
+            return doc.body.innerHTML;
+        }
+
+        // 浮動物件的定位基準：投影片最外層容器（LLM 依規範產生 w-full h-full 的單一根元素）
+        function slideRoot() {
+            const scaler = getScaler();
+            if (!scaler) return null;
+            const root = scaler.firstElementChild;
+            if (!root || scaler.children.length !== 1) return scaler;
+            if (getComputedStyle(root).position === 'static') root.style.position = 'relative';
+            return root;
+        }
+        function slideScale() { return document.getElementById('slideCanvas').clientWidth / SLIDE_W; }
+
+        /* ----- 插入圖片 ----- */
+        function pickSlideImage() {
+            if (!editMode) return;
+            const input = document.getElementById('slideImageInput');
+            input.value = '';
+            input.click();
+        }
+        document.getElementById('slideImageInput').addEventListener('change', e => {
+            const f = e.target.files?.[0];
+            if (f) insertSlideImage(f);
+        });
+
+        function loadImageElement(url) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('無法讀取這張圖片'));
+                img.src = url;
+            });
+        }
+
+        // 縮到最長邊 1600px 並重新編碼：PNG / GIF / WebP / SVG 保留透明（PNG），太大或照片類改 JPEG
+        async function compressImage(file) {
+            const url = URL.createObjectURL(file);
+            try {
+                const img = await loadImageElement(url);
+                let w = img.naturalWidth || 800, h = img.naturalHeight || 600;
+                const k = Math.min(1, IMG_MAX_SIDE / Math.max(w, h));
+                w = Math.max(1, Math.round(w * k)); h = Math.max(1, Math.round(h * k));
+                const c = document.createElement('canvas');
+                c.width = w; c.height = h;
+                const ctx = c.getContext('2d');
+                const keepAlpha = file.type !== 'image/jpeg';
+                if (!keepAlpha) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); }
+                ctx.drawImage(img, 0, 0, w, h);
+                let data = keepAlpha ? c.toDataURL('image/png') : '';
+                if (!data || data.length > IMG_MAX_DATA_URL / 2) {
+                    // 照片存成 PNG 會很大：鋪白底後改存 JPEG
+                    const j = document.createElement('canvas');
+                    j.width = w; j.height = h;
+                    const jctx = j.getContext('2d');
+                    jctx.fillStyle = '#fff'; jctx.fillRect(0, 0, w, h);
+                    jctx.drawImage(c, 0, 0);
+                    data = j.toDataURL('image/jpeg', 0.85);
+                }
+                if (data.length > IMG_MAX_DATA_URL) throw new Error('圖片壓縮後仍過大，請換一張較小的圖片');
+                return { data, w, h };
+            } finally {
+                URL.revokeObjectURL(url);
+            }
+        }
+
+        async function insertSlideImage(file, at) {
+            if (!editMode || !currentPresentationData) return;
+            if (!/^image\/(png|jpeg|webp|gif|svg\+xml)$/.test(file.type)) { showToast('只支援 PNG、JPG、WebP、GIF、SVG 圖片', 'error'); return; }
+            if (file.size > IMG_MAX_INPUT) { showToast('圖片過大（上限 15 MB）', 'error'); return; }
+            const slideIdx = currentSlideIdx;
+            let result;
+            try { result = await compressImage(file); }
+            catch (err) { showToast(err.message || '無法讀取這張圖片', 'error'); return; }
+            if (!editMode || slideIdx !== currentSlideIdx) return;   // 處理期間已換頁或離開編輯
+            const root = slideRoot();
+            if (!root) return;
+            stopTextEdit();
+            // 預設寬度約 40% 版面，太高時以高度為準
+            let w = Math.min(result.w, SLIDE_W * 0.4), h = w * result.h / result.w;
+            if (h > SLIDE_H * 0.6) { h = SLIDE_H * 0.6; w = h * result.w / result.h; }
+            let x = (SLIDE_W - w) / 2, y = (SLIDE_H - h) / 2;
+            if (at) { x = at.x - w / 2; y = at.y - h / 2; }
+            const img = document.createElement('img');
+            img.src = result.data;
+            img.alt = file.name.replace(/\.[^.]+$/, '').slice(0, 80);
+            img.setAttribute('data-rs-img', '');
+            img.setAttribute('data-rs-float', '');
+            img.setAttribute('draggable', 'false');
+            setFloatRect(img, x, y, w, null);
+            img.style.zIndex = '10';
+            img.style.objectFit = 'contain';
+            root.appendChild(img);
+            commitSlideEdit();
+            selectElement(img);
+            showToast('已插入圖片，可拖曳移動、拉角落調整大小', 'success', 2200);
+        }
+
+        // 拖放 / 貼上圖片到投影片（僅編輯模式）
+        slideCanvasEl.addEventListener('dragover', e => {
+            if (!editMode || ![...(e.dataTransfer?.types || [])].includes('Files')) return;
+            e.preventDefault();
+            slideCanvasEl.classList.add('drop-target');
+        });
+        slideCanvasEl.addEventListener('dragleave', () => slideCanvasEl.classList.remove('drop-target'));
+        slideCanvasEl.addEventListener('drop', e => {
+            slideCanvasEl.classList.remove('drop-target');
+            if (!editMode) return;
+            const f = [...(e.dataTransfer?.files || [])].find(f => f.type.startsWith('image/'));
+            if (!f) return;
+            e.preventDefault();
+            const r = slideCanvasEl.getBoundingClientRect(), s = slideScale();
+            insertSlideImage(f, { x: (e.clientX - r.left) / s, y: (e.clientY - r.top) / s });
+        });
+        slideCanvasEl.addEventListener('dragstart', e => { if (editMode) e.preventDefault(); });
+        document.addEventListener('paste', e => {
+            if (!editMode || editingEl || /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+            if (document.getElementById('sectionPlayer').classList.contains('hidden')) return;
+            const f = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/'));
+            if (f) { e.preventDefault(); insertSlideImage(f); }
+        });
+
+        /* ----- 浮動物件：移動與縮放 ----- */
+        function setFloatRect(el, x, y, w, h) {
+            Object.assign(el.style, { position: 'absolute', left: Math.round(x) + 'px', top: Math.round(y) + 'px', width: Math.round(w) + 'px' });
+            el.style.height = h == null ? 'auto' : Math.round(h) + 'px';
+        }
+        function floatRect(el) {
+            return { x: parseFloat(el.style.left) || 0, y: parseFloat(el.style.top) || 0, w: el.offsetWidth, h: el.offsetHeight };
+        }
+        function isFloat(el) { return !!el && el.hasAttribute('data-rs-float') && el.style.position === 'absolute'; }
+
+        (function buildFloatBox() {
+            const box = document.createElement('div');
+            box.id = 'floatBox';
+            box.innerHTML = ['nw', 'ne', 'sw', 'se'].map(h => `<span class="fh" data-h="${h}"></span>`).join('') + '<span class="fsize"></span>';
+            document.body.appendChild(box);
+            box.addEventListener('pointerdown', e => {
+                const h = e.target.closest('.fh');
+                if (h) startFloatDrag(e, h.dataset.h);
+            });
+        })();
+
+        function positionFloatBox() {
+            const box = document.getElementById('floatBox');
+            if (!box) return;
+            if (!editMode || !isFloat(selectedEl) || !selectedEl.isConnected) { box.classList.remove('open'); return; }
+            const r = selectedEl.getBoundingClientRect();
+            Object.assign(box.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+            box.querySelector('.fsize').textContent = `${selectedEl.offsetWidth} × ${selectedEl.offsetHeight}`;
+            box.classList.add('open');
+        }
+
+        let floatDrag = null;
+        function startFloatDrag(e, handle) {
+            const el = selectedEl;
+            if (!editMode || !isFloat(el) || e.button !== 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+            stopTextEdit();
+            floatDrag = { el, handle, sx: e.clientX, sy: e.clientY, r: floatRect(el), s: slideScale(), moved: false, keepRatio: el.hasAttribute('data-rs-img') };
+            e.target.setPointerCapture?.(e.pointerId);
+            e.target.addEventListener('pointermove', onFloatDragMove);
+            e.target.addEventListener('pointerup', endFloatDrag, { once: true });
+            e.target.addEventListener('pointercancel', endFloatDrag, { once: true });
+        }
+        function onFloatDragMove(e) {
+            const d = floatDrag;
+            if (!d) return;
+            const dx = (e.clientX - d.sx) / d.s, dy = (e.clientY - d.sy) / d.s;
+            if (!d.moved && Math.abs(dx) + Math.abs(dy) < 2) return;
+            d.moved = true;
+            const { x, y, w, h } = d.r;
+            const MIN = 24;
+            if (!d.handle) {
+                // 移動：至少保留 24px 在投影片內，避免拖出畫面找不回來
+                const nx = Math.min(Math.max(x + dx, MIN - w), SLIDE_W - MIN);
+                const ny = Math.min(Math.max(y + dy, MIN - h), SLIDE_H - MIN);
+                d.el.style.left = Math.round(nx) + 'px';
+                d.el.style.top = Math.round(ny) + 'px';
+            } else {
+                const west = d.handle.includes('w'), north = d.handle.includes('n');
+                let nw = Math.max(MIN, w + (west ? -dx : dx));
+                let nh = Math.max(MIN, h + (north ? -dy : dy));
+                if (d.keepRatio) nh = nw * h / w;
+                // 從左 / 上方的控制點縮放時，對側固定不動
+                setFloatRect(d.el, west ? x + w - nw : x, north ? y + h - nh : y, nw, d.keepRatio ? null : nh);
+            }
+            positionToolbar();
+        }
+        function endFloatDrag(e) {
+            e.target.removeEventListener('pointermove', onFloatDragMove);
+            const d = floatDrag;
+            floatDrag = null;
+            if (!d || !d.moved) return;
+            suppressNextClick = true;
+            if (d.handle && d.el.hasAttribute('data-rs-chart')) rerenderChart(d.el);  // 依新尺寸重畫，文字不變形
+            commitSlideEdit();
+            refreshToolbar();
+        }
+        let suppressNextClick = false;
+        slideCanvasEl.addEventListener('pointerdown', e => {
+            if (!editMode || editingEl) return;
+            const obj = e.target.closest('[data-rs-float]');
+            if (!obj || !getScaler()?.contains(obj) || !isFloat(obj)) return;
+            if (selectedEl !== obj) selectElement(obj);
+            startFloatDrag(e, null);
+        });
+        // 拖曳結束後的 click 不要重新觸發選取（避免工具列閃動）
+        slideCanvasEl.addEventListener('click', e => {
+            if (suppressNextClick) { suppressNextClick = false; e.stopImmediatePropagation(); e.preventDefault(); }
+        }, true);
+
+        /* ----- 圖表資料編輯 ----- */
+        let chartEditTarget = null;      // null = 插入新圖表；否則為 [data-rs-chart] 容器
+
+        function chartToText(spec) {
+            const rows = [['類別', ...spec.datasets.map((d, i) => d.label || `系列${i + 1}`)]];
+            spec.labels.forEach((l, i) => rows.push([l, ...spec.datasets.map(d => d.values[i] ?? 0)]));
+            return rows.map(r => r.join(', ')).join('\n');
+        }
+
+        // 解析數據：有 Tab 就以 Tab 分隔（從 Excel 貼上，數字可含千分位），否則以逗號分隔
+        function parseChartText(text) {
+            const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+            if (lines.length < 2) throw new Error('請至少輸入標題列與一列數據');
+            const tab = lines.some(l => l.includes('\t'));
+            const split = l => (tab ? l.split('\t') : l.split(/[,，]/)).map(c => c.trim());
+            const head = split(lines[0]);
+            const width = Math.max(2, head.length);
+            const datasets = Array.from({ length: width - 1 }, (_, k) => ({ label: head[k + 1] || '', values: [] }));
+            const labels = [];
+            lines.slice(1).forEach((line, r) => {
+                const cells = split(line);
+                labels.push(cells[0] || `項目 ${r + 1}`);
+                datasets.forEach((d, k) => {
+                    const raw = (cells[k + 1] || '').replace(/[,\s%]/g, '');
+                    const v = raw === '' ? 0 : Number(raw);
+                    if (!Number.isFinite(v)) throw new Error(`第 ${r + 2} 列的「${cells[k + 1]}」不是數字`);
+                    d.values.push(v);
+                });
+            });
+            if (labels.length > 12) throw new Error('類別最多 12 個');
+            if (datasets.length > 4) throw new Error('資料系列最多 4 個');
+            return { labels, datasets };
+        }
+
+        function readChartForm() {
+            const { labels, datasets } = parseChartText(document.getElementById('chartData').value);
+            const type = document.getElementById('chartType').value;
+            const colors = document.getElementById('chartColors').value.split(/[,，\s]+/).map(c => c.trim()).filter(Boolean);
+            const bad = colors.find(c => !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(c));
+            if (bad) throw new Error(`「${bad}」不是有效的 HEX 色碼`);
+            return {
+                type,
+                title: document.getElementById('chartTitle').value.trim().slice(0, 40),
+                unit: document.getElementById('chartUnit').value.trim().slice(0, 12),
+                labels,
+                datasets: type === 'pie' || type === 'doughnut' ? datasets.slice(0, 1) : datasets,
+                colors
+            };
+        }
+
+        function updateChartPreview() {
+            const box = document.getElementById('chartPreview');
+            const err = document.getElementById('chartError');
+            try {
+                const spec = readChartForm();
+                const target = chartEditTarget;
+                const w = target ? target.offsetWidth : 480, h = target ? target.offsetHeight : 280;
+                box.innerHTML = renderChartSvg(spec, w, h);
+                err.classList.add('hidden');
+                document.getElementById('chartApplyBtn').disabled = false;
+            } catch (e) {
+                err.textContent = e.message;
+                err.classList.remove('hidden');
+                document.getElementById('chartApplyBtn').disabled = true;
+            }
+        }
+        ['chartType', 'chartTitle', 'chartUnit', 'chartData', 'chartColors'].forEach(id =>
+            document.getElementById(id).addEventListener('input', updateChartPreview));
+
+        function openChartEditor(target) {
+            if (!editMode || !currentPresentationData) return;
+            stopTextEdit();
+            const slide = currentPresentationData.slides[currentSlideIdx];
+            const spec = target ? slide.charts?.[Number(target.getAttribute('data-rs-chart'))] : null;
+            if (target && !spec) { showToast('找不到這張圖表的資料', 'error'); return; }
+            chartEditTarget = target;
+            const s = spec || {
+                type: 'bar', title: '', unit: '', colors: [],
+                labels: ['第一季', '第二季', '第三季', '第四季'],
+                datasets: [{ label: '2024', values: [120, 150, 170, 210] }, { label: '2025', values: [140, 180, 205, 260] }]
+            };
+            document.getElementById('chartModalTitle').textContent = target ? '編輯圖表資料' : '插入圖表';
+            document.getElementById('chartApplyLabel').textContent = target ? '套用' : '插入圖表';
+            document.getElementById('chartType').value = s.type;
+            document.getElementById('chartTitle').value = s.title || '';
+            document.getElementById('chartUnit').value = s.unit || '';
+            document.getElementById('chartColors').value = (s.colors || []).join(', ');
+            document.getElementById('chartData').value = chartToText(s);
+            document.getElementById('chartModal').classList.remove('hidden');
+            updateChartPreview();
+            setTimeout(() => document.getElementById('chartData').focus(), 0);
+        }
+
+        function closeChartEditor() {
+            chartEditTarget = null;
+            document.getElementById('chartModal').classList.add('hidden');
+        }
+
+        function rerenderChart(el) {
+            const slide = currentPresentationData.slides[currentSlideIdx];
+            const spec = slide.charts?.[Number(el.getAttribute('data-rs-chart'))];
+            if (spec) el.innerHTML = renderChartSvg(spec, el.offsetWidth, el.offsetHeight);
+        }
+
+        function applyChartEditor() {
+            let spec;
+            try { spec = readChartForm(); } catch (e) { updateChartPreview(); return; }
+            const slide = currentPresentationData?.slides?.[currentSlideIdx];
+            if (!editMode || !slide) { closeChartEditor(); return; }
+            const target = chartEditTarget;
+            if (target && !target.isConnected) { closeChartEditor(); return; }
+            // 同時修改 slide.charts 與 HTML：先記錄撤銷點，再以 commitSlideEdit(false) 寫回
+            pushUndoSnapshot();
+            slide.charts = Array.isArray(slide.charts) ? slide.charts : [];
+            let el = target;
+            if (el) {
+                slide.charts[Number(el.getAttribute('data-rs-chart'))] = spec;
+            } else {
+                const root = slideRoot();
+                if (!root) { closeChartEditor(); return; }
+                slide.charts.push(spec);
+                el = document.createElement('div');
+                el.setAttribute('data-rs-chart', String(slide.charts.length - 1));
+                el.setAttribute('data-rs-float', '');
+                const w = 480, h = 280;
+                setFloatRect(el, (SLIDE_W - w) / 2, (SLIDE_H - h) / 2, w, h);
+                el.style.zIndex = '10';
+                root.appendChild(el);
+            }
+            rerenderChart(el);
+            commitSlideEdit(false);
+            closeChartEditor();
+            selectElement(el);
+            showToast(target ? '已更新圖表' : '已插入圖表，可拖曳移動、拉角落調整大小', 'success', 2200);
+        }
 
         /* ===================== 頁面管理：標題、排序、複製、刪除 ===================== */
         let dragSlideIdx = null;
@@ -3101,6 +3642,10 @@
 
         /* ===================== 全域事件 ===================== */
         document.addEventListener('keydown', (e) => {
+            if (!document.getElementById('chartModal').classList.contains('hidden')) {
+                if (e.key === 'Escape') { e.preventDefault(); closeChartEditor(); }
+                return;                                   // 圖表視窗開啟時不觸發換頁 / 刪除等快捷鍵
+            }
             if (e.key === 'Escape' && !document.getElementById('regenModal').classList.contains('hidden')) {
                 e.preventDefault();
                 closeRegenerateModal();

@@ -3,6 +3,8 @@
  *   sanitizeSlideHtml(html)       清理 AI 產生的內容（script / on* / javascript: / 外部資源白名單）
  *   buildExportHtml(title, slides) 輸出完整 HTML 字串
  *   exportPresentationHtml()      組裝並觸發下載
+ * 圖表是 static/charts.js 預先畫好的靜態 inline SVG、上傳的圖片是 data:image/png|jpeg，
+ * 兩者都不需要 script 或外部資源，因此這裡的白名單不必放行 Chart.js 等腳本。
  * 離線版（內嵌 Tailwind / FA / 字型）之後再補。
  */
 
@@ -156,7 +158,7 @@ body{box-sizing:border-box;min-height:100vh;font-family:"PingFang TC","Microsoft
 #stage:fullscreen #canvas{width:min(100vw,calc(100vh*16/9));border-radius:0;border:0;box-shadow:none}
 #stage:fullscreen .ui{display:none}
 .slide-anim{width:100%;height:100%}
-.slide-scaler{width:1024px;height:576px;transform-origin:top left}
+.slide-scaler{position:relative;width:1024px;height:576px;transform-origin:top left}
 @keyframes inR{from{opacity:0;transform:translateX(48px) scale(.98)}to{opacity:1;transform:none}}
 @keyframes inL{from{opacity:0;transform:translateX(-48px) scale(.98)}to{opacity:1;transform:none}}
 @keyframes inF{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}

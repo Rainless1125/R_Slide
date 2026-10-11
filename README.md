@@ -8,6 +8,8 @@
 ## 特色
 
 - **內容導向的動態版面**:依內容型態自動選擇版型(KPI 大數字、流程步驟卡、左右對比等),而非固定模板。
+- **圖表**:數據類內容由 LLM 輸出結構化圖表資料(直條、橫條、折線、圓餅、環圈),前端畫成靜態 SVG,編輯與匯出都不需要額外腳本;編輯模式中可修改圖表數據或自行插入圖表(可直接貼上 Excel 表格)。
+- **插入圖片**:編輯模式中可上傳、拖放或貼上圖片,拖曳移動、拉角落調整大小;圖片在瀏覽器端壓縮後內嵌於簡報,不經過伺服器。
 - **匯入檔案作為素材**:支援 PDF、Word(.docx)、Markdown、TXT,可點選上傳、拖放或貼上檔案;文字抽出後會先填入輸入框,可檢查、修改再生成。
 - **多模型支援**:Gemini 與 OpenAI 可切換,只需設定其中一個 API Key。
 - **視覺風格可指定**:例如「蘋果極簡白」、科技深色風等,以 Tailwind CSS 實踐。
@@ -77,6 +79,7 @@ client_max_body_size 40m;   # 檔案匯入上限 10 MB;匯出 PPTX 時整份簡�
 | 前端資源 | 介面載入 Tailwind CDN 與 Font Awesome CDN,使用者瀏覽器需可連外。 |
 | 匯出 PDF | 在瀏覽器端完成,不經過伺服器;第一次匯出時會從 cdnjs 載入 html-to-image 與 jsPDF。 |
 | 匯出 PPTX | 每頁圖片由瀏覽器渲染後送到伺服器組成 PPTX,伺服器不保存;同樣需從 cdnjs 載入 html-to-image。 |
+| 插入圖片 | 在瀏覽器端縮至最長邊 1600px 後以 data URL 存在簡報與歷史記錄(localStorage)中,不會上傳;重產單頁時圖片也不會送給 LLM。圖片多時歷史記錄可能因儲存空間不足而自動移除較舊的紀錄。 |
 | 匯出 HTML | 目前為 CDN 版;離線版(內嵌 Tailwind / Font Awesome / 字型)尚在規劃中。 |
 
 若需要完全內網 / 離線運作,需自行改接內部 LLM 端點並自架前端靜態資源。
@@ -84,10 +87,12 @@ client_max_body_size 40m;   # 檔案匯入上限 10 MB;匯出 PPTX 時整份簡�
 ## 專案結構
 
 ```
+charts.py         圖表資料的 schema、LLM 提示規則與正規化
 app.py            FastAPI 後端(/api/generate、/api/regenerate-slide、/api/extract、/api/export/pptx、/api/models)
 extract.py        上傳檔案的文字抽取(PDF / DOCX / Markdown / TXT)
 exporter.py       將投影片圖片組成 PPTX(/api/export/pptx)
 static/index.html 前端介面
+static/charts.js  圖表 → 靜態 SVG 繪製
 static/export.js  匯出(HTML / PDF / PPTX)與 HTML 清理邏輯
 .env_example      環境變數範本
 tests/            後端測試
