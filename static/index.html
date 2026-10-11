@@ -579,6 +579,17 @@
             transform: translateY(-2px);
         }
 
+        /* 檔案拖放 / 匯入中的遮罩 */
+        #dropOverlay {
+            opacity: 0;
+            transition: opacity .15s;
+        }
+
+        #inputDropZone.dragging #dropOverlay,
+        #inputDropZone.importing #dropOverlay {
+            opacity: 1;
+        }
+
         .thumb:hover {
             transform: translateY(-3px);
         }
@@ -958,13 +969,18 @@
 
                 <div class="space-y-5">
                     <div>
-                        <div class="relative">
+                        <div id="inputDropZone" class="relative">
                             <textarea id="inputContent" rows="10" maxlength="50000"
                                 class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 pb-8 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow resize-none"
-                                placeholder="輸入素材內容...（Ctrl / ⌘ + Enter 快速生成）"></textarea>
+                                placeholder="輸入素材內容，或拖放 PDF / Word / Markdown / TXT 檔案至此...（Ctrl / ⌘ + Enter 快速生成）"></textarea>
                             <span id="charCount"
                                 class="absolute bottom-2 right-3 text-[11px] text-zinc-400 dark:text-zinc-500 tabular-nums transition-colors">0
                                 字</span>
+                            <div id="dropOverlay" aria-hidden="true"
+                                class="absolute inset-0 rounded-xl border-2 border-dashed border-black dark:border-white bg-white/85 dark:bg-zinc-950/85 flex flex-col items-center justify-center gap-2 text-sm font-medium pointer-events-none">
+                                <i id="dropOverlayIcon" class="fa-solid fa-file-arrow-up text-2xl"></i>
+                                <span id="dropOverlayLabel">放開以匯入檔案</span>
+                            </div>
                         </div>
                         <div class="flex flex-wrap items-center gap-2 mt-3">
                             <span class="text-[11px] text-zinc-400 mr-1"><i
@@ -978,8 +994,14 @@
                             <button type="button" onclick="fillSample(2)"
                                 class="chip text-xs px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"><i
                                     class="fa-solid fa-graduation-cap mr-1"></i>教學課程</button>
+                            <button type="button" id="importBtn" onclick="document.getElementById('fileInput').click()"
+                                title="支援 PDF、DOCX、Markdown、TXT，上限 10 MB"
+                                class="chip text-xs px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 ml-auto"><i
+                                    id="importIcon" class="fa-solid fa-file-arrow-up mr-1"></i><span id="importLabel">上傳檔案</span></button>
+                            <input type="file" id="fileInput" class="hidden"
+                                accept=".pdf,.docx,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/markdown,text/plain">
                             <button type="button" onclick="clearInput()"
-                                class="chip text-xs px-3 py-1 rounded-full text-zinc-400 hover:text-red-500 ml-auto"><i
+                                class="chip text-xs px-3 py-1 rounded-full text-zinc-400 hover:text-red-500"><i
                                     class="fa-solid fa-eraser mr-1"></i>清除</button>
                         </div>
                     </div>
@@ -1338,6 +1360,7 @@
             const has = re => re.test(raw);
             let msg;
             if (err?.name === 'TypeError' && has(/fetch|network/i)) msg = '無法連線到伺服器，請確認網路或服務是否仍在執行。';
+            else if (status === 413) msg = '檔案過大，超過伺服器允許的上傳大小。';
             else if (has(/未設定\s*(GEMINI|OPENAI)_API_KEY/i)) msg = '尚未設定此平台的 API Key，請改選其他平台，或到 .env 補上金鑰。';
             else if (status === 401 || status === 403 || has(/api[_ ]?key.*(invalid|not valid|expired)|incorrect api key|unauthorized|permission[_ ]denied|UNAUTHENTICATED/i)) msg = 'API Key 無效或沒有權限，請檢查 .env 內的金鑰。';
             else if (status === 429 || has(/quota|rate.?limit|RESOURCE_EXHAUSTED|too many requests/i)) msg = 'API 額度已用完或請求過於頻繁，請稍候再試，或換一個模型 / 平台。';
@@ -1603,6 +1626,107 @@
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') startGeneration();
         });
 
+        /* ===================== 檔案匯入（PDF / DOCX / Markdown / TXT） ===================== */
+        const IMPORT_EXTS = ['.pdf', '.docx', '.md', '.markdown', '.txt'];
+        const IMPORT_MAX_BYTES = 10 * 1024 * 1024;
+        let importing = false;
+
+        function setImporting(on, name = '') {
+            importing = on;
+            document.getElementById('inputDropZone').classList.toggle('importing', on);
+            document.getElementById('inputContent').readOnly = on;
+            document.getElementById('importBtn').disabled = on;
+            document.getElementById('importIcon').className = (on ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-file-arrow-up') + ' mr-1';
+            document.getElementById('importLabel').textContent = on ? '匯入中…' : '上傳檔案';
+            document.getElementById('dropOverlayIcon').className = (on ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-file-arrow-up') + ' text-2xl';
+            document.getElementById('dropOverlayLabel').textContent = on ? `正在讀取 ${name}…` : '放開以匯入檔案';
+        }
+
+        async function importFile(file) {
+            if (!file || importing) return;
+            if (isGenerating()) { showToast('生成中，請稍候再匯入檔案', 'info'); return; }
+            const ext = (file.name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+            if (!IMPORT_EXTS.includes(ext)) { showToast('不支援的檔案格式，目前支援 PDF、DOCX、Markdown、TXT', 'error', 5000); return; }
+            if (file.size > IMPORT_MAX_BYTES) { showToast('檔案過大（上限 10 MB）', 'error', 5000); return; }
+
+            setImporting(true, file.name);
+            try {
+                const form = new FormData();
+                form.append('file', file);
+                const res = await fetch('/api/extract', { method: 'POST', body: form });
+                if (!res.ok) throw await readApiError(res);
+                applyImportedText(await res.json());
+            } catch (err) {
+                showToast(friendlyError(err), 'error', 6000);
+            } finally {
+                setImporting(false);
+            }
+        }
+
+        // 以匯入內容取代輸入框；原本有內容時提供「復原」
+        function applyImportedText(data) {
+            const ta = document.getElementById('inputContent');
+            const prev = ta.value;
+            ta.value = data.text;
+            updateCount();
+            saveDraft();
+            ta.scrollTop = 0;
+            const meta = [data.pages ? `${data.pages} 頁` : '', `${data.text.length.toLocaleString()} 字`].filter(Boolean).join('，');
+            const undoAction = prev.trim() ? {
+                label: '復原', onClick: () => { ta.value = prev; updateCount(); saveDraft(); }
+            } : null;
+            showToast(`已匯入 ${data.filename}（${meta}）`, 'success', undoAction ? 6000 : 2600, undoAction);
+            if (data.truncated) {
+                showToast(`原文共 ${data.chars.toLocaleString()} 字，超過上限，已截斷至前 ${data.text.length.toLocaleString()} 字`, 'info', 7000);
+            }
+        }
+
+        (function initFileImport() {
+            const zone = document.getElementById('inputDropZone');
+            const input = document.getElementById('fileInput');
+            const hasFiles = e => [...(e.dataTransfer?.types || [])].includes('Files');
+            let dragDepth = 0;
+
+            input.addEventListener('change', () => {
+                importFile(input.files[0]);
+                input.value = ''; // 允許重複選同一個檔案
+            });
+            zone.addEventListener('dragenter', e => {
+                if (!hasFiles(e)) return;
+                e.preventDefault();
+                dragDepth++;
+                zone.classList.add('dragging');
+            });
+            zone.addEventListener('dragover', e => {
+                if (!hasFiles(e)) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = importing ? 'none' : 'copy';
+            });
+            zone.addEventListener('dragleave', e => {
+                if (!hasFiles(e)) return;
+                if (--dragDepth <= 0) { dragDepth = 0; zone.classList.remove('dragging'); }
+            });
+            zone.addEventListener('drop', e => {
+                if (!hasFiles(e)) return;
+                e.preventDefault();
+                dragDepth = 0;
+                zone.classList.remove('dragging');
+                const files = e.dataTransfer.files;
+                if (files.length > 1) showToast('一次只能匯入一個檔案，已匯入第一個', 'info', 3000);
+                importFile(files[0]);
+            });
+            // 從檔案總管複製後在輸入框貼上
+            document.getElementById('inputContent').addEventListener('paste', e => {
+                const file = e.clipboardData?.files?.[0];
+                if (!file) return;
+                e.preventDefault();
+                importFile(file);
+            });
+            // 檔案若誤放在輸入框以外，避免瀏覽器直接開啟檔案而離開頁面
+            window.addEventListener('dragover', e => { if (hasFiles(e)) e.preventDefault(); });
+            window.addEventListener('drop', e => { if (hasFiles(e)) e.preventDefault(); });
+        })();
+
         /* ===================== 輸入區：受眾快選 / 風格卡片 / 草稿自動儲存 ===================== */
         const AUDIENCE_PRESETS = ['公司主管', '客戶 / 投資人', '技術團隊', '學生 / 入門學習者', '一般大眾'];
         (function initAudienceChips() {
@@ -1840,6 +1964,7 @@
             const numPages = parseInt(document.getElementById('numPages').value);
             const stylePreference = document.getElementById('stylePreference').value; // 讀取選擇的風格
 
+            if (importing) { showToast('檔案匯入中，請稍候', 'info'); return; }
             if (!content) {
                 ta.classList.remove('shake'); void ta.offsetWidth; ta.classList.add('shake');
                 ta.focus();

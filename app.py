@@ -1,13 +1,17 @@
 import os
 import json
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
 from openai import OpenAI
+from starlette.datastructures import UploadFile
+
+from extract import MAX_UPLOAD_BYTES, ExtractError, extract_text
 
 load_dotenv()
 MY_GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -73,7 +77,8 @@ class AdaptiveSlide(BaseModel):
     html_content: str = Field(
         description="""
         這一頁投影片的完整 HTML 代碼 (純 HTML + Tailwind CSS class)。
-        必須以 <div class="w-full h-full p-8 flex ..."> 作為最外層容器，確保填滿 16:9 畫布。
+        畫布固定為 1024×576 px，超出部分會被裁掉。
+        必須以 <div class="w-full h-full overflow-hidden flex flex-col p-10 ..."> 作為最外層容器，主要內容區使用 flex-1 min-h-0。
         請嚴格依據使用者指定的【視覺風格】來配置 Tailwind 顏色 (包含 bg-xxx, text-xxx, border-xxx 等)，切勿千篇一律使用深色。
         """
     )
@@ -84,6 +89,30 @@ class AdaptivePresentation(BaseModel):
 
 MAX_CONTENT_CHARS = 50_000
 MAX_PAGES = 20
+
+# 投影片固定以 1024×576 px 渲染（static/index.html 與 export.js 的 .slide-scaler），超出部分會被裁掉
+SLIDE_LAYOUT_RULES = """
+    【版面尺寸硬性限制（最優先，內容超出畫面即視為失敗）】：
+    1. 每頁畫布固定為 1024 × 576 px（16:9），不會捲動，超出的內容會被直接裁掉看不見。
+    2. 最外層容器固定寫法：<div class="w-full h-full overflow-hidden flex flex-col p-10 ...">（padding 介於 p-8 ~ p-12）。
+       主要內容區使用 flex-1 min-h-0，只能使用剩餘高度。
+       禁止使用 h-screen、min-h-screen、vh 單位，也禁止任何超過 576px 的固定高度或寬度超過 1024px。
+    3. 垂直空間預算（扣除上下 padding 後約剩 490px）：
+       - 頁首（小標籤 + 主標題 + 副標題）合計不超過約 140px。
+       - 主要內容區約 300px。
+       - 頁尾註記 / 結論列最多一列、約 40px；非必要就不要放。
+    4. 內容量上限：
+       - 主標題 1 個；副標題最多 1 句、不超過 30 字。
+       - 卡片 / 欄位 / 步驟最多 4 個並排、最多 2 列；每張卡片內文不超過 40 字、最多 3 行。
+       - 條列清單最多 5 點，每點不超過 25 字。
+       - 素材太多時請精簡、合併重點（頁數由你決定時可拆成更多頁），絕對不要把所有文字硬塞進同一頁。
+    5. 字級與間距上限：
+       - 主標題最大 text-4xl；只有封面或單一大數字頁可用 text-5xl ~ text-6xl。
+       - 卡片標題 text-lg ~ text-xl；內文 text-sm ~ text-base；註記 text-xs。
+       - 卡片內距 p-5 ~ p-6；區塊間距 gap-4 ~ gap-6；不要使用 p-10 以上的卡片內距或 mb-12 以上的間距。
+    6. 輸出前請自行估算：各區塊高度相加（含 padding、gap、margin、圖示）必須小於 576px。
+       若可能超出，先刪減文字，其次縮小字級與間距，最後才刪除次要區塊（例如頁尾列）。
+"""
 
 
 class GenerateRequest(BaseModel):
@@ -131,12 +160,10 @@ def generate_slides(req: GenerateRequest):
        - 若內容是流程/SOP，請設計為「橫向流程步驟卡 (Step Cards) 或 時間軸 (Timeline)」。
        - 若內容是優缺點/方案比較，請設計為「左右對稱對比欄位 (Comparison Columns)」。
     2. 視覺與配色規範：
-       - 最外層必須為 <div class="w-full h-full ...">，使用 padding (如 p-8 或 p-12) 保持邊距。
-       - 內容文字必須自適應，嚴格防止超出容器。
        - 僅輸出 Tailwind CSS class。
        - 禁止使用emoji，請一律使用font-awesome圖示。
        - 【重要】你必須絕對服從使用者指定的「視覺風格」。如果要求明亮風，請多用 bg-white/bg-slate-50；如果要求科技風，才使用深色底 bg-slate-900 搭配螢光點綴色。
-    """
+    """ + SLIDE_LAYOUT_RULES
 
     pages_hint = f"{req.num_pages} 頁" if req.num_pages > 0 else "由你依內容多寡與重點自行決定（建議 3~8 頁）"
     prompt = f"""
@@ -155,6 +182,33 @@ def generate_slides(req: GenerateRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/extract")
+async def extract_file(request: Request):
+    """抽取上傳檔案的文字，供前端填入輸入框。檔案不會被保存。"""
+    # 解析 multipart 前先以 Content-Length 擋下過大的請求（預留 64KB 給表單邊界等額外資料）
+    length = request.headers.get("content-length")
+    if not length or not length.isdigit():
+        raise HTTPException(status_code=411, detail="缺少 Content-Length")
+    if int(length) > MAX_UPLOAD_BYTES + 64 * 1024:
+        raise HTTPException(status_code=413, detail=f"檔案過大（上限 {MAX_UPLOAD_BYTES // 1024 // 1024} MB）")
+
+    form = await request.form(max_files=1, max_fields=1)
+    try:
+        upload = form.get("file")
+        if not isinstance(upload, UploadFile):
+            raise HTTPException(status_code=400, detail="請選擇要上傳的檔案")
+        data = await upload.read(MAX_UPLOAD_BYTES + 1)
+        filename = upload.filename or ""
+    finally:
+        await form.close()
+
+    try:
+        return await run_in_threadpool(extract_text, filename, data, MAX_CONTENT_CHARS)
+    except ExtractError as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=400, detail="無法解析此檔案，請確認檔案未損毀")
 
 @app.post("/api/regenerate-slide")
 def regenerate_slide(req: RegenerateSlideRequest):
@@ -179,11 +233,11 @@ def regenerate_slide(req: RegenerateSlideRequest):
 
     【硬性規範】：
     1. 只輸出單頁資料，不要輸出整份簡報。
-    2. 最外層必須是 <div class="w-full h-full ...">，使用 Tailwind CSS class。
+    2. 僅使用 Tailwind CSS class。
     3. 禁止使用 emoji，請使用 font-awesome 圖示。
     4. 必須服從指定視覺風格，並避免與其他頁過度重複。
-    5. 內容需可讀、精簡，不能溢出畫面。
-    """
+    5. 使用者的額外需求若會讓內容超出畫面（例如要求加入更多內容），請以精簡文字的方式達成，不可違反版面尺寸限制。
+    """ + SLIDE_LAYOUT_RULES
 
     prompt = f"""
     【簡報標題】：{req.presentation_title}
