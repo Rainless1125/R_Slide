@@ -959,7 +959,7 @@
                 <div class="space-y-5">
                     <div>
                         <div class="relative">
-                            <textarea id="inputContent" rows="10"
+                            <textarea id="inputContent" rows="10" maxlength="50000"
                                 class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 pb-8 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow resize-none"
                                 placeholder="輸入素材內容...（Ctrl / ⌘ + Enter 快速生成）"></textarea>
                             <span id="charCount"
@@ -1274,6 +1274,16 @@
         let currentStep = 1;
 
         /* ===================== 小工具 ===================== */
+        // AI 產生的 HTML 不可信（可能被素材中的提示注入影響）：進入應用前先清理，
+        // 移除 script / 事件屬性 / meta refresh / iframe / 非白名單的外部資源（與匯出共用 sanitizeSlideHtml）
+        function sanitizeSlide(slide) {
+            if (slide && typeof slide.html_content === 'string') slide.html_content = sanitizeSlideHtml(slide.html_content);
+            return slide;
+        }
+        function sanitizePresentation(data) {
+            if (data && Array.isArray(data.slides)) data.slides.forEach(sanitizeSlide);
+            return data;
+        }
         function esc(s) {
             return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         }
@@ -1462,7 +1472,7 @@
             if (!h || !h.data || !Array.isArray(h.data.slides)) { showToast('此紀錄資料已損毀', 'error'); return; }
             stopAutoplay();
             currentHistoryId = id;
-            currentPresentationData = h.data;
+            currentPresentationData = sanitizePresentation(h.data);
             currentSlideIdx = 0;
             resetUndo();
 
@@ -1703,6 +1713,7 @@
         /* ===================== 步驟條 ===================== */
         function setStep(n) {
             currentStep = n;
+            if (n !== 3) toggleEditMode(false);
             for (let i = 1; i <= 3; i++) {
                 const el = document.getElementById('stepTag' + i);
                 const active = i === n;
@@ -1854,7 +1865,7 @@
                 });
 
                 if (!res.ok) throw await readApiError(res);
-                const data = await res.json();
+                const data = sanitizePresentation(await res.json());
                 currentPresentationData = data;
                 currentSlideIdx = 0;
                 resetUndo();
@@ -2078,7 +2089,7 @@
 
                 if (!res.ok) throw await readApiError(res);
 
-                const newSlide = await res.json();
+                const newSlide = sanitizeSlide(await res.json());
                 const oldSlide = currentPresentationData.slides[idx];
                 pushUndoSnapshot();
                 currentPresentationData.slides[idx] = {
