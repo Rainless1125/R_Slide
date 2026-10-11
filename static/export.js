@@ -175,12 +175,15 @@ body{box-sizing:border-box;min-height:100vh;font-family:"PingFang TC","Microsoft
 #counter{font:12px ui-monospace,monospace;width:60px;text-align:center}
 #thumbs{flex:none;display:flex;gap:12px;width:100%;max-width:1024px;overflow-x:auto;padding:6px 4px;scrollbar-width:none}
 #thumbs::-webkit-scrollbar{display:none}
-.thumb{flex:0 0 160px;height:96px;padding:12px;text-align:left;background:#fafafa;border:1px solid #e4e4e7;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;justify-content:space-between;opacity:.6;transition:all .3s;color:inherit;font:inherit}
+.thumb{position:relative;flex:0 0 176px;padding:0;overflow:hidden;background:#fff;border:1px solid #e4e4e7;border-radius:8px;cursor:pointer;opacity:.6;transition:all .3s;color:inherit;font:inherit}
+.thumb .ti{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;pointer-events:none;user-select:none;text-align:left}
+.thumb .ti .slide-scaler{color:#18181b}
 .thumb:hover{opacity:1}
 .thumb.on{opacity:1;border-color:#18181b;box-shadow:0 0 0 2px #18181b;transform:scale(1.05)}
-.thumb i{font:normal 10px ui-monospace,monospace}
-.thumb b{font-size:12px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.thumb i{position:absolute;left:6px;top:6px;z-index:1;padding:1px 6px;border-radius:4px;background:rgba(0,0,0,.65);color:#fff;font:normal 10px ui-monospace,monospace}
 .hint{flex:none;font-size:11px;color:#a1a1aa;margin:0}
+.ex-footer{flex:none;margin:auto 0 0;padding:8px 0 4px;font-size:11px;letter-spacing:.04em;color:#a1a1aa;text-align:center;user-select:none}
+@media (prefers-color-scheme:dark){.ex-footer{color:#52525b}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 </style>
 </head>
@@ -199,6 +202,7 @@ body{box-sizing:border-box;min-height:100vh;font-family:"PingFang TC","Microsoft
 </div>
 <div id="thumbs"></div>
 <p class="hint">快捷鍵：← → 換頁　F 全螢幕　空白鍵 自動播放　Home / End 首尾頁</p>
+<footer class="ex-footer"><i class="fa-solid fa-chalkboard" style="margin-right:4px"></i>R_Slide　·　<i class="fa-brands fa-github" style="margin-right:4px"></i>Rainless1125/R_Slide</footer>
 <script>
 (function () {
   var SLIDES = {{SLIDES_JSON}};
@@ -230,12 +234,23 @@ body{box-sizing:border-box;min-height:100vh;font-family:"PingFang TC","Microsoft
   SLIDES.forEach(function (s, i) {
     var b = document.createElement('button');
     b.className = 'thumb';
+    b.setAttribute('aria-label', '第 ' + (i + 1) + ' 頁：' + s.title);
     var n = document.createElement('i'); n.textContent = pad(i + 1);
-    var t = document.createElement('b'); t.textContent = s.title;
-    b.appendChild(n); b.appendChild(t);
+    var box = document.createElement('div'); box.className = 'ti';
+    box.innerHTML = '<div class="slide-scaler">' + s.html + '</div>';
+    b.appendChild(n); b.appendChild(box);
     b.onclick = function () { show(i); };
     thumbs.appendChild(b);
   });
+  function fitThumbs() {
+    var bs = thumbs.querySelectorAll('.ti');
+    for (var k = 0; k < bs.length; k++) {
+      var sc = bs[k].firstChild;
+      if (bs[k].clientWidth) sc.style.transform = 'scale(' + bs[k].clientWidth / 1024 + ')';
+    }
+  }
+  fitThumbs();
+  window.addEventListener('resize', fitThumbs);
 
   function toggleAuto() {
     var btn = document.getElementById('auto');

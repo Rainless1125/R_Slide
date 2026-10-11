@@ -132,9 +132,10 @@ async def generate_slides(req: GenerateRequest):
        - 【重要】你必須絕對服從使用者指定的「視覺風格」。如果要求明亮風，請多用 bg-white/bg-slate-50；如果要求科技風，才使用深色底 bg-slate-900 搭配螢光點綴色。
     """
 
+    pages_hint = f"{req.num_pages} 頁" if req.num_pages > 0 else "由你依內容多寡與重點自行決定（建議 3~8 頁）"
     prompt = f"""
     【簡報目標客群】：{req.target_audience}
-    【預計生成頁數】：{req.num_pages} 頁
+    【預計生成頁數】：{pages_hint}
     【指定視覺風格】：{req.style_preference} (請利用 Tailwind CSS 確實實踐此氛圍)
     【原始素材內容】：
     {req.content}

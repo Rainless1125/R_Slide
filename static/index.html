@@ -582,6 +582,56 @@
             transform: translateY(-3px);
         }
 
+        /* ---------- Toast 動作按鈕 ---------- */
+        .toast-action {
+            margin-left: .5rem;
+            padding: .15rem .65rem;
+            border-radius: 9999px;
+            border: 1px solid currentColor;
+            font-size: .75rem;
+            font-weight: 700;
+            opacity: .9;
+            transition: opacity .2s, background-color .2s;
+        }
+
+        .toast-action:hover {
+            opacity: 1;
+            background: rgba(128, 128, 128, .25);
+        }
+
+        /* ---------- 版面審查：縮圖網格 ---------- */
+        .rv-thumb {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            overflow: hidden;
+            border-radius: .75rem;
+            border: 1px solid rgb(228 228 231);
+            background: #fff;
+            cursor: pointer;
+        }
+
+        .dark .rv-thumb {
+            border-color: rgb(39 39 42);
+        }
+
+        .rv-thumb .slide-scaler {
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .rv-thumb::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: transparent;
+            transition: background-color .2s;
+        }
+
+        .rv-thumb:hover::after {
+            background: rgba(0, 0, 0, .06);
+        }
+
         @media (prefers-reduced-motion: reduce) {
 
             *,
@@ -741,8 +791,9 @@
                             <label
                                 class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider"><i
                                     class="fa-solid fa-users mr-1"></i>目標受眾</label>
-                            <input type="text" id="targetAudience" value="" placeholder="目標受眾"
+                            <input type="text" id="targetAudience" value="" placeholder="目標受眾（可點下方快速選擇）"
                                 class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow">
+                            <div id="audienceChips" class="flex flex-wrap gap-1.5 mt-2"></div>
                         </div>
                         <div>
                             <label
@@ -750,6 +801,7 @@
                                     class="fa-regular fa-file-lines mr-1"></i>頁數設定</label>
                             <select id="numPages"
                                 class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow appearance-none cursor-pointer">
+                                <option value="0">由 AI 決定</option>
                                 <option value="2" selected>2 頁 (2 Pages)</option>
                                 <option value="3">3 頁 (3 Pages)</option>
                                 <option value="4">4 頁 (4 Pages)</option>
@@ -761,8 +813,13 @@
                             <label
                                 class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider"><i
                                     class="fa-solid fa-palette mr-1"></i>簡報風格 (AI 動態配色)</label>
-                            <select id="stylePreference"
-                                class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow appearance-none cursor-pointer">
+                            <div id="styleDropdown" class="relative">
+                                <button type="button" id="styleBtn" aria-haspopup="listbox" aria-expanded="false"
+                                    class="w-full flex items-center justify-between gap-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-left focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow"></button>
+                                <ul id="styleList" role="listbox" aria-label="簡報風格"
+                                    class="hidden absolute z-30 left-0 right-0 mt-1 max-h-72 overflow-y-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1"></ul>
+                            </div>
+                            <select id="stylePreference" class="hidden" tabindex="-1" aria-hidden="true">
                                 <!-- 原有熱門風格 -->
                                 <option value="蘋果極簡白 (純白底 bg-white、高對比黑字 text-zinc-900、微灰色邊框 border-zinc-200、大量留白)">極簡白
                                     (Apple Minimalist)</option>
@@ -842,7 +899,7 @@
                         </button>
                     </div>
                 </div>
-                <div id="reviewContainer" class="space-y-4 stagger"></div>
+                <div id="reviewContainer" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 stagger"></div>
             </section>
 
             <!-- 步驟 3: 動態播放器畫布 & 縮圖導航 -->
@@ -1018,7 +1075,7 @@
             void el.offsetWidth;
             el.classList.add(cls);
         }
-        function showToast(msg, type = 'info', ms = 3200) {
+        function showToast(msg, type = 'info', ms = 3200, action = null) {
             const root = document.getElementById('toastRoot');
             const icon = {
                 info: 'fa-circle-info text-sky-400',
@@ -1028,8 +1085,53 @@
             const t = document.createElement('div');
             t.className = 'toast';
             t.innerHTML = `<i class="fa-solid ${icon}"></i><span>${esc(msg)}</span>`;
+            const dismiss = () => { t.classList.add('out'); setTimeout(() => t.remove(), 320); };
+            if (action) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'toast-action';
+                btn.textContent = action.label;
+                btn.onclick = () => { dismiss(); action.onClick(); };
+                t.appendChild(btn);
+            }
             root.appendChild(t);
-            setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 320); }, ms);
+            setTimeout(dismiss, ms);
+        }
+
+        /* ===================== 錯誤訊息白話化 ===================== */
+        // 讀出後端回傳的錯誤字串（FastAPI 的 {"detail": "..."} 或純文字）
+        async function readApiError(res) {
+            let raw = '';
+            try { raw = await res.text(); } catch (_) { }
+            try {
+                const j = JSON.parse(raw);
+                const d = j?.detail;
+                raw = typeof d === 'string' ? d : (d ? JSON.stringify(d) : raw);
+            } catch (_) { }
+            const err = new Error(raw || ('HTTP ' + res.status));
+            err.status = res.status;
+            return err;
+        }
+
+        // 將常見的 LLM / 網路錯誤轉成使用者看得懂的說明
+        function friendlyError(err) {
+            const raw = String(err?.message || err || '');
+            const status = err?.status || 0;
+            const has = re => re.test(raw);
+            let msg;
+            if (err?.name === 'TypeError' && has(/fetch|network/i)) msg = '無法連線到伺服器，請確認網路或服務是否仍在執行。';
+            else if (has(/未設定\s*(GEMINI|OPENAI)_API_KEY/i)) msg = '尚未設定此平台的 API Key，請改選其他平台，或到 .env 補上金鑰。';
+            else if (status === 401 || status === 403 || has(/api[_ ]?key.*(invalid|not valid|expired)|incorrect api key|unauthorized|permission[_ ]denied|UNAUTHENTICATED/i)) msg = 'API Key 無效或沒有權限，請檢查 .env 內的金鑰。';
+            else if (status === 429 || has(/quota|rate.?limit|RESOURCE_EXHAUSTED|too many requests/i)) msg = 'API 額度已用完或請求過於頻繁，請稍候再試，或換一個模型 / 平台。';
+            else if (has(/timed? ?out|deadline|DEADLINE_EXCEEDED|504/i)) msg = 'AI 回應逾時，請稍後再試，或減少頁數與內容長度。';
+            else if (status === 503 || has(/overloaded|unavailable|UNAVAILABLE|high demand/i)) msg = 'AI 服務目前忙碌中，請稍後再試，或換一個模型。';
+            else if (has(/拒絕回應|safety|blocked|refus/i)) msg = '模型拒絕處理這段內容，請調整素材後再試。';
+            else if (has(/JSON|Unterminated|Expecting|validation|parse/i)) msg = 'AI 回傳的格式有誤，通常重試一次即可。';
+            else if (has(/not.?found|404|model/i) && has(/model/i)) msg = '找不到所選模型，請改選其他模型。';
+            else if (status >= 500 || !raw) msg = '伺服器發生錯誤，請稍後再試。';
+            else msg = raw.length > 80 ? raw.slice(0, 80) + '…' : raw;
+            if (raw) console.error('[R Slide]', raw);
+            return msg;
         }
         function fmtTime(ts) {
             const d = new Date(ts), now = new Date();
@@ -1158,9 +1260,10 @@
 
             document.getElementById('inputContent').value = h.input?.content || '';
             document.getElementById('targetAudience').value = h.input?.target_audience || '';
-            if (h.input?.num_pages) document.getElementById('numPages').value = String(h.input.num_pages);
+            if (h.input?.num_pages != null) document.getElementById('numPages').value = String(h.input.num_pages);
             if (h.input?.style_preference) document.getElementById('stylePreference').value = h.input.style_preference;
             updateCount();
+            syncStyleCards();
 
             renderHistory();
             confirmAndPlay();
@@ -1269,6 +1372,7 @@
             document.getElementById('inputContent').value = '';
             document.getElementById('targetAudience').value = '';
             updateCount();
+            try { localStorage.removeItem(DRAFT_KEY); } catch (e) { }
         }
         function updateCount() {
             const ta = document.getElementById('inputContent');
@@ -1280,6 +1384,113 @@
         document.getElementById('inputContent').addEventListener('keydown', e => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') startGeneration();
         });
+
+        /* ===================== 輸入區：受眾快選 / 風格卡片 / 草稿自動儲存 ===================== */
+        const AUDIENCE_PRESETS = ['公司主管', '客戶 / 投資人', '技術團隊', '學生 / 入門學習者', '一般大眾'];
+        (function initAudienceChips() {
+            const box = document.getElementById('audienceChips');
+            const input = document.getElementById('targetAudience');
+            AUDIENCE_PRESETS.forEach(name => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = name;
+                b.className = 'chip text-[11px] px-2.5 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800';
+                b.onclick = () => { input.value = name; input.dispatchEvent(new Event('input')); };
+                box.appendChild(b);
+            });
+        })();
+
+        // 依選項順序對應的示意配色：[底色, 色塊1, 色塊2, 色塊3]
+        const STYLE_SWATCHES = [
+            ['#ffffff', '#18181b', '#d4d4d8', '#a1a1aa'],
+            ['#020617', '#ffffff', '#22d3ee', '#3b82f6'],
+            ['#f8fafc', '#1e3a8a', '#3b82f6', '#94a3b8'],
+            ['#fffbeb', '#facc15', '#f472b6', '#fb923c'],
+            ['#f5f5f4', '#3f6212', '#78350f', '#a8a29e'],
+            ['#fef3c7', '#000000', '#f472b6', '#38bdf8'],
+            ['#09090b', '#e879f9', '#67e8f9', '#a855f7'],
+            ['#0a0a0a', '#fcd34d', '#d97706', '#737373'],
+            ['#ecfdf5', '#022c22', '#059669', '#6ee7b7'],
+            ['#f4f4f5', '#000000', '#dc2626', '#a1a1aa']
+        ];
+        // 文字後方顯示示意色塊（底色 + 三個強調色）
+        function swatchHtml(i) {
+            const [bg, a, b, c] = STYLE_SWATCHES[i] || ['#fff', '#000', '#888', '#bbb'];
+            const dot = col => `<span class="inline-block w-3 h-3 rounded-full border border-black/15 dark:border-white/25" style="background:${col}"></span>`;
+            return `<span class="inline-flex items-center gap-1 shrink-0" aria-hidden="true">${dot(bg)}${dot(a)}${dot(b)}${dot(c)}</span>`;
+        }
+        function styleLabel(opt) { return opt.textContent.replace(/\s+/g, ' ').trim(); }
+        function initStyleCards() {
+            const sel = document.getElementById('stylePreference');
+            const list = document.getElementById('styleList');
+            const btn = document.getElementById('styleBtn');
+            const setOpen = open => {
+                list.classList.toggle('hidden', !open);
+                btn.setAttribute('aria-expanded', String(open));
+                if (open) list.querySelector('[aria-selected=true]')?.scrollIntoView({ block: 'nearest' });
+            };
+            [...sel.options].forEach((opt, i) => {
+                const li = document.createElement('li');
+                li.setAttribute('role', 'option');
+                li.dataset.value = opt.value;
+                li.className = 'flex items-center justify-between gap-3 px-4 py-2 text-sm cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 aria-selected:font-bold aria-selected:bg-zinc-100 dark:aria-selected:bg-zinc-800';
+                li.innerHTML = `<span class="truncate">${esc(styleLabel(opt))}</span>${swatchHtml(i)}`;
+                li.onclick = () => { sel.value = opt.value; syncStyleCards(); setOpen(false); saveDraft(); btn.focus(); };
+                list.appendChild(li);
+            });
+            btn.onclick = () => setOpen(list.classList.contains('hidden'));
+            document.addEventListener('click', e => { if (!e.target.closest('#styleDropdown')) setOpen(false); });
+            document.getElementById('styleDropdown').addEventListener('keydown', e => {
+                if (e.key === 'Escape') { setOpen(false); btn.focus(); return; }
+                if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+                e.preventDefault();
+                const n = sel.options.length;
+                sel.selectedIndex = (sel.selectedIndex + (e.key === 'ArrowDown' ? 1 : n - 1)) % n;
+                syncStyleCards(); saveDraft();
+                setOpen(true);
+            });
+            syncStyleCards();
+        }
+        function syncStyleCards() {
+            const sel = document.getElementById('stylePreference');
+            const i = sel.selectedIndex;
+            document.getElementById('styleBtn').innerHTML =
+                `<span class="truncate">${esc(styleLabel(sel.options[i]))}</span><span class="flex items-center gap-2 shrink-0">${swatchHtml(i)}<i class="fa-solid fa-chevron-down text-[10px] text-zinc-400"></i></span>`;
+            document.querySelectorAll('#styleList [role=option]').forEach(li => li.setAttribute('aria-selected', String(li.dataset.value === sel.value)));
+        }
+
+        const DRAFT_KEY = 'rslide_draft';
+        let draftTimer = null;
+        function saveDraft() {
+            clearTimeout(draftTimer);
+            draftTimer = setTimeout(() => {
+                try {
+                    const content = document.getElementById('inputContent').value;
+                    if (!content.trim()) { localStorage.removeItem(DRAFT_KEY); return; }
+                    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+                        content,
+                        audience: document.getElementById('targetAudience').value,
+                        pages: document.getElementById('numPages').value,
+                        style: document.getElementById('stylePreference').value
+                    }));
+                } catch (e) { }
+            }, 400);
+        }
+        function restoreDraft() {
+            let d = null;
+            try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (e) { }
+            if (!d || !d.content) return;
+            document.getElementById('inputContent').value = d.content;
+            document.getElementById('targetAudience').value = d.audience || '';
+            if (d.pages != null) document.getElementById('numPages').value = d.pages;
+            if (d.style) document.getElementById('stylePreference').value = d.style;
+            updateCount();
+            syncStyleCards();
+            showToast('已還原上次未送出的草稿', 'info', 2400);
+        }
+        ['inputContent', 'targetAudience'].forEach(id => document.getElementById(id).addEventListener('input', saveDraft));
+        ['numPages', 'stylePreference'].forEach(id => document.getElementById(id).addEventListener('change', saveDraft));
+        initStyleCards();
 
         /* ===================== 步驟條 ===================== */
         function setStep(n) {
@@ -1418,7 +1629,7 @@
                     })
                 });
 
-                if (!res.ok) throw new Error(await res.text());
+                if (!res.ok) throw await readApiError(res);
                 const data = await res.json();
                 currentPresentationData = data;
                 currentSlideIdx = 0;
@@ -1430,7 +1641,7 @@
                 showToast('版面生成完成，已存入歷史記錄', 'success', 2200);
             } catch (err) {
                 setLoading(false);
-                showToast("生成失敗: " + err.message, 'error', 5000);
+                showToast(friendlyError(err), 'error', 8000, { label: '重試', onClick: startGeneration });
             }
         }
 
@@ -1446,24 +1657,27 @@
 
             currentPresentationData.slides.forEach((slide, idx) => {
                 const card = document.createElement('div');
-                card.className = "spot p-5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-600";
+                card.className = "spot p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 rounded-xl flex flex-col gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-600";
                 card.innerHTML = `
-          <div class="relative min-w-0 flex-1">
-            <div class="flex items-center gap-3 mb-1">
-              <span class="text-xs font-mono bg-zinc-200 dark:bg-zinc-800 px-2 py-1 rounded text-zinc-600 dark:text-zinc-300">0${esc(slide.page_number)}</span>
-              <span class="font-bold">${esc(slide.slide_title)}</span>
+          <div class="rv-thumb" role="button" tabindex="0" onclick="previewSingleSlide(${idx})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();previewSingleSlide(${idx})}" aria-label="預覽第 ${idx + 1} 頁：${esc(slide.slide_title)}" title="點擊放大預覽">
+            <div class="slide-scaler">${slide.html_content}</div>
+          </div>
+          <div class="relative min-w-0 px-1">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs font-mono bg-zinc-200 dark:bg-zinc-800 px-2 py-0.5 rounded text-zinc-600 dark:text-zinc-300">${pad(idx + 1)}</span>
+              <span class="font-bold text-sm truncate" title="${esc(slide.slide_title)}">${esc(slide.slide_title)}</span>
             </div>
-            <div class="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
-              <span class="inline-block w-2 h-2 rounded-full bg-green-500 pulse-dot"></span>
-              Layout: ${esc(slide.layout_concept)}
+            <div class="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1 min-w-0">
+              <span class="inline-block w-2 h-2 shrink-0 rounded-full bg-green-500 pulse-dot"></span>
+              <span class="truncate" title="${esc(slide.layout_concept)}">${esc(slide.layout_concept)}</span>
             </div>
           </div>
-          <div class="flex items-center gap-2 shrink-0 self-start md:self-center">
-            <button onclick="previewSingleSlide(${idx})" class="icon-btn text-xs px-3 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-semibold flex items-center gap-1.5 whitespace-nowrap">
+          <div class="flex items-center gap-2 px-1 pb-1">
+            <button onclick="previewSingleSlide(${idx})" class="icon-btn flex-1 justify-center text-xs px-3 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-semibold flex items-center gap-1.5 whitespace-nowrap">
               <i class="fa-regular fa-eye text-[10px]"></i>
-              <span>預覽此頁</span>
+              <span>預覽</span>
             </button>
-            <button id="regenSlideBtn-${idx}" onclick="openRegenerateModal(${idx})" class="icon-btn text-xs px-3 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-semibold flex items-center gap-1.5 whitespace-nowrap">
+            <button id="regenSlideBtn-${idx}" onclick="openRegenerateModal(${idx})" class="icon-btn flex-1 justify-center text-xs px-3 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-semibold flex items-center gap-1.5 whitespace-nowrap">
               <i id="regenSlideIcon-${idx}" class="fa-solid fa-arrows-rotate text-[10px]"></i>
               <span id="regenSlideLabel-${idx}">重產此頁</span>
             </button>
@@ -1471,9 +1685,20 @@
         `;
                 container.appendChild(card);
             });
+            fitReviewThumbs();
+            if (regeneratingSlideIdx !== null) setReviewRegenerateState(regeneratingSlideIdx, true);
 
             review.scrollIntoView({ behavior: 'smooth' });
         }
+
+        // 縮圖寬度不固定（隨視窗變動），依容器寬度等比縮放 1024px 的投影片
+        function fitReviewThumbs() {
+            document.querySelectorAll('#reviewContainer .rv-thumb').forEach(box => {
+                const scaler = box.querySelector('.slide-scaler');
+                if (scaler && box.clientWidth) scaler.style.transform = `scale(${box.clientWidth / 1024})`;
+            });
+        }
+        new ResizeObserver(fitReviewThumbs).observe(document.getElementById('reviewContainer'));
 
         function previewSingleSlide(idx) {
             currentSlideIdx = idx;
@@ -1604,16 +1829,7 @@
                     })
                 });
 
-                if (!res.ok) {
-                    let detail = '';
-                    try {
-                        const errData = await res.json();
-                        detail = errData?.detail || JSON.stringify(errData);
-                    } catch (_) {
-                        detail = await res.text();
-                    }
-                    throw new Error(detail || '伺服器錯誤');
-                }
+                if (!res.ok) throw await readApiError(res);
 
                 const newSlide = await res.json();
                 const oldSlide = currentPresentationData.slides[idx];
@@ -1637,7 +1853,7 @@
                 if (modalOpen) closeRegenerateModal(true);
                 showToast(`第 ${idx + 1} 頁已重產完成`, 'success', 2200);
             } catch (err) {
-                showToast('重產失敗: ' + (err?.message || '未知錯誤'), 'error', 5000);
+                showToast(friendlyError(err), 'error', 8000, { label: '重試', onClick: () => regenerateSingleSlide(idx, customPrompt) });
             } finally {
                 setReviewRegenerateState(idx, false);
                 setCurrentRegenerateState(false);
@@ -1725,6 +1941,7 @@
             scaler.style.transform = `scale(${canvas.clientWidth / 1024})`;
         }
         new ResizeObserver(fitSlide).observe(document.getElementById('slideCanvas'));
+        window.addEventListener('resize', () => fitPlayerThumbs());
 
         function renderSlide(index, mode) {
             const total = currentPresentationData.slides.length;
@@ -1757,16 +1974,29 @@
             container.innerHTML = '';
             currentPresentationData.slides.forEach((slide, idx) => {
                 const thumb = document.createElement('div');
-                thumb.className = 'thumb spot flex-shrink-0 w-40 h-24 rounded-lg border p-3 flex flex-col justify-between cursor-pointer transition-all duration-300 select-none text-left';
+                thumb.className = THUMB_BASE;
                 thumb.dataset.idx = idx;
+                thumb.title = slide.slide_title;
+                thumb.setAttribute('role', 'button');
+                thumb.tabIndex = 0;
+                thumb.setAttribute('aria-label', `第 ${idx + 1} 頁：${slide.slide_title}`);
                 thumb.onclick = () => renderSlide(idx);
+                thumb.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); renderSlide(idx); } };
                 thumb.innerHTML = `
-          <div class="relative text-[10px] font-mono">0${idx + 1}</div>
-          <div class="relative text-xs font-bold line-clamp-2 leading-snug">${esc(slide.slide_title)}</div>
+          <span class="absolute left-1.5 top-1.5 z-10 text-[10px] font-mono px-1.5 py-px rounded bg-black/65 text-white">${pad(idx + 1)}</span>
+          <div class="rv-thumb !border-0 !rounded-none !cursor-pointer"><div class="slide-scaler">${slide.html_content}</div></div>
         `;
                 container.appendChild(thumb);
             });
+            fitPlayerThumbs();
             animateIn(container, 'reveal');
+        }
+        const THUMB_BASE = 'thumb relative flex-shrink-0 w-44 rounded-lg border overflow-hidden cursor-pointer transition-all duration-300 select-none ';
+        function fitPlayerThumbs() {
+            document.querySelectorAll('#thumbnailContainer .rv-thumb').forEach(box => {
+                const sc = box.querySelector('.slide-scaler');
+                if (sc && box.clientWidth) sc.style.transform = `scale(${box.clientWidth / 1024})`;
+            });
         }
 
         function updateThumbnails() {
@@ -1774,12 +2004,9 @@
             container.querySelectorAll('.thumb').forEach(thumb => {
                 const idx = Number(thumb.dataset.idx);
                 const isCurrent = idx === currentSlideIdx;
-                const base = 'thumb spot flex-shrink-0 w-40 h-24 rounded-lg border p-3 flex flex-col justify-between cursor-pointer transition-all duration-300 select-none text-left ';
-                thumb.className = base + (isCurrent
-                    ? 'border-black dark:border-white ring-2 ring-black dark:ring-white bg-white dark:bg-zinc-800 shadow-md scale-105'
-                    : 'border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800 opacity-60 hover:opacity-100');
-                thumb.children[0].className = 'relative text-[10px] font-mono ' + (isCurrent ? 'text-black dark:text-white' : 'text-zinc-500');
-                thumb.children[1].className = 'relative text-xs font-bold line-clamp-2 leading-snug ' + (isCurrent ? 'text-black dark:text-white' : 'text-zinc-600 dark:text-zinc-400');
+                thumb.className = THUMB_BASE + (isCurrent
+                    ? 'border-black dark:border-white ring-2 ring-black dark:ring-white shadow-md scale-105'
+                    : 'border-zinc-200 dark:border-zinc-800 opacity-60 hover:opacity-100');
                 if (isCurrent) thumb.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
             });
         }
@@ -1960,6 +2187,7 @@
 
         setStep(1);
         renderHistory(true);
+        restoreDraft();
     </script>
 </body>
 
