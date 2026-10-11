@@ -583,20 +583,166 @@
         }
 
         /* ---------- 行內文字編輯 ---------- */
-        #slideCanvas.editing [contenteditable] {
-            cursor: text;
-            outline: 1px dashed transparent;
+        /* 編輯模式：滑過顯示虛線（只標示最內層）、選取為藍框、文字編輯中為實線 */
+        #slideCanvas.editing .slide-scaler * {
+            cursor: default;
+        }
+
+        #slideCanvas.editing .slide-scaler *:hover:not(:has(:hover)) {
+            outline: 1px dashed rgba(59, 130, 246, .8);
+            outline-offset: 1px;
+        }
+
+        /* 編輯模式隱藏左右懸浮箭頭，避免蓋住投影片邊緣的元素（控制列與方向鍵仍可換頁） */
+        #slideCanvas.editing~.stage-nav-btn {
+            display: none;
+        }
+
+        #slideCanvas.editing [data-rs-sel] {
+            outline: 2px solid #3b82f6 !important;
             outline-offset: 2px;
-            transition: outline-color .15s;
         }
 
-        #slideCanvas.editing [contenteditable]:hover {
-            outline-color: rgba(59, 130, 246, .75);
+        #slideCanvas.editing .slide-scaler>[data-rs-sel] {
+            outline-offset: -3px;
         }
 
-        #slideCanvas.editing [contenteditable]:focus {
-            outline: 2px solid #3b82f6;
-            border-radius: 2px;
+        #slideCanvas.editing [contenteditable] {
+            cursor: text !important;
+            outline-style: solid !important;
+            background-image: linear-gradient(rgba(59, 130, 246, .08), rgba(59, 130, 246, .08));
+        }
+
+        /* ---------- 浮動格式工具列 ---------- */
+        #fmtToolbar {
+            position: fixed;
+            z-index: 55;
+            display: none;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 2px;
+            max-width: calc(100vw - 16px);
+            padding: 4px 6px;
+            border-radius: 14px;
+            border: 1px solid rgb(228 228 231);
+            background: rgba(255, 255, 255, .97);
+            color: #18181b;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .18);
+            backdrop-filter: blur(8px);
+            font-size: 12px;
+        }
+
+        .dark #fmtToolbar {
+            border-color: rgb(63 63 70);
+            background: rgba(24, 24, 27, .97);
+            color: #f4f4f5;
+        }
+
+        #fmtToolbar.open {
+            display: flex;
+        }
+
+        #fmtToolbar .fb {
+            min-width: 28px;
+            height: 28px;
+            padding: 0 6px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        #fmtToolbar .fb:hover:not(:disabled) {
+            background: rgba(128, 128, 128, .18);
+        }
+
+        #fmtToolbar .fb:disabled {
+            opacity: .35;
+            cursor: not-allowed;
+        }
+
+        #fmtToolbar .fb[aria-pressed="true"] {
+            background: #3b82f6;
+            color: #fff;
+        }
+
+        #fmtToolbar .fb.danger:hover:not(:disabled) {
+            background: rgba(239, 68, 68, .15);
+            color: #ef4444;
+        }
+
+        #fmtToolbar select {
+            height: 28px;
+            border-radius: 8px;
+            border: 1px solid rgba(128, 128, 128, .35);
+            background: transparent;
+            color: inherit;
+            font-size: 12px;
+            padding: 0 4px;
+        }
+
+        #fmtToolbar select option {
+            color: #18181b;
+        }
+
+        #fmtToolbar .sep {
+            width: 1px;
+            height: 18px;
+            margin: 0 4px;
+            background: rgba(128, 128, 128, .35);
+        }
+
+        #fmtToolbar .chipbox {
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+            border: 1px solid rgba(128, 128, 128, .5);
+        }
+
+        #fmtPalette {
+            position: fixed;
+            z-index: 56;
+            display: none;
+            width: 236px;
+            max-height: 340px;
+            overflow-y: auto;
+            padding: 8px;
+            border-radius: 12px;
+            border: 1px solid rgb(228 228 231);
+            background: #fff;
+            color: #18181b;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .22);
+        }
+
+        .dark #fmtPalette {
+            border-color: rgb(63 63 70);
+            background: #18181b;
+            color: #f4f4f5;
+        }
+
+        #fmtPalette.open {
+            display: block;
+        }
+
+        #fmtPalette .pal-row {
+            display: flex;
+            gap: 2px;
+            margin-top: 2px;
+        }
+
+        #fmtPalette .pal-chip {
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            border: 1px solid rgba(128, 128, 128, .3);
+        }
+
+        #fmtPalette .pal-chip:hover {
+            transform: scale(1.25);
+            border-color: #3b82f6;
         }
 
         #editBtn[aria-pressed="true"] {
@@ -2037,28 +2183,20 @@
         let editMode = false;
         const PLAINTEXT_EDIT = (() => { const d = document.createElement('div'); try { d.contentEditable = 'plaintext-only'; } catch (e) { } return d.contentEditable === 'plaintext-only'; })();
 
-        // 序列化投影片 DOM：移除編輯用屬性，得到可存回 html_content 的字串
+        // 序列化投影片 DOM：移除編輯用的標記屬性（文字編輯中 / 拼字檢查 / 選取標記），得到可存回 html_content 的字串
+        const EDIT_ATTRS = ['contenteditable', 'spellcheck', 'data-rs-sel'];
         function serializeScaler(scaler) {
             const c = scaler.cloneNode(true);
-            c.querySelectorAll('[contenteditable],[spellcheck]').forEach(el => { el.removeAttribute('contenteditable'); el.removeAttribute('spellcheck'); });
+            c.querySelectorAll(EDIT_ATTRS.map(a => `[${a}]`).join(',')).forEach(el => EDIT_ATTRS.forEach(a => el.removeAttribute(a)));
             return c.innerHTML;
         }
 
-        // 把「直接含有文字」的元素變成可編輯（略過 SVG 內部與 script/style）
-        function markEditable() {
-            const scaler = document.querySelector('#slideCanvas .slide-scaler');
-            if (!scaler) return;
-            scaler.dataset.base = serializeScaler(scaler);
-            scaler.querySelectorAll('*').forEach(el => {
-                if (/^(SCRIPT|STYLE)$/i.test(el.tagName) || el.closest('svg')) return;
-                if (![...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim())) return;
-                el.setAttribute('contenteditable', PLAINTEXT_EDIT ? 'plaintext-only' : 'true');
-                el.setAttribute('spellcheck', 'false');
-            });
-        }
+        function getScaler() { return document.querySelector('#slideCanvas .slide-scaler'); }
 
-        function unmarkEditable() {
-            document.querySelectorAll('#slideCanvas [contenteditable]').forEach(el => { el.removeAttribute('contenteditable'); el.removeAttribute('spellcheck'); });
+        // 進入編輯模式／換頁後：記下目前內容作為比對基準
+        function prepareEditing() {
+            const scaler = getScaler();
+            if (scaler) scaler.dataset.base = serializeScaler(scaler);
         }
 
         function toggleEditMode(force) {
@@ -2068,6 +2206,8 @@
                 if (!currentPresentationData || regeneratingSlideIdx !== null) return;
                 stopAutoplay();
             } else {
+                stopTextEdit();
+                clearSelection();
                 commitSlideEdit();
             }
             editMode = want;
@@ -2077,13 +2217,12 @@
             btn.setAttribute('aria-pressed', String(editMode));
             document.getElementById('editLabel').textContent = editMode ? '完成編輯' : '編輯文字';
             document.getElementById('editIcon').className = 'fa-solid text-[11px] ' + (editMode ? 'fa-check' : 'fa-pen-to-square');
-            if (editMode) { markEditable(); showToast('點投影片上的文字即可直接修改（Esc 結束，可撤銷）', 'info', 3000); }
-            else unmarkEditable();
+            if (editMode) { prepareEditing(); showToast('單擊選取元素、雙擊編輯文字（Esc 取消選取，可撤銷）', 'info', 3500); }
         }
 
         // 把畫面上的修改寫回資料（一次編輯 = 一個撤銷步驟）
         function commitSlideEdit() {
-            const scaler = document.querySelector('#slideCanvas .slide-scaler');
+            const scaler = getScaler();
             const slide = currentPresentationData?.slides?.[currentSlideIdx];
             if (!scaler || !slide || scaler.dataset.base === undefined) return;
             const html = serializeScaler(scaler);
@@ -2095,15 +2234,348 @@
             if (thumbScaler) thumbScaler.innerHTML = html;
             syncCurrentPresentationToHistory();
         }
-        document.getElementById('slideCanvas').addEventListener('focusout', () => { if (editMode) commitSlideEdit(); });
-        document.getElementById('slideCanvas').addEventListener('keydown', e => {
+
+        /* ----- 選取（單擊）與文字編輯（雙擊） ----- */
+        let selectedEl = null;
+        let editingEl = null;
+
+        function hasOwnText(el) { return [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()); }
+        function isRootBlock(el) { return !!el && el.parentElement === getScaler(); }
+
+        function selectElement(el) {
+            if (selectedEl && selectedEl !== el) selectedEl.removeAttribute('data-rs-sel');
+            selectedEl = el;
+            el.setAttribute('data-rs-sel', '1');
+            fmtRO.disconnect();
+            fmtRO.observe(el);
+            refreshToolbar();
+        }
+
+        function clearSelection() {
+            if (selectedEl) selectedEl.removeAttribute('data-rs-sel');
+            selectedEl = null;
+            fmtRO.disconnect();
+            hidePalette();
+            document.getElementById('fmtToolbar')?.classList.remove('open');
+        }
+
+        function startTextEdit(el, x, y) {
+            if (editingEl && editingEl !== el) stopTextEdit();
+            editingEl = el;
+            el.setAttribute('contenteditable', PLAINTEXT_EDIT ? 'plaintext-only' : 'true');
+            el.setAttribute('spellcheck', 'false');
+            selectElement(el);
+            el.focus({ preventScroll: true });
+            // 游標放在雙擊的位置
+            let range = null;
+            if (document.caretRangeFromPoint) range = document.caretRangeFromPoint(x, y);
+            else if (document.caretPositionFromPoint) {
+                const pos = document.caretPositionFromPoint(x, y);
+                if (pos) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); range.collapse(true); }
+            }
+            if (range && el.contains(range.startContainer)) {
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+        }
+
+        function stopTextEdit() {
+            if (!editingEl) return;
+            const el = editingEl;
+            editingEl = null;
+            el.removeAttribute('contenteditable');
+            el.removeAttribute('spellcheck');
+            commitSlideEdit();
+        }
+
+        const slideCanvasEl = document.getElementById('slideCanvas');
+        slideCanvasEl.addEventListener('click', e => {
+            if (!editMode) return;
+            const scaler = getScaler();
+            let t = e.target;
+            if (!scaler || !scaler.contains(t) || t === scaler) { clearSelection(); return; }
+            if (editingEl && editingEl.contains(t)) return;          // 編輯中：保留游標操作
+            e.preventDefault();                                       // 避免投影片內的連結跳轉
+            if (editingEl) stopTextEdit();
+            const svg = t.closest('svg');
+            if (svg && svg !== t && scaler.contains(svg)) t = svg;   // SVG 內部以整個圖形為單位
+            selectElement(t);
+        });
+        slideCanvasEl.addEventListener('dblclick', e => {
+            if (!editMode) return;
+            const scaler = getScaler();
+            let el = e.target;
+            while (el && el !== scaler && !hasOwnText(el)) el = el.parentElement;
+            if (!el || el === scaler || el.closest('svg')) return;
+            e.preventDefault();
+            startTextEdit(el, e.clientX, e.clientY);
+        });
+        slideCanvasEl.addEventListener('focusout', e => {
+            if (!editMode) return;
+            if (e.target === editingEl) stopTextEdit(); else commitSlideEdit();
+        });
+        slideCanvasEl.addEventListener('keydown', e => {
             // 編輯中避免 Enter 觸發外層按鈕行為；貼上一律純文字
             if (editMode && e.key === 'Enter' && !PLAINTEXT_EDIT) { e.preventDefault(); document.execCommand('insertLineBreak'); }
         });
-        document.getElementById('slideCanvas').addEventListener('paste', e => {
+        slideCanvasEl.addEventListener('paste', e => {
             if (!editMode || PLAINTEXT_EDIT) return;
             e.preventDefault();
             document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text/plain'));
+        });
+
+        /* ----- 以 Tailwind class 為單位的樣式替換 ----- */
+        const TW_HUES = ['slate', 'gray', 'zinc', 'neutral', 'stone', 'red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose'];
+        const TW_SHADES = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
+        const COLOR_BODY = `(?:white|black|transparent|current|inherit|(?:${TW_HUES.join('|')})-(?:${TW_SHADES.join('|')}))(?:\\/\\d{1,3})?`;
+        const RE = {
+            size: /^text-(?:xs|sm|base|lg|xl|[2-9]xl)$|^text-\[\d*\.?\d+(?:px|rem|em|vw|vh|%)\]$/,
+            weight: /^font-(?:thin|extralight|light|normal|medium|semibold|bold|extrabold|black)$/,
+            align: /^text-(?:left|center|right|justify|start|end)$/,
+            justify: /^justify-(?:start|center|end)$/,
+            items: /^items-(?:start|center|end)$/,
+            textColor: new RegExp(`^text-${COLOR_BODY}$|^text-\\[(?:#|rgb|hsl)[^\\]]*\\]$`),
+            bgColor: new RegExp(`^bg-${COLOR_BODY}$|^bg-\\[(?:#|rgb|hsl)[^\\]]*\\]$|^bg-gradient-to-\\w+$|^(?:from|via|to)-${COLOR_BODY}$`),
+            radius: /^rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full))?$|^rounded-\[[^\]]*\]$/
+        };
+        const SIZE_STEPS = ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl', '7xl', '8xl', '9xl'];
+        const SIZE_PX = [12, 14, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96, 128];
+        const WEIGHTS = [['thin', '極細', 100], ['light', '細', 300], ['normal', '標準', 400], ['medium', '中等', 500], ['semibold', '半粗', 600], ['bold', '粗', 700], ['extrabold', '特粗', 800], ['black', '黑', 900]];
+        const RADII = [['none', '無'], ['sm', '極小'], ['', '小'], ['md', '中'], ['lg', '大'], ['xl', '特大'], ['2xl', '2XL'], ['3xl', '3XL'], ['full', '圓形']];
+
+        function removeClasses(el, ...res) {
+            [...el.classList].forEach(c => { if (res.some(re => re.test(c))) el.classList.remove(c); });
+        }
+        function setClass(el, groupRes, cls) {
+            removeClasses(el, ...groupRes);
+            if (cls) el.classList.add(cls);
+            if (!el.getAttribute('class')) el.removeAttribute('class');
+        }
+        function clearInlineStyle(el, ...props) {
+            props.forEach(p => el.style.removeProperty(p));
+            if (!el.getAttribute('style')) el.removeAttribute('style');
+        }
+
+        function currentSizeIndex(el) {
+            const cls = [...el.classList].find(c => /^text-(?:xs|sm|base|lg|xl|[2-9]xl)$/.test(c));
+            if (cls) return SIZE_STEPS.indexOf(cls.slice(5));
+            const px = parseFloat(getComputedStyle(el).fontSize) || 16;
+            return SIZE_PX.reduce((best, v, i) => Math.abs(v - px) < Math.abs(SIZE_PX[best] - px) ? i : best, 0);
+        }
+        function currentWeight(el) {
+            const cls = [...el.classList].find(c => RE.weight.test(c));
+            if (cls) { const n = cls.slice(5); return (WEIGHTS.find(w => w[0] === n) || WEIGHTS.find(w => w[0] === 'light'))[0]; }
+            const w = parseInt(getComputedStyle(el).fontWeight) || 400;
+            return WEIGHTS.reduce((best, x) => Math.abs(x[2] - w) < Math.abs(best[2] - w) ? x : best, WEIGHTS[2])[0];
+        }
+        function currentRadius(el) {
+            const cls = [...el.classList].find(c => /^rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full))?$/.test(c));
+            if (cls) return cls === 'rounded' ? '' : cls.slice(8);
+            return getComputedStyle(el).borderTopLeftRadius === '0px' ? 'none' : '__custom';
+        }
+        function currentAlign(el) {
+            const a = getComputedStyle(el).textAlign;
+            return a === 'center' ? 'center' : (a === 'right' || a === 'end') ? 'right' : 'left';
+        }
+
+        // 套用樣式 → 寫回資料（一個撤銷步驟）→ 稍後更新工具列（等 Tailwind 產生新 class 的樣式）
+        function fmtCommit() {
+            commitSlideEdit();
+            setTimeout(refreshToolbar, 90);
+        }
+
+        const FMT_ACTIONS = {
+            sizeDown() { stepSize(-1); },
+            sizeUp() { stepSize(1); },
+            align(v) {
+                const el = selectedEl;
+                setClass(el, [RE.align], 'text-' + v);
+                const cs = getComputedStyle(el);
+                const pos = { left: 'start', center: 'center', right: 'end' }[v];
+                if (/flex/.test(cs.display)) {      // flex 容器的子項不吃 text-align，一併調整主軸／交叉軸對齊
+                    if (cs.flexDirection.startsWith('column')) setClass(el, [RE.items], 'items-' + pos);
+                    else setClass(el, [RE.justify], 'justify-' + pos);
+                }
+            },
+            weight(v) { setClass(selectedEl, [RE.weight], 'font-' + v); },
+            radius(v) { if (v !== '__custom') setClass(selectedEl, [RE.radius], v === '' ? 'rounded' : 'rounded-' + v); },
+            color(kind, c) {                         // c === '' → 移除
+                const el = selectedEl;
+                if (kind === 'text') { setClass(el, [RE.textColor], c ? 'text-' + c : ''); clearInlineStyle(el, 'color'); }
+                else { setClass(el, [RE.bgColor], c ? 'bg-' + c : ''); clearInlineStyle(el, 'background', 'background-color', 'background-image'); }
+            },
+            parent() {
+                const p = selectedEl.parentElement;
+                if (p && p !== getScaler()) { stopTextEdit(); selectElement(p); }
+            },
+            remove() {
+                if (isRootBlock(selectedEl)) return;
+                const el = selectedEl;
+                stopTextEdit();
+                clearSelection();
+                el.remove();
+            },
+            duplicate() {
+                if (isRootBlock(selectedEl)) return;
+                stopTextEdit();
+                const el = selectedEl;
+                const c = el.cloneNode(true);
+                [c, ...c.querySelectorAll(EDIT_ATTRS.map(a => `[${a}]`).join(','))].forEach(n => EDIT_ATTRS.forEach(a => n.removeAttribute(a)));
+                el.after(c);
+                selectElement(c);
+            },
+            moveUp() { moveSibling(-1); },
+            moveDown() { moveSibling(1); }
+        };
+
+        function stepSize(dir) {
+            const i = currentSizeIndex(selectedEl) + dir;
+            if (i < 0 || i >= SIZE_STEPS.length) return;
+            setClass(selectedEl, [RE.size], 'text-' + SIZE_STEPS[i]);
+        }
+        function moveSibling(dir) {
+            const el = selectedEl;
+            if (isRootBlock(el)) return;
+            const other = dir < 0 ? el.previousElementSibling : el.nextElementSibling;
+            if (!other) return;
+            stopTextEdit();
+            if (dir < 0) other.before(el); else other.after(el);
+        }
+
+        function runFmt(name, ...args) {
+            if (!editMode || !selectedEl || !selectedEl.isConnected) return;
+            FMT_ACTIONS[name](...args);
+            fmtCommit();
+        }
+
+        /* ----- 浮動工具列 ----- */
+        const fmtRO = new ResizeObserver(() => positionToolbar());
+        (function buildToolbar() {
+            const tb = document.createElement('div');
+            tb.id = 'fmtToolbar';
+            tb.setAttribute('role', 'toolbar');
+            tb.setAttribute('aria-label', '文字與元素格式');
+            const btn = (id, icon, title, extra = '') => `<button type="button" class="fb ${extra}" data-fmt="${id}" title="${title}" aria-label="${title}">${icon}</button>`;
+            tb.innerHTML = `
+          ${btn('parent', '<i class="fa-solid fa-turn-up text-[11px]"></i>', '選取父層元素')}
+          <span class="sep"></span>
+          ${btn('sizeDown', '<i class="fa-solid fa-minus text-[9px]"></i><span>A</span>', '縮小字級')}
+          <span id="fmtSize" class="px-1 tabular-nums min-w-[2.2rem] text-center" title="目前字級"></span>
+          ${btn('sizeUp', '<span>A</span><i class="fa-solid fa-plus text-[9px]"></i>', '放大字級')}
+          <span class="sep"></span>
+          <select id="fmtWeight" title="字體粗細" aria-label="字體粗細">${WEIGHTS.map(w => `<option value="${w[0]}">${w[1]}</option>`).join('')}</select>
+          <span class="sep"></span>
+          ${btn('align-left', '<i class="fa-solid fa-align-left text-[11px]"></i>', '靠左')}
+          ${btn('align-center', '<i class="fa-solid fa-align-center text-[11px]"></i>', '置中')}
+          ${btn('align-right', '<i class="fa-solid fa-align-right text-[11px]"></i>', '靠右')}
+          <span class="sep"></span>
+          ${btn('pal-text', '<span class="font-bold">A</span><span id="fmtTextChip" class="chipbox"></span>', '文字顏色')}
+          ${btn('pal-bg', '<i class="fa-solid fa-fill-drip text-[11px]"></i><span id="fmtBgChip" class="chipbox"></span>', '背景顏色')}
+          <span class="sep"></span>
+          <select id="fmtRadius" title="圓角" aria-label="圓角"><option value="__custom" disabled hidden>圓角</option>${RADII.map(r => `<option value="${r[0]}">圓角：${r[1]}</option>`).join('')}</select>
+          <span class="sep"></span>
+          ${btn('duplicate', '<i class="fa-regular fa-clone text-[11px]"></i>', '複製元素')}
+          ${btn('moveUp', '<i class="fa-solid fa-arrow-up text-[11px]"></i>', '同層上移（往前）')}
+          ${btn('moveDown', '<i class="fa-solid fa-arrow-down text-[11px]"></i>', '同層下移（往後）')}
+          ${btn('remove', '<i class="fa-regular fa-trash-can text-[11px]"></i>', '刪除元素（Delete）', 'danger')}`;
+            document.body.appendChild(tb);
+
+            const pal = document.createElement('div');
+            pal.id = 'fmtPalette';
+            const chip = (c, label) => `<button type="button" class="pal-chip ${c ? 'bg-' + c : ''}" data-color="${c}" title="${label}" aria-label="${label}"></button>`;
+            pal.innerHTML = `
+          <div class="flex items-center gap-1 mb-1">
+            <button type="button" class="fb text-[11px] px-2 h-6 rounded-md border border-zinc-300 dark:border-zinc-600" data-color="" >預設（移除）</button>
+            ${chip('white', 'white')}${chip('black', 'black')}<button type="button" class="pal-chip" data-color="transparent" title="transparent" aria-label="transparent" style="background:linear-gradient(135deg,#fff 45%,#ef4444 45%,#ef4444 55%,#fff 55%)"></button>
+          </div>
+          ${TW_HUES.map(h => `<div class="pal-row">${TW_SHADES.map(sh => chip(`${h}-${sh}`, `${h}-${sh}`)).join('')}</div>`).join('')}`;
+            document.body.appendChild(pal);
+
+            // 按鈕不搶走焦點（維持文字編輯中的游標）；select 例外
+            tb.addEventListener('mousedown', e => { if (!e.target.closest('select')) e.preventDefault(); });
+            pal.addEventListener('mousedown', e => e.preventDefault());
+            tb.addEventListener('click', e => {
+                const b = e.target.closest('[data-fmt]');
+                if (!b || b.disabled) return;
+                const id = b.dataset.fmt;
+                if (id.startsWith('align-')) runFmt('align', id.slice(6));
+                else if (id === 'pal-text' || id === 'pal-bg') togglePalette(id === 'pal-text' ? 'text' : 'bg', b);
+                else runFmt(id);
+            });
+            tb.querySelector('#fmtWeight').addEventListener('change', e => runFmt('weight', e.target.value));
+            tb.querySelector('#fmtRadius').addEventListener('change', e => runFmt('radius', e.target.value));
+            pal.addEventListener('click', e => {
+                const c = e.target.closest('[data-color]');
+                if (!c) return;
+                runFmt('color', palMode, c.dataset.color);
+                hidePalette();
+            });
+        })();
+
+        let palMode = 'text';
+        function togglePalette(mode, anchor) {
+            const pal = document.getElementById('fmtPalette');
+            if (pal.classList.contains('open') && palMode === mode) { hidePalette(); return; }
+            palMode = mode;
+            pal.classList.add('open');
+            const r = anchor.getBoundingClientRect();
+            const h = pal.offsetHeight, w = pal.offsetWidth;
+            let top = r.bottom + 6;
+            if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
+            pal.style.top = top + 'px';
+            pal.style.left = Math.min(Math.max(8, r.left), window.innerWidth - w - 8) + 'px';
+        }
+        function hidePalette() { document.getElementById('fmtPalette')?.classList.remove('open'); }
+
+        function refreshToolbar() {
+            const tb = document.getElementById('fmtToolbar');
+            const el = selectedEl;
+            if (!editMode || !el || !el.isConnected) { clearSelection(); return; }
+            tb.classList.add('open');
+            const cs = getComputedStyle(el);
+            document.getElementById('fmtSize').textContent = SIZE_STEPS[currentSizeIndex(el)];
+            document.getElementById('fmtWeight').value = currentWeight(el);
+            const rad = currentRadius(el);
+            const radSel = document.getElementById('fmtRadius');
+            radSel.value = rad;
+            if (radSel.value !== rad) radSel.value = '__custom';
+            const al = currentAlign(el);
+            tb.querySelectorAll('[data-fmt^="align-"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.fmt === 'align-' + al)));
+            document.getElementById('fmtTextChip').style.background = cs.color;
+            const bg = cs.backgroundColor;
+            document.getElementById('fmtBgChip').style.background = bg === 'rgba(0, 0, 0, 0)' ? 'transparent' : bg;
+            const root = isRootBlock(el);
+            const sizeIdx = currentSizeIndex(el);
+            tb.querySelector('[data-fmt="parent"]').disabled = root;
+            tb.querySelector('[data-fmt="sizeDown"]').disabled = sizeIdx <= 0;
+            tb.querySelector('[data-fmt="sizeUp"]').disabled = sizeIdx >= SIZE_STEPS.length - 1;
+            tb.querySelector('[data-fmt="duplicate"]').disabled = root;
+            tb.querySelector('[data-fmt="remove"]').disabled = root;
+            tb.querySelector('[data-fmt="moveUp"]').disabled = root || !el.previousElementSibling;
+            tb.querySelector('[data-fmt="moveDown"]').disabled = root || !el.nextElementSibling;
+            positionToolbar();
+        }
+
+        // 工具列固定在視窗座標：優先放在元素上方，放不下就改放下方
+        function positionToolbar() {
+            const tb = document.getElementById('fmtToolbar');
+            if (!tb || !selectedEl || !tb.classList.contains('open')) return;
+            const r = selectedEl.getBoundingClientRect();
+            if (r.bottom < 0 || r.top > window.innerHeight) { tb.style.visibility = 'hidden'; return; }
+            tb.style.visibility = 'visible';
+            const w = tb.offsetWidth, h = tb.offsetHeight;
+            let top = r.top - h - 8;
+            if (top < 8) top = r.bottom + 8;
+            if (top + h > window.innerHeight - 8) top = Math.max(8, Math.min(r.top + 8, window.innerHeight - h - 8));
+            tb.style.top = top + 'px';
+            tb.style.left = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - w - 8)) + 'px';
+        }
+        window.addEventListener('scroll', () => { positionToolbar(); hidePalette(); }, { passive: true });
+        window.addEventListener('resize', () => { positionToolbar(); hidePalette(); });
+        new ResizeObserver(() => positionToolbar()).observe(document.getElementById('slideCanvas'));
+        document.addEventListener('mousedown', e => {
+            if (!e.target.closest('#fmtPalette') && !e.target.closest('[data-fmt^="pal-"]')) hidePalette();
         });
 
         /* ===================== 頁面管理：標題、排序、複製、刪除 ===================== */
@@ -2211,7 +2683,7 @@
             canvas.innerHTML = `<div class="slide-anim ${cls}"><div class="slide-scaler">${slide.html_content}</div></div>`;
             fitSlide();
             document.getElementById('currentLayoutBadge').innerText = slide.layout_concept;
-            if (editMode) markEditable();
+            if (editMode) { editingEl = null; clearSelection(); prepareEditing(); }
 
             document.getElementById('slideCounter').textContent = `${pad(index + 1)} / ${pad(total)}`;
             document.getElementById('slideProgress').style.width = ((index + 1) / total * 100) + '%';
@@ -2321,6 +2793,8 @@
             }
             const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || !!e.target.isContentEditable;
             if (e.key === 'Escape' && e.target.isContentEditable && e.target.closest('#slideCanvas')) { e.target.blur(); return; }
+            if (e.key === 'Escape' && editMode && selectedEl && !typing) { clearSelection(); return; }
+            if ((e.key === 'Delete' || e.key === 'Backspace') && editMode && selectedEl && !typing) { e.preventDefault(); runFmt('remove'); return; }
             if ((e.ctrlKey || e.metaKey) && !e.altKey && !typing && currentPresentationData) {
                 const k = e.key.toLowerCase();
                 if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
