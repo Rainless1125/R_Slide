@@ -11,6 +11,7 @@ from pptx.util import Emu
 MAX_EXPORT_SLIDES = 60
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_IMAGE_SIDE = 4096
+MAX_NOTES_CHARS = 5000
 # 16:9，與 PowerPoint「寬螢幕」預設尺寸相同（13.333 x 7.5 in）
 SLIDE_WIDTH = Emu(12192000)
 SLIDE_HEIGHT = Emu(6858000)
@@ -44,7 +45,7 @@ def _decode_image(data_url: str, page: int) -> bytes:
 
 
 def build_pptx(title: str, slides: list[dict]) -> bytes:
-    """每頁放一張滿版圖片；投影片標題寫入圖片替代文字與備忘稿。"""
+    """每頁放一張滿版圖片；投影片標題寫入圖片替代文字，講者備註寫入備忘稿（沒有備註時改寫標題）。"""
     if not slides:
         raise ExportError("沒有可匯出的投影片")
     if len(slides) > MAX_EXPORT_SLIDES:
@@ -61,7 +62,9 @@ def build_pptx(title: str, slides: list[dict]) -> bytes:
         slide_title = (slide_data.get("title") or "").strip() or f"第 {i} 頁"
         pic.name = f"Slide {i}"
         pic._element.nvPicPr.cNvPr.set("descr", slide_title)
-        slide.notes_slide.notes_text_frame.text = slide_title
+        notes = slide_data.get("notes")
+        notes = notes.strip()[:MAX_NOTES_CHARS] if isinstance(notes, str) else ""
+        slide.notes_slide.notes_text_frame.text = notes or slide_title
 
     out = io.BytesIO()
     prs.save(out)

@@ -13,6 +13,7 @@
 - **匯入檔案作為素材**:支援 PDF、Word(.docx)、Markdown、TXT,可點選上傳、拖放或貼上檔案;文字抽出後會先填入輸入框,可檢查、修改再生成。
 - **多模型支援**:Gemini 與 OpenAI 可切換,只需設定其中一個 API Key。
 - **視覺風格可指定**:例如「蘋果極簡白」、科技深色風等,以 Tailwind CSS 實踐。
+- **講者備註與講者檢視**:LLM 會為每頁產生口語化的講稿(補充畫面上沒寫的脈絡,不重複投影片文字),可在播放器下方的備註區直接修改(快捷鍵 N)。「講者檢視」(快捷鍵 P)另開視窗顯示目前頁、下一頁、備註與計時器,適合主畫面投影、筆電看講稿;在講者檢視中可用方向鍵、PageUp / PageDown(簡報筆)換頁。備註會寫入 PPTX 的備忘稿,HTML 匯出也可按 N 顯示。
 - **單頁重新生成**:不滿意某一頁時,可附加需求單獨重產,並維持整份簡報一致。
 - **匯出 PDF / PPTX / HTML**:PDF 與 PPTX 的每一頁為 2 倍解析度的圖片,外觀與畫面一致,但文字無法再編輯;HTML 為可直接播放的單一檔案,匯出時會清理 AI 產生的內容(移除 script、事件屬性、外部資源白名單)。
 - **輕量部署**:後端為單一 FastAPI 服務,前端為靜態檔案,無需資料庫。
@@ -98,6 +99,7 @@ exporter.py       將投影片圖片組成 PPTX(/api/export/pptx)
 static/index.html 前端介面
 static/charts.js  圖表 → 靜態 SVG 繪製
 static/export.js  匯出(HTML / PDF / PPTX)與 HTML 清理邏輯
+static/presenter.js 講者備註區與講者檢視視窗
 .env_example      環境變數範本
 tests/            後端測試
 ```
