@@ -86,11 +86,13 @@ class AdaptiveSlide(BaseModel):
         """
     )
     charts: list[ChartSpec] = Field(description="此頁的圖表資料，依 data-rs-chart 索引對應；沒有圖表時為空陣列")
+    speaker_notes: str = Field(description="講者備註：講者上台時照著說的口語講稿（純文字，不含 HTML），規則見【講者備註】")
 
 
 class SlideInput(AdaptiveSlide):
-    """前端送回的投影片：舊版歷史紀錄沒有 charts，且圖表資料已在前端正規化過，因此放寬驗證。"""
+    """前端送回的投影片：舊版歷史紀錄沒有 charts / speaker_notes，且圖表資料已在前端正規化過，因此放寬驗證。"""
     charts: list[dict] = Field(default_factory=list)
+    speaker_notes: str = ""
 
 class AdaptivePresentation(BaseModel):
     presentation_title: str = Field(description="整份簡報的大標題")
@@ -121,6 +123,17 @@ SLIDE_LAYOUT_RULES = """
        - 卡片內距 p-5 ~ p-6；區塊間距 gap-4 ~ gap-6；不要使用 p-10 以上的卡片內距或 mb-12 以上的間距。
     6. 輸出前請自行估算：各區塊高度相加（含 padding、gap、margin、圖示）必須小於 576px。
        若可能超出，先刪減文字，其次縮小字級與間距，最後才刪除次要區塊（例如頁尾列）。
+"""
+
+
+# 講者備註只出現在播放器的備註區與 PPTX 備忘稿，不會畫在投影片上，因此不受版面字數限制
+SPEAKER_NOTES_RULES = """
+    【講者備註（speaker_notes）】：
+    1. 每頁都要提供講者備註：講者上台時可以直接照著念的口語講稿，使用與原始素材相同的語言。
+    2. 長度約 80 ~ 200 字，2 ~ 5 句；封面與結尾頁可較短。
+    3. 內容要補充畫面上沒有寫出的脈絡、數據來源、舉例或轉場，不要逐字重複投影片上的文字。
+    4. 最後一句可以自然帶出下一頁的主題（最後一頁則做總結或呼籲行動）。
+    5. 只輸出純文字，不要 HTML、Markdown 符號或 emoji；換段可使用換行。
 """
 
 
@@ -173,7 +186,7 @@ def generate_slides(req: GenerateRequest):
        - 僅輸出 Tailwind CSS class。
        - 禁止使用emoji，請一律使用font-awesome圖示。
        - 【重要】你必須絕對服從使用者指定的「視覺風格」。如果要求明亮風，請多用 bg-white/bg-slate-50；如果要求科技風，才使用深色底 bg-slate-900 搭配螢光點綴色。
-    """ + SLIDE_LAYOUT_RULES + CHART_RULES
+    """ + SLIDE_LAYOUT_RULES + CHART_RULES + SPEAKER_NOTES_RULES
 
     pages_hint = f"{req.num_pages} 頁" if req.num_pages > 0 else "由你依內容多寡與重點自行決定（建議 3~8 頁）"
     prompt = f"""
@@ -279,7 +292,8 @@ def regenerate_slide(req: RegenerateSlideRequest):
     5. 使用者的額外需求若會讓內容超出畫面（例如要求加入更多內容），請以精簡文字的方式達成，不可違反版面尺寸限制。
     6. 原 HTML 中 <img data-rs-img src="rs-img:數字"> 是使用者上傳的圖片：除非使用者要求移除，否則請保留該 <img> 標籤與 src 原樣，
        可調整它的位置與大小。原 HTML 中的 data-rs-chart 容器內容已省略，圖表資料請參考【原圖表資料】。
-    """ + SLIDE_LAYOUT_RULES + CHART_RULES
+    7. 講者備註需配合新版面重新撰寫；使用者的額外需求若只針對版面，仍可沿用【原講者備註】的重點。
+    """ + SLIDE_LAYOUT_RULES + CHART_RULES + SPEAKER_NOTES_RULES
 
     prompt = f"""
     【簡報標題】：{req.presentation_title}
@@ -300,6 +314,8 @@ def regenerate_slide(req: RegenerateSlideRequest):
     {target_slide.html_content}
     - 原圖表資料（JSON，可沿用、修改或刪除）：
     {json.dumps(target_slide.charts, ensure_ascii=False) if target_slide.charts else "（無）"}
+    - 原講者備註：
+    {target_slide.speaker_notes.strip() or "（無）"}
 
     【使用者額外重產需求】：
     {req.custom_prompt.strip() if req.custom_prompt.strip() else "（無，請你自行優化此頁）"}
