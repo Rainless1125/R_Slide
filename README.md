@@ -96,8 +96,18 @@ charts.py         圖表資料的 schema、LLM 提示規則與正規化
 app.py            FastAPI 後端(/api/generate、/api/regenerate-slide、/api/extract、/api/export/pptx、/api/models)
 extract.py        上傳檔案的文字抽取(PDF / DOCX / Markdown / TXT)
 exporter.py       將投影片圖片組成 PPTX(/api/export/pptx)
-static/index.html 前端介面
+static/index.html 前端介面(HTML 結構;樣式與程式在 static/app/)
+static/app/       主畫面的樣式與程式,依功能分檔,以一般 <script> 依序載入、共用全域:
+  app.css         主畫面樣式
+  core.js         主題、全域狀態、小工具、錯誤訊息、歷史記錄、側邊欄
+  input.js        範例、檔案匯入、輸入區(受眾 / 風格 / 草稿)
+  generate.js     步驟條、模型選單、生成、檢閱頁、單頁重新生成
+  editor.js       撤銷 / 重做、選取與行內文字編輯、格式工具列
+  media.js        圖片、文字方塊、浮動物件拖曳縮放、圖表資料編輯
+  player.js       頁面管理、播放器、自動播放、全螢幕、匯出選單
+  main.js         全域快捷鍵、捲動 / 縮放事件與啟動(最後載入)
 static/charts.js  圖表 → 靜態 SVG 繪製
+static/chart-grid.js 圖表數據的試算表式輸入表格
 static/export.js  匯出(HTML / PDF / PPTX)與 HTML 清理邏輯
 static/presenter.js 講者備註區與講者檢視視窗
 .env_example      環境變數範本
