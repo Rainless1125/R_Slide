@@ -21,7 +21,7 @@
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/app/app.css?v=1">
+    <link rel="stylesheet" href="/static/app/app.css?v=2">
 </head>
 
 <body
@@ -386,6 +386,11 @@
                         aria-label="插入圖表" title="輸入數據插入圖表">
                         <i class="fa-solid fa-chart-column text-[11px]"></i><span class="hidden xl:inline">圖表</span>
                     </button>
+                    <button id="iconPickerBtn" onclick="toggleIconPicker()" data-edit-only aria-haspopup="dialog" aria-expanded="false" aria-controls="iconPicker"
+                        class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
+                        aria-label="插入圖示" title="從常用圖示中快速插入（可搜尋關鍵字）">
+                        <i class="fa-solid fa-icons text-[11px]"></i><span class="hidden xl:inline">圖示</span>
+                    </button>
                     <input id="slideImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" class="hidden">
                     <button id="regenCurrentBtn" onclick="regenerateCurrentSlide()"
                         class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
@@ -491,6 +496,24 @@
         </div>
     </div>
 
+    <!-- 插入圖示面板（static/icons.js 的清單，由 media.js 建立格狀按鈕） -->
+    <div id="iconPicker" role="dialog" aria-label="插入圖示"
+        class="hidden fixed z-[80] flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl">
+        <div class="p-2.5 border-b border-zinc-200 dark:border-zinc-800">
+            <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400"></i>
+                <input id="iconSearch" type="search" autocomplete="off" spellcheck="false"
+                    placeholder="搜尋圖示，例如 cash、會議、成長" aria-label="搜尋圖示" aria-describedby="iconCount"
+                    class="w-full h-9 pl-8 pr-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100">
+            </div>
+            <div class="mt-1.5 flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
+                <span id="iconCount" aria-live="polite"></span>
+                <span class="hidden sm:inline">Enter 插入第一個 · Esc 關閉</span>
+            </div>
+        </div>
+        <div id="iconGrid" class="flex-1 min-h-0 overflow-y-auto p-2.5"></div>
+    </div>
+
     <!-- 圖表資料 Modal -->
     <div id="chartModal" role="dialog" aria-modal="true" aria-labelledby="chartModalTitle"
         class="hidden fixed inset-0 z-[90] bg-black/45 backdrop-blur-sm p-4 flex items-center justify-center">
@@ -570,13 +593,14 @@
     <script src="/static/chart-grid.js?v=1"></script>
     <script src="/static/export.js?v=6"></script>
     <script src="/static/presenter.js?v=1"></script>
+    <script src="/static/icons.js?v=1"></script>
     <script src="/static/app/core.js?v=1"></script>
     <script src="/static/app/input.js?v=1"></script>
     <script src="/static/app/generate.js?v=1"></script>
-    <script src="/static/app/editor.js?v=1"></script>
-    <script src="/static/app/media.js?v=1"></script>
+    <script src="/static/app/editor.js?v=2"></script>
+    <script src="/static/app/media.js?v=2"></script>
     <script src="/static/app/player.js?v=1"></script>
-    <script src="/static/app/main.js?v=1"></script>
+    <script src="/static/app/main.js?v=2"></script>
 </body>
 
 </html>

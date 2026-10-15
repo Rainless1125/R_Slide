@@ -782,6 +782,52 @@ body.sb-open #sidebar {
     user-select: none;
 }
 
+/* ---------- 插入圖示面板（一列 10 個） ---------- */
+.icon-group + .icon-group { margin-top: 12px; }
+.icon-group-title {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin: 0 2px 6px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #3f3f46;
+}
+.icon-group-title span {
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #a1a1aa;
+}
+.icon-grid {
+    display: grid;
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    gap: 4px;
+}
+.icon-cell {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 16px;
+    color: #3f3f46;
+    transition: background-color .12s, color .12s, transform .12s;
+}
+.icon-cell:hover, .icon-cell:focus-visible {
+    background: #eff6ff;
+    color: #2563eb;
+    transform: scale(1.12);
+    outline: none;
+}
+.icon-cell:focus-visible { box-shadow: 0 0 0 2px #3b82f6; }
+.dark .icon-group-title { color: #d4d4d8; }
+.dark .icon-group-title span { color: #71717a; }
+.dark .icon-cell { color: #d4d4d8; }
+.dark .icon-cell:hover, .dark .icon-cell:focus-visible { background: #172554; color: #93c5fd; }
+#iconPickerBtn[aria-expanded="true"] { background: #3b82f6; color: #fff; }
+
 /* ---------- 圖表數據表格（static/chart-grid.js） ---------- */
 .rs-grid-scroll {
     max-height: 320px;

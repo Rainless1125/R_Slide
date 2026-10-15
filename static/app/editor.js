@@ -94,6 +94,7 @@ function toggleEditMode(force) {
         if (!currentPresentationData || regeneratingSlideIdx !== null) return;
         stopAutoplay();
     } else {
+        closeIconPicker();
         stopTextEdit();
         clearSelection();
         commitSlideEdit();
@@ -106,7 +107,7 @@ function toggleEditMode(force) {
     document.getElementById('editLabel').textContent = editMode ? '完成編輯' : '編輯';
     document.getElementById('editIcon').className = 'fa-solid text-[11px] ' + (editMode ? 'fa-check' : 'fa-pen-to-square');
     document.querySelectorAll('[data-edit-only]').forEach(b => { b.classList.toggle('hidden', !editMode); b.classList.toggle('flex', editMode); });
-    if (editMode) { prepareEditing(); showToast('單擊選取元素、雙擊編輯文字；插入的文字、圖片與圖表可拖曳移動、拉角落縮放（Esc 取消選取，可撤銷）', 'info', 4000); }
+    if (editMode) { prepareEditing(); showToast('單擊選取元素、雙擊編輯文字；插入的文字、圖片、圖表與圖示可拖曳移動、拉角落縮放（Esc 取消選取，可撤銷）', 'info', 4000); }
 }
 
 // 把畫面上的修改寫回資料（一次編輯 = 一個撤銷步驟）
@@ -204,6 +205,7 @@ slideCanvasEl.addEventListener('dblclick', e => {
     if (!editMode) return;
     const scaler = getScaler();
     let el = e.target;
+    if (el.closest('[data-rs-icon]')) return;                // 圖示沒有文字可編輯
     while (el && el !== scaler && !hasOwnText(el)) el = el.parentElement;
     if (!el || el === scaler || el.closest('svg')) return;
     e.preventDefault();
@@ -343,6 +345,7 @@ const FMT_ACTIONS = {
 
 function stepSize(dir) {
     const el = selectedEl;
+    if (el.hasAttribute('data-rs-icon')) { scaleIcon(el, dir); return; }   // 圖示以外框邊長縮放
     const isChart = el.hasAttribute('data-rs-chart');
     const i = currentSizeIndex(el) + dir;
     if (i < 0 || i > (isChart ? CHART_SIZE_MAX : SIZE_STEPS.length - 1)) return;
@@ -452,7 +455,8 @@ function refreshToolbar() {
     if (!editMode || !el || !el.isConnected) { clearSelection(); return; }
     tb.classList.add('open');
     const cs = getComputedStyle(el);
-    document.getElementById('fmtSize').textContent = SIZE_STEPS[currentSizeIndex(el)];
+    const isIcon = el.hasAttribute('data-rs-icon');
+    document.getElementById('fmtSize').textContent = isIcon ? el.offsetWidth + 'px' : SIZE_STEPS[currentSizeIndex(el)];
     document.getElementById('fmtWeight').value = currentWeight(el);
     const rad = currentRadius(el);
     const radSel = document.getElementById('fmtRadius');
@@ -466,8 +470,8 @@ function refreshToolbar() {
     const root = isRootBlock(el);
     const sizeIdx = currentSizeIndex(el);
     tb.querySelector('[data-fmt="parent"]').disabled = root;
-    tb.querySelector('[data-fmt="sizeDown"]').disabled = sizeIdx <= 0;
-    tb.querySelector('[data-fmt="sizeUp"]').disabled = sizeIdx >= (el.hasAttribute('data-rs-chart') ? CHART_SIZE_MAX : SIZE_STEPS.length - 1);
+    tb.querySelector('[data-fmt="sizeDown"]').disabled = isIcon ? el.offsetWidth <= ICON_MIN : sizeIdx <= 0;
+    tb.querySelector('[data-fmt="sizeUp"]').disabled = isIcon ? el.offsetWidth >= ICON_MAX : sizeIdx >= (el.hasAttribute('data-rs-chart') ? CHART_SIZE_MAX : SIZE_STEPS.length - 1);
     tb.querySelector('[data-fmt="duplicate"]').disabled = root;
     tb.querySelector('[data-fmt="remove"]').disabled = root;
     tb.querySelector('[data-fmt="moveUp"]').disabled = root || !el.previousElementSibling;

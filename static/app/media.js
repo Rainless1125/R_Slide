@@ -1,4 +1,4 @@
-/* 圖片、文字方塊、浮動物件拖曳縮放、圖表資料編輯
+/* 圖片、文字方塊、圖示、浮動物件拖曳縮放、圖表資料編輯
  * 由 index.html 拆出；所有 app/*.js 是一般 <script>（非 module），共用全域，須依 index.html 中的順序載入。 */
 /* ===================== 圖片與圖表 ===================== */
 // 圖片以 data URL 內嵌在 html_content（不經伺服器、不需外部資源，sanitizeSlideHtml 本來就允許 data:image/png|jpeg）；
@@ -177,6 +177,147 @@ function insertTextBox() {
     sel.addRange(range);
 }
 
+/* ----- 插入圖示 ----- */
+// 清單在 static/icons.js（RS_ICON_GROUPS）；圖示為 Font Awesome 字型，以浮動物件外框（data-rs-icon）包住 <i>，
+// 外框固定為正方形、字級隨邊長調整；顏色、背景、圓角沿用格式工具列（套在外框上，<i> 繼承文字顏色）
+const ICON_DEFAULT = 96, ICON_MIN = 16, ICON_MAX = 480;
+function iconFontPx(size) { return Math.round(size * 0.75) + 'px'; }
+function setIconBox(el, x, y, size) {
+    setFloatRect(el, x, y, size, size);
+    Object.assign(el.style, { display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: '1', fontSize: iconFontPx(size) });
+}
+
+function insertSlideIcon(name) {
+    if (!editMode || !currentPresentationData) return;
+    const root = slideRoot();
+    if (!root) return;
+    stopTextEdit();
+    const el = document.createElement('div');
+    el.setAttribute('data-rs-icon', '');
+    el.setAttribute('data-rs-float', '');
+    const i = document.createElement('i');
+    i.className = 'fa-solid fa-' + name;
+    i.setAttribute('aria-hidden', 'true');
+    el.appendChild(i);
+    // 連續插入時錯開位置，避免疊在一起
+    const n = root.querySelectorAll(':scope > [data-rs-icon]').length % 6;
+    setIconBox(el, (SLIDE_W - ICON_DEFAULT) / 2 + n * 24, (SLIDE_H - ICON_DEFAULT) / 2 + n * 24, ICON_DEFAULT);
+    el.style.zIndex = '10';
+    root.appendChild(el);
+    commitSlideEdit();
+    selectElement(el);
+}
+
+// 格式工具列的放大 / 縮小：圖示以外框邊長縮放（±25%），中心點不動
+function scaleIcon(el, dir) {
+    const r = floatRect(el);
+    const size = Math.min(ICON_MAX, Math.max(ICON_MIN, Math.round(r.w * (dir > 0 ? 1.25 : 0.8))));
+    setIconBox(el, r.x + (r.w - size) / 2, r.y + (r.h - size) / 2, size);
+}
+
+(function buildIconPicker() {
+    const grid = document.getElementById('iconGrid');
+    // 搜尋字串：圖示名稱（含以空白分隔的版本）、關鍵字、分組中英文名稱
+    const entries = [];
+    grid.innerHTML = RS_ICON_GROUPS.map((g, gi) => `
+        <section class="icon-group" data-group="${gi}">
+            <h4 class="icon-group-title">${esc(g.name)}<span>${esc(g.en)}</span></h4>
+            <div class="icon-grid">${g.icons.map(([name, kw]) => {
+        entries.push({ name, group: gi, hay: `${name} ${name.replace(/-/g, ' ')} ${kw} ${g.name} ${g.en}`.toLowerCase() });
+        return `<button type="button" class="icon-cell" data-icon="${name}" title="${name}" aria-label="${name}"><i class="fa-solid fa-${name}" aria-hidden="true"></i></button>`;
+    }).join('')}</div>
+        </section>`).join('') + '<p id="iconEmpty" class="hidden py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">找不到符合的圖示，試試其他關鍵字</p>';
+    const cells = [...grid.querySelectorAll('.icon-cell')];
+    const sections = [...grid.querySelectorAll('.icon-group')];
+
+    // 多個關鍵字以空白分隔，需全部符合
+    function filterIcons() {
+        const terms = document.getElementById('iconSearch').value.toLowerCase().split(/\s+/).filter(Boolean);
+        const visible = new Set();
+        let count = 0;
+        entries.forEach((e, i) => {
+            const ok = terms.every(t => e.hay.includes(t));
+            cells[i].classList.toggle('hidden', !ok);
+            if (ok) { count++; visible.add(e.group); }
+        });
+        sections.forEach((s, gi) => s.classList.toggle('hidden', !visible.has(gi)));
+        document.getElementById('iconEmpty').classList.toggle('hidden', count > 0);
+        document.getElementById('iconCount').textContent = terms.length ? `找到 ${count} 個圖示` : `共 ${entries.length} 個圖示`;
+    }
+    filterIcons();
+
+    const search = document.getElementById('iconSearch');
+    search.addEventListener('input', () => { filterIcons(); grid.scrollTop = 0; });
+    search.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const first = cells.find(c => !c.classList.contains('hidden'));
+            if (first) pickIcon(first.dataset.icon);
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            cells.find(c => !c.classList.contains('hidden'))?.focus();
+        }
+    });
+    grid.addEventListener('click', e => {
+        const c = e.target.closest('.icon-cell');
+        if (c) pickIcon(c.dataset.icon);
+    });
+    // 方向鍵在可見的圖示間移動（一列 10 個）
+    grid.addEventListener('keydown', e => {
+        const i = cells.indexOf(document.activeElement);
+        if (i < 0) return;
+        const vis = cells.filter(c => !c.classList.contains('hidden'));
+        const k = vis.indexOf(cells[i]);
+        const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -10, ArrowDown: 10 }[e.key];
+        if (!step) return;
+        e.preventDefault();
+        e.stopPropagation();                      // 避免觸發全域的換頁快捷鍵
+        if (k + step < 0) { search.focus(); return; }
+        vis[Math.min(vis.length - 1, k + step)]?.focus();
+    });
+    document.addEventListener('mousedown', e => {
+        if (!e.target.closest('#iconPicker') && !e.target.closest('#iconPickerBtn')) closeIconPicker();
+    });
+
+    function pickIcon(name) {
+        closeIconPicker();
+        insertSlideIcon(name);
+    }
+})();
+
+function isIconPickerOpen() { return !document.getElementById('iconPicker').classList.contains('hidden'); }
+function toggleIconPicker() {
+    if (isIconPickerOpen()) { closeIconPicker(); return; }
+    if (!editMode || !currentPresentationData) return;
+    stopTextEdit();
+    document.getElementById('iconPicker').classList.remove('hidden');
+    document.getElementById('iconPickerBtn').setAttribute('aria-expanded', 'true');
+    positionIconPicker();
+    const search = document.getElementById('iconSearch');
+    search.focus();
+    search.select();
+}
+function closeIconPicker() {
+    const panel = document.getElementById('iconPicker');
+    if (!panel || panel.classList.contains('hidden')) return;
+    panel.classList.add('hidden');
+    document.getElementById('iconPickerBtn').setAttribute('aria-expanded', 'false');
+}
+// 面板固定在視窗座標：工具列在投影片下方，空間夠就往上開，否則往下開
+function positionIconPicker() {
+    if (!isIconPickerOpen()) return;
+    const panel = document.getElementById('iconPicker');
+    const r = document.getElementById('iconPickerBtn').getBoundingClientRect();
+    const w = Math.min(460, window.innerWidth - 16);
+    const above = r.top - 16, below = window.innerHeight - r.bottom - 16;
+    const up = above >= Math.min(420, below);
+    const h = Math.min(520, Math.max(220, up ? above : below));
+    panel.style.width = w + 'px';
+    panel.style.height = h + 'px';
+    panel.style.left = Math.min(Math.max(8, r.right - w), window.innerWidth - w - 8) + 'px';
+    panel.style.top = (up ? Math.max(8, r.top - 8 - h) : r.bottom + 8) + 'px';
+}
+
 /* ----- 浮動物件：移動與縮放 ----- */
 function setFloatRect(el, x, y, w, h) {
     Object.assign(el.style, { position: 'absolute', left: Math.round(x) + 'px', top: Math.round(y) + 'px', width: Math.round(w) + 'px' });
@@ -215,7 +356,7 @@ function startFloatDrag(e, handle) {
     e.preventDefault();
     e.stopPropagation();
     stopTextEdit();
-    floatDrag = { el, handle, sx: e.clientX, sy: e.clientY, r: floatRect(el), s: slideScale(), moved: false, keepRatio: el.hasAttribute('data-rs-img') };
+    floatDrag = { el, handle, sx: e.clientX, sy: e.clientY, r: floatRect(el), s: slideScale(), moved: false, keepRatio: el.hasAttribute('data-rs-img') || el.hasAttribute('data-rs-icon') };
     e.target.setPointerCapture?.(e.pointerId);
     e.target.addEventListener('pointermove', onFloatDragMove);
     e.target.addEventListener('pointerup', endFloatDrag, { once: true });
@@ -240,10 +381,12 @@ function onFloatDragMove(e) {
         let nw = Math.max(MIN, w + (west ? -dx : dx));
         let nh = Math.max(MIN, h + (north ? -dy : dy));
         if (d.keepRatio) nh = nw * h / w;
-        const autoH = d.keepRatio || d.el.hasAttribute('data-rs-text');   // 文字方塊只調寬度，高度隨文字
-        if (autoH && !d.keepRatio) nh = h;
+        const isText = d.el.hasAttribute('data-rs-text');                 // 文字方塊只調寬度，高度隨文字
+        const autoH = isText || d.el.hasAttribute('data-rs-img');
+        if (isText) nh = h;
         // 從左 / 上方的控制點縮放時，對側固定不動
         setFloatRect(d.el, west ? x + w - nw : x, north ? y + h - nh : y, nw, autoH ? null : nh);
+        if (d.el.hasAttribute('data-rs-icon')) d.el.style.fontSize = iconFontPx(nw);
     }
     positionToolbar();
 }
