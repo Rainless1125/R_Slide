@@ -1467,17 +1467,17 @@
                     <button onclick="insertTextBox()" data-edit-only
                         class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
                         aria-label="插入文字" title="插入可自由移動的文字方塊">
-                        <i class="fa-solid fa-font text-[11px]"></i><span class="hidden xl:inline">插入文字</span>
+                        <i class="fa-solid fa-font text-[11px]"></i><span class="hidden xl:inline">文字</span>
                     </button>
                     <button onclick="pickSlideImage()" data-edit-only
                         class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
                         aria-label="插入圖片" title="插入圖片（也可直接把圖片拖到投影片上）">
-                        <i class="fa-regular fa-image text-[11px]"></i><span class="hidden xl:inline">插入圖片</span>
+                        <i class="fa-regular fa-image text-[11px]"></i><span class="hidden xl:inline">圖片</span>
                     </button>
                     <button onclick="openChartEditor(null)" data-edit-only
                         class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
                         aria-label="插入圖表" title="輸入數據插入圖表">
-                        <i class="fa-solid fa-chart-column text-[11px]"></i><span class="hidden xl:inline">插入圖表</span>
+                        <i class="fa-solid fa-chart-column text-[11px]"></i><span class="hidden xl:inline">圖表</span>
                     </button>
                     <input id="slideImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" class="hidden">
                     <button id="regenCurrentBtn" onclick="regenerateCurrentSlide()"
@@ -1659,7 +1659,7 @@
         </div>
     </div>
 
-    <script src="/static/charts.js?v=2"></script>
+    <script src="/static/charts.js?v=3"></script>
     <script src="/static/chart-grid.js?v=1"></script>
     <script src="/static/export.js?v=6"></script>
     <script src="/static/presenter.js?v=1"></script>
@@ -3007,10 +3007,12 @@
             if (!el.getAttribute('style')) el.removeAttribute('style');
         }
 
+        // 圖表的文字大小由 chartFontScale 換算（只認容器自己的字級，範圍 xs ~ 4xl），沒設定時視為 base
+        const CHART_SIZE_MAX = SIZE_STEPS.indexOf('4xl');
         function currentSizeIndex(el) {
             const cls = [...el.classList].find(c => /^text-(?:xs|sm|base|lg|xl|[2-9]xl)$/.test(c));
             if (cls) return SIZE_STEPS.indexOf(cls.slice(5));
-            const px = parseFloat(getComputedStyle(el).fontSize) || 16;
+            const px = el.hasAttribute('data-rs-chart') ? chartFontScale(el) * 16 : parseFloat(getComputedStyle(el).fontSize) || 16;
             return SIZE_PX.reduce((best, v, i) => Math.abs(v - px) < Math.abs(SIZE_PX[best] - px) ? i : best, 0);
         }
         function currentWeight(el) {
@@ -3092,9 +3094,12 @@
         };
 
         function stepSize(dir) {
-            const i = currentSizeIndex(selectedEl) + dir;
-            if (i < 0 || i >= SIZE_STEPS.length) return;
-            setClass(selectedEl, [RE.size], 'text-' + SIZE_STEPS[i]);
+            const el = selectedEl;
+            const isChart = el.hasAttribute('data-rs-chart');
+            const i = currentSizeIndex(el) + dir;
+            if (i < 0 || i > (isChart ? CHART_SIZE_MAX : SIZE_STEPS.length - 1)) return;
+            setClass(el, [RE.size], 'text-' + SIZE_STEPS[i]);
+            if (isChart) { clearInlineStyle(el, 'font-size'); rerenderChart(el); }   // 圖表是 SVG，字級要重畫才會生效
         }
         function moveSibling(dir) {
             const el = selectedEl;
@@ -3214,7 +3219,7 @@
             const sizeIdx = currentSizeIndex(el);
             tb.querySelector('[data-fmt="parent"]').disabled = root;
             tb.querySelector('[data-fmt="sizeDown"]').disabled = sizeIdx <= 0;
-            tb.querySelector('[data-fmt="sizeUp"]').disabled = sizeIdx >= SIZE_STEPS.length - 1;
+            tb.querySelector('[data-fmt="sizeUp"]').disabled = sizeIdx >= (el.hasAttribute('data-rs-chart') ? CHART_SIZE_MAX : SIZE_STEPS.length - 1);
             tb.querySelector('[data-fmt="duplicate"]').disabled = root;
             tb.querySelector('[data-fmt="remove"]').disabled = root;
             tb.querySelector('[data-fmt="moveUp"]').disabled = root || !el.previousElementSibling;
@@ -3630,7 +3635,7 @@
                 const spec = readChartForm();
                 const target = chartEditTarget;
                 const w = target ? target.offsetWidth : 480, h = target ? target.offsetHeight : 280;
-                box.innerHTML = renderChartSvg(spec, w, h);
+                box.innerHTML = renderChartSvg(spec, w, h, target ? chartFontScale(target) : 1);
                 err.classList.add('hidden');
                 document.getElementById('chartApplyBtn').disabled = false;
             } catch (e) {
@@ -3678,7 +3683,7 @@
         function rerenderChart(el) {
             const slide = currentPresentationData.slides[currentSlideIdx];
             const spec = slide.charts?.[Number(el.getAttribute('data-rs-chart'))];
-            if (spec) el.innerHTML = renderChartSvg(spec, el.offsetWidth, el.offsetHeight);
+            if (spec) el.innerHTML = renderChartSvg(spec, el.offsetWidth, el.offsetHeight, chartFontScale(el));
         }
 
         function applyChartEditor() {
