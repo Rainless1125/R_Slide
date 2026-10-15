@@ -13,6 +13,22 @@
 const RS_CHART_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
 const RS_CHART_TYPES = ['bar', 'horizontal_bar', 'line', 'pie', 'doughnut'];
 const RS_CHART_DEFAULT_W = 560, RS_CHART_DEFAULT_H = 300;
+/* 參考線（目標、規格上下限、門檻）：只畫在有數值軸的圖；圓餅 / 環圈是占比，沒有可對照的軸 */
+const RS_REF_LINE_TYPES = ['bar', 'horizontal_bar', 'line'];
+const RS_REF_LINE_COLOR = '#dc2626';
+const RS_REF_LINE_MAX = 3;
+
+function _cRefLines(spec) {
+    if (!RS_REF_LINE_TYPES.includes(spec?.type)) return [];
+    return (spec.ref_lines || [])
+        .filter(l => l && l.value !== '' && l.value != null && Number.isFinite(Number(l.value)))
+        .slice(0, RS_REF_LINE_MAX)
+        .map(l => ({
+            label: String(l.label || ''),
+            value: Number(l.value),
+            color: /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(l.color || '').trim()) ? String(l.color).trim() : RS_REF_LINE_COLOR
+        }));
+}
 
 function _cEsc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -105,7 +121,8 @@ function renderChartSvg(spec, width, height) {
     else if (type === 'pie' || type === 'doughnut') body += _cPie(type, labels, datasets[0], unit, spec, W, H, top, fs) || empty('無可顯示的數值');
     else body += _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs);
 
-    const aria = [title || '圖表', ...labels.map((l, i) => `${l} ${datasets.map(d => _cFmt(d.values[i] ?? 0, unit)).join(' / ')}`)].join('；');
+    const aria = [title || '圖表', ...labels.map((l, i) => `${l} ${datasets.map(d => _cFmt(d.values[i] ?? 0, unit)).join(' / ')}`),
+        ..._cRefLines({ ...spec, type }).map(l => `${l.label || '參考線'} ${_cFmt(l.value, unit)}`)].join('；');
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${_cEsc(aria)}" style="display:block;overflow:visible;font-family:inherit">${body}</svg>`;
 }
 
@@ -118,16 +135,21 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs) {
         out += lg.svg;
         top += lg.height;
     }
-    const all = datasets.flatMap(d => d.values.slice(0, labels.length).map(v => Number(v) || 0));
+    const refs = _cRefLines({ ...spec, type });
+    // 參考線的數值也納入刻度範圍，門檻高於所有資料時仍看得到
+    const all = [...datasets.flatMap(d => d.values.slice(0, labels.length).map(v => Number(v) || 0)), ...refs.map(l => l.value)];
     const sc = _cNiceScale(Math.min(0, ...all), Math.max(0, ...all));
     const ticks = [];
     for (let v = sc.lo; v <= sc.hi + sc.step / 2; v += sc.step) ticks.push(_cNum(v));
     const n = labels.length;
     const tip = (i, d) => `${labels[i]}${multi ? ' · ' + (d.label || '') : ''}：${_cFmt(d.values[i] ?? 0, unit)}${unit.length > 2 ? ' ' + unit : ''}`;
     const showValues = n * datasets.length <= 16;
+    const refText = l => `${l.label ? l.label + ' ' : ''}${_cFmt(l.value, unit)}`;
+    const refTip = l => `${l.label || '參考線'}：${_cFmt(l.value, unit)}${unit.length > 2 ? ' ' + unit : ''}`;
 
     if (type === 'horizontal_bar') {
         const labelW = Math.min(W * 0.32, Math.max(...labels.map(l => _cTextW(l, fs))) + 8);
+        if (refs.length) top += fs + 6;            // 參考線名稱寫在線的上端
         const left = labelW, right = W - 8 - (showValues ? 44 : 0), bottom = H - 20;
         const px = v => left + (v - sc.lo) / (sc.hi - sc.lo) * (right - left);
         ticks.forEach(t => {
@@ -148,11 +170,23 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs) {
                 if (showValues) out += `<text x="${_cNum(v >= 0 ? x1 + 4 : x0 - 4)}" y="${_cNum(y + barH / 2 + fs * .35)}" text-anchor="${v >= 0 ? 'start' : 'end'}" font-size="${fs - 1}" fill="currentColor" fill-opacity=".85">${_cFmt(v, unit)}</text>`;
             });
         });
+        refs.forEach(l => {
+            const x = _cNum(px(l.value));
+            const text = _cFit(refText(l), Math.max(60, (right - left) * 0.45), fs - 1);
+            const tw = _cTextW(text, fs - 1);
+            const anchor = x - tw / 2 < 0 ? 'start' : x + tw / 2 > W ? 'end' : 'middle';
+            out += `<g><title>${_cEsc(refTip(l))}</title>` +
+                `<line x1="${x}" x2="${x}" y1="${top - 2}" y2="${bottom}" stroke="${l.color}" stroke-width="1.5" stroke-dasharray="6 4"/>` +
+                `<text x="${x}" y="${top - 6}" text-anchor="${anchor}" font-size="${fs - 1}" font-weight="600" fill="${l.color}">${_cEsc(text)}</text></g>`;
+        });
         return out;
     }
 
     const axisW = Math.max(...ticks.map(t => _cTextW(_cFmt(t, unit), fs - 1))) + 8;
-    const left = axisW, right = W - (type === 'line' ? 12 : 4), bottom = H - 22;
+    // 參考線名稱寫在繪圖區右側外面，避免和長條、數值標籤重疊
+    const refLabels = refs.map(l => _cFit(refText(l), W * 0.22, fs - 1));
+    const refGutter = refs.length ? Math.max(...refLabels.map(t => _cTextW(t, fs - 1))) + 10 : 0;
+    const left = axisW, right = W - (type === 'line' ? 12 : 4) - refGutter, bottom = H - 22;
     const plotTop = top + (showValues ? 14 : 4);
     const py = v => bottom - (v - sc.lo) / (sc.hi - sc.lo) * (bottom - plotTop);
     ticks.forEach(t => {
@@ -161,6 +195,20 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs) {
     });
     const band = (right - left) / n;
     const xLabelSize = fs;
+    // 水平參考虛線；名稱在右側欄與線同高，數值相近時往上下推開避免重疊
+    const refSvg = () => {
+        const items = refs.map((l, i) => ({ l, text: refLabels[i], y: py(l.value), ty: py(l.value) }))
+            .sort((a, b) => a.y - b.y);
+        const gapY = fs + 2;
+        for (let i = 1; i < items.length; i++) items[i].ty = Math.max(items[i].ty, items[i - 1].ty + gapY);
+        for (let i = items.length - 1; i >= 0; i--) {
+            items[i].ty = Math.min(items[i].ty, i === items.length - 1 ? bottom : items[i + 1].ty - gapY);
+        }
+        const lineEnd = type === 'line' ? right + 8 : right;
+        return items.map(({ l, text, y, ty }) => `<g><title>${_cEsc(refTip(l))}</title>` +
+            `<line x1="${left}" x2="${_cNum(lineEnd)}" y1="${_cNum(y)}" y2="${_cNum(y)}" stroke="${l.color}" stroke-width="1.5" stroke-dasharray="6 4"/>` +
+            `<text x="${_cNum(lineEnd + 6)}" y="${_cNum(ty + (fs - 1) * .35)}" font-size="${fs - 1}" font-weight="600" fill="${l.color}">${_cEsc(text)}</text></g>`).join('');
+    };
     const labelEvery = Math.max(1, Math.ceil(Math.max(...labels.map(l => _cTextW(l, xLabelSize))) / Math.max(band, 1) * 0.6));
 
     if (type === 'line') {
@@ -185,7 +233,7 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs) {
                 out += `<text x="${_cNum(pts[i][0])}" y="${_cNum(pts[i][1] - 9)}" text-anchor="middle" font-size="${fs - 1}" fill="currentColor" fill-opacity=".85">${_cFmt(d.values[i] ?? 0, unit)}</text>`;
             });
         });
-        return out;
+        return out + refSvg();
     }
 
     // 直條圖（分組）
@@ -204,7 +252,7 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs) {
             if (showValues) out += `<text x="${_cNum(x + barW / 2)}" y="${_cNum(v >= 0 ? y0 - 5 : y1 + fs)}" text-anchor="middle" font-size="${fs - 1}" fill="currentColor" fill-opacity=".85">${_cFmt(v, unit)}</text>`;
         });
     });
-    return out;
+    return out + refSvg();
 }
 
 function _cPie(type, labels, ds, unit, spec, W, H, top, fs) {

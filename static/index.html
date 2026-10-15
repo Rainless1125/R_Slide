@@ -1624,6 +1624,18 @@
                     </div>
                     <p class="text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400 -mt-1">
                         第一列填系列名稱、第一欄填類別標籤。直接打字輸入，方向鍵 / Tab / Enter 移動，雙擊或 F2 修改；可從 Excel、Google 試算表複製多格後貼上（數字可含千分位）。圓餅 / 環圈圖只使用第一個系列。</p>
+                    <div id="chartRefSection">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">參考線（選填）</span>
+                            <button type="button" id="chartRefAdd" onclick="addChartRefRow()"
+                                class="icon-btn h-6 px-2.5 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
+                                <i class="fa-solid fa-plus text-[10px]"></i>新增參考線
+                            </button>
+                        </div>
+                        <div id="chartRefList" class="mt-1.5 flex flex-col gap-1.5"></div>
+                        <p id="chartRefHint" class="mt-1 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                            以虛線標示目標、規格上下限或門檻，一眼看出哪些資料達標（最多 3 條）。</p>
+                    </div>
                     <label class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">顏色（選填，以逗號分隔的 HEX 色碼）
                         <input id="chartColors" placeholder="#2563eb, #f97316" class="mt-1 w-full h-9 px-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm font-mono text-zinc-900 dark:text-zinc-100">
                     </label>
@@ -1647,7 +1659,7 @@
         </div>
     </div>
 
-    <script src="/static/charts.js?v=1"></script>
+    <script src="/static/charts.js?v=2"></script>
     <script src="/static/chart-grid.js?v=1"></script>
     <script src="/static/export.js?v=6"></script>
     <script src="/static/presenter.js?v=1"></script>
@@ -3545,6 +3557,55 @@
             return { labels, datasets };
         }
 
+        /* ----- 參考線：只有直條、橫條、折線圖適用（RS_REF_LINE_TYPES） ----- */
+        function addChartRefRow(line = {}, focus = true) {
+            const list = document.getElementById('chartRefList');
+            if (list.children.length >= RS_REF_LINE_MAX) return;
+            const row = document.createElement('div');
+            row.className = 'chart-ref-row flex items-center gap-1.5';
+            const field = 'h-8 px-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100';
+            row.innerHTML = `
+                <input data-ref="label" maxlength="16" placeholder="名稱，例如：目標" aria-label="參考線名稱" class="${field} flex-1 min-w-0">
+                <input data-ref="value" inputmode="decimal" placeholder="數值" aria-label="參考線數值" class="${field} w-24 text-right tabular-nums">
+                <input data-ref="color" type="color" aria-label="參考線顏色" title="參考線顏色" class="h-8 w-9 p-0.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg cursor-pointer">
+                <button type="button" data-ref="remove" aria-label="刪除參考線" title="刪除參考線" class="icon-btn w-7 h-7 shrink-0 rounded-full text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40">
+                    <i class="fa-solid fa-xmark text-xs"></i></button>`;
+            row.querySelector('[data-ref="label"]').value = line.label || '';
+            row.querySelector('[data-ref="value"]').value = line.value ?? '';
+            row.querySelector('[data-ref="color"]').value = /^#[0-9a-f]{6}$/i.test(line.color || '') ? line.color : RS_REF_LINE_COLOR;
+            row.addEventListener('input', updateChartPreview);
+            row.querySelector('[data-ref="remove"]').addEventListener('click', () => { row.remove(); syncChartRefUi(); updateChartPreview(); });
+            list.appendChild(row);
+            syncChartRefUi();
+            if (focus) { row.querySelector('[data-ref="value"]').focus(); updateChartPreview(); }
+        }
+
+        function syncChartRefUi() {
+            const type = document.getElementById('chartType').value;
+            const ok = RS_REF_LINE_TYPES.includes(type);
+            const count = document.getElementById('chartRefList').children.length;
+            document.getElementById('chartRefSection').classList.toggle('hidden', !ok);
+            document.getElementById('chartRefAdd').disabled = count >= RS_REF_LINE_MAX;
+        }
+
+        function readChartRefLines(type) {
+            if (!RS_REF_LINE_TYPES.includes(type)) return [];   // 圓餅 / 環圈：占比圖沒有數值軸，不存參考線
+            const out = [];
+            document.querySelectorAll('#chartRefList .chart-ref-row').forEach((row, i) => {
+                const label = row.querySelector('[data-ref="label"]').value.trim().slice(0, 16);
+                const rawText = row.querySelector('[data-ref="value"]').value.trim();
+                const raw = rawText.replace(/[,，\s%]/g, '');
+                if (raw === '') {
+                    if (label) throw new Error(`參考線「${label}」請填寫數值`);
+                    return;                                       // 名稱與數值都空白：略過
+                }
+                const value = Number(raw);
+                if (!Number.isFinite(value)) throw new Error(`參考線 ${i + 1} 的「${rawText}」不是數字`);
+                out.push({ label, value, color: row.querySelector('[data-ref="color"]').value });
+            });
+            return out;
+        }
+
         function readChartForm() {
             const { labels, datasets } = parseChartRows(chartGrid.getRows());
             const type = document.getElementById('chartType').value;
@@ -3557,7 +3618,8 @@
                 unit: document.getElementById('chartUnit').value.trim().slice(0, 12),
                 labels,
                 datasets: type === 'pie' || type === 'doughnut' ? datasets.slice(0, 1) : datasets,
-                colors
+                colors,
+                ref_lines: readChartRefLines(type)
             };
         }
 
@@ -3579,6 +3641,7 @@
         }
         ['chartType', 'chartTitle', 'chartUnit', 'chartColors'].forEach(id =>
             document.getElementById(id).addEventListener('input', updateChartPreview));
+        document.getElementById('chartType').addEventListener('input', syncChartRefUi);
 
         function openChartEditor(target) {
             if (!editMode || !currentPresentationData) return;
@@ -3599,6 +3662,9 @@
             document.getElementById('chartUnit').value = s.unit || '';
             document.getElementById('chartColors').value = (s.colors || []).join(', ');
             chartGrid.setRows(chartToRows(s));
+            document.getElementById('chartRefList').replaceChildren();
+            (s.ref_lines || []).forEach(l => addChartRefRow(l, false));
+            syncChartRefUi();
             document.getElementById('chartModal').classList.remove('hidden');
             updateChartPreview();
             setTimeout(() => chartGrid.focus(), 0);
