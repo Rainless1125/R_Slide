@@ -18,7 +18,20 @@ def chart(**kw):
 
 
 def test_valid_chart_passes_through():
-    assert normalize_chart(chart()) == chart(datasets=[{"label": "營收", "values": [1.0, 2.0, 3.0]}])
+    assert normalize_chart(chart()) == chart(datasets=[{"label": "營收", "values": [1.0, 2.0, 3.0]}], ref_lines=[])
+
+
+def test_ref_lines_are_cleaned_and_limited():
+    c = normalize_chart(chart(ref_lines=[{"label": "目標", "value": "2.5"}, {"label": "上限", "value": 4, "color": "#dc2626"},
+                                         {"label": "壞色", "value": 1, "color": "red"}, {"label": "無值"}, "x",
+                                         {"label": "第四條", "value": 9}]))
+    assert c["ref_lines"] == [{"label": "目標", "value": 2.5}, {"label": "上限", "value": 4.0, "color": "#dc2626"},
+                              {"label": "壞色", "value": 1.0}]
+
+
+def test_pie_has_no_ref_lines():
+    c = normalize_chart(chart(type="doughnut", ref_lines=[{"label": "目標", "value": 2}]))
+    assert c["ref_lines"] == []
 
 
 def test_values_are_aligned_to_labels_and_coerced():
