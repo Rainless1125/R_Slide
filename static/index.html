@@ -805,6 +805,174 @@
             user-select: none;
         }
 
+        /* ---------- 圖表數據表格（static/chart-grid.js） ---------- */
+        .rs-grid-scroll {
+            max-height: 320px;
+            overflow: auto;
+            border: 1px solid #e4e4e7;
+            border-radius: 8px;
+            background: #fff;
+        }
+        .rs-grid table {
+            border-collapse: separate;
+            border-spacing: 0;
+            width: 100%;
+            table-layout: fixed;
+            font-size: 13px;
+        }
+        .rs-grid th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: #f4f4f5;
+            color: #71717a;
+            font-size: 11px;
+            font-weight: 600;
+            height: 26px;
+            padding: 0 6px;
+            border-right: 1px solid #e4e4e7;
+            border-bottom: 1px solid #e4e4e7;
+            text-align: center;
+            white-space: nowrap;
+            user-select: none;
+        }
+        .rs-grid th.rs-rowhead {
+            position: sticky;
+            left: 0;
+            z-index: 1;
+            width: 44px;
+            top: auto;
+        }
+        .rs-grid th.rs-corner {
+            left: 0;
+            z-index: 3;
+            width: 44px;
+        }
+        .rs-grid th.rs-hl {
+            background: #e0ecfb;
+            color: #1d4ed8;
+        }
+        .rs-grid td {
+            position: relative;
+            padding: 0;
+            height: 30px;
+            border-right: 1px solid #e4e4e7;
+            border-bottom: 1px solid #e4e4e7;
+            background: #fff;
+        }
+        .rs-grid tr.rs-namerow td {
+            background: #fafafa;
+        }
+        .rs-grid tr.rs-namerow input,
+        .rs-grid td[data-c="0"] input {
+            font-weight: 600;
+        }
+        .rs-grid input {
+            display: block;
+            width: 100%;
+            height: 100%;
+            padding: 0 8px;
+            border: 0;
+            outline: none;
+            background: transparent;
+            color: #18181b;
+            font: inherit;
+            cursor: cell;
+            caret-color: transparent;
+        }
+        .rs-grid input.rs-num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+        .rs-grid input::placeholder {
+            color: #d4d4d8;
+            font-weight: 400;
+        }
+        .rs-grid input::selection {
+            background: transparent;
+        }
+        .rs-grid td.rs-sel {
+            background: #e8f0fe !important;
+        }
+        .rs-grid td.rs-cur::after {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border: 2px solid #2563eb;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .rs-grid td.rs-editing {
+            background: #fff !important;
+        }
+        .rs-grid td.rs-editing input {
+            cursor: text;
+            caret-color: auto;
+        }
+        .rs-grid td.rs-editing input::selection {
+            background: #bfdbfe;
+        }
+        .rs-grid .rs-del {
+            display: none;
+            position: absolute;
+            right: 2px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            line-height: 14px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #a1a1aa;
+        }
+        .rs-grid th:hover .rs-del {
+            display: block;
+        }
+        .rs-grid .rs-del:hover {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        .rs-grid-tools {
+            display: flex;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .rs-grid-tools button {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            height: 26px;
+            padding: 0 10px;
+            border-radius: 999px;
+            border: 1px solid #e4e4e7;
+            font-size: 12px;
+            font-weight: 600;
+            color: #52525b;
+        }
+        .rs-grid-tools button i {
+            font-size: 10px;
+        }
+        .rs-grid-tools button:hover:not(:disabled) {
+            background: #f4f4f5;
+        }
+        .rs-grid-tools button:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
+        .dark .rs-grid-scroll { border-color: #27272a; background: #09090b; }
+        .dark .rs-grid th { background: #18181b; color: #a1a1aa; border-color: #27272a; }
+        .dark .rs-grid th.rs-hl { background: #1e3a5f; color: #93c5fd; }
+        .dark .rs-grid td { background: #09090b; border-color: #27272a; }
+        .dark .rs-grid tr.rs-namerow td { background: #111113; }
+        .dark .rs-grid input { color: #f4f4f5; }
+        .dark .rs-grid input::placeholder { color: #3f3f46; }
+        .dark .rs-grid td.rs-sel { background: #172554 !important; }
+        .dark .rs-grid td.rs-editing { background: #09090b !important; }
+        .dark .rs-grid td.rs-editing input::selection { background: #1e40af; }
+        .dark .rs-grid-tools button { border-color: #3f3f46; color: #d4d4d8; }
+        .dark .rs-grid-tools button:hover:not(:disabled) { background: #27272a; }
+        .dark .rs-grid .rs-del:hover { background: #450a0a; color: #f87171; }
+
         #slideCanvas.editing [data-rs-chart] svg * {
             cursor: inherit !important;
             outline: none !important;
@@ -1450,12 +1618,12 @@
                     <label class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">標題（選填）
                         <input id="chartTitle" maxlength="40" class="mt-1 w-full h-9 px-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100">
                     </label>
-                    <label class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">數據
-                        <textarea id="chartData" rows="8" spellcheck="false"
-                            class="mt-1 w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-sm font-mono text-zinc-900 dark:text-zinc-100 resize-y"></textarea>
-                    </label>
+                    <div>
+                        <div id="chartDataLabel" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">數據</div>
+                        <div id="chartData" role="group" aria-labelledby="chartDataLabel" class="mt-1"></div>
+                    </div>
                     <p class="text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400 -mt-1">
-                        第一列為「類別, 系列名稱…」，之後每列為「標籤, 數值…」。可直接貼上 Excel 表格（以 Tab 分隔，數字可含千分位）。圓餅 / 環圈圖只使用第一個數值欄。</p>
+                        第一列填系列名稱、第一欄填類別標籤。直接打字輸入，方向鍵 / Tab / Enter 移動，雙擊或 F2 修改；可從 Excel、Google 試算表複製多格後貼上（數字可含千分位）。圓餅 / 環圈圖只使用第一個系列。</p>
                     <label class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">顏色（選填，以逗號分隔的 HEX 色碼）
                         <input id="chartColors" placeholder="#2563eb, #f97316" class="mt-1 w-full h-9 px-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm font-mono text-zinc-900 dark:text-zinc-100">
                     </label>
@@ -1480,6 +1648,7 @@
     </div>
 
     <script src="/static/charts.js?v=1"></script>
+    <script src="/static/chart-grid.js?v=1"></script>
     <script src="/static/export.js?v=6"></script>
     <script src="/static/presenter.js?v=1"></script>
     <script>
@@ -3339,39 +3508,45 @@
         /* ----- 圖表資料編輯 ----- */
         let chartEditTarget = null;      // null = 插入新圖表；否則為 [data-rs-chart] 容器
 
-        function chartToText(spec) {
+        // 表格上限：標題列 + 12 個類別、類別欄 + 4 個系列（與 charts.py 的 MAX_LABELS / MAX_DATASETS 一致）
+        const chartGrid = createChartGrid(document.getElementById('chartData'), {
+            maxRows: 13, maxCols: 5,
+            onChange: () => updateChartPreview(),
+            onNotice: msg => showToast(msg, 'info', 3000)
+        });
+
+        function chartToRows(spec) {
             const rows = [['類別', ...spec.datasets.map((d, i) => d.label || `系列${i + 1}`)]];
-            spec.labels.forEach((l, i) => rows.push([l, ...spec.datasets.map(d => d.values[i] ?? 0)]));
-            return rows.map(r => r.join(', ')).join('\n');
+            spec.labels.forEach((l, i) => rows.push([l, ...spec.datasets.map(d => String(d.values[i] ?? 0))]));
+            return rows;
         }
 
-        // 解析數據：有 Tab 就以 Tab 分隔（從 Excel 貼上，數字可含千分位），否則以逗號分隔
-        function parseChartText(text) {
-            const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-            if (lines.length < 2) throw new Error('請至少輸入標題列與一列數據');
-            const tab = lines.some(l => l.includes('\t'));
-            const split = l => (tab ? l.split('\t') : l.split(/[,，]/)).map(c => c.trim());
-            const head = split(lines[0]);
-            const width = Math.max(2, head.length);
-            const datasets = Array.from({ length: width - 1 }, (_, k) => ({ label: head[k + 1] || '', values: [] }));
-            const labels = [];
-            lines.slice(1).forEach((line, r) => {
-                const cells = split(line);
-                labels.push(cells[0] || `項目 ${r + 1}`);
-                datasets.forEach((d, k) => {
-                    const raw = (cells[k + 1] || '').replace(/[,\s%]/g, '');
+        // 解析表格：略過整列空白的列、整欄空白的系列；數字可含千分位、空白與 %
+        function parseChartRows(grid) {
+            const cells = grid.map(r => r.map(v => String(v ?? '').trim()));
+            const head = cells[0] || [];
+            const cols = [];
+            for (let c = 1; c < head.length; c++) if (cells.some(r => r[c])) cols.push(c);
+            if (!cols.length) cols.push(1);
+            const body = cells.map((r, i) => ({ r, line: i + 1 })).slice(1).filter(({ r }) => r.some(Boolean));
+            if (!body.length) throw new Error('請至少輸入一列數據');
+            if (body.length > 12) throw new Error('類別最多 12 個');
+            if (cols.length > 4) throw new Error('資料系列最多 4 個');
+            const datasets = cols.map(c => ({ label: head[c] || '', values: [] }));
+            const labels = body.map(({ r, line }, i) => {
+                cols.forEach((c, k) => {
+                    const raw = (r[c] || '').replace(/[,，\s%]/g, '');
                     const v = raw === '' ? 0 : Number(raw);
-                    if (!Number.isFinite(v)) throw new Error(`第 ${r + 2} 列的「${cells[k + 1]}」不是數字`);
-                    d.values.push(v);
+                    if (!Number.isFinite(v)) throw new Error(`第 ${line - 1} 列「${head[c] || '系列 ' + c}」的「${r[c]}」不是數字`);
+                    datasets[k].values.push(v);
                 });
+                return r[0] || `項目 ${i + 1}`;
             });
-            if (labels.length > 12) throw new Error('類別最多 12 個');
-            if (datasets.length > 4) throw new Error('資料系列最多 4 個');
             return { labels, datasets };
         }
 
         function readChartForm() {
-            const { labels, datasets } = parseChartText(document.getElementById('chartData').value);
+            const { labels, datasets } = parseChartRows(chartGrid.getRows());
             const type = document.getElementById('chartType').value;
             const colors = document.getElementById('chartColors').value.split(/[,，\s]+/).map(c => c.trim()).filter(Boolean);
             const bad = colors.find(c => !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(c));
@@ -3402,7 +3577,7 @@
                 document.getElementById('chartApplyBtn').disabled = true;
             }
         }
-        ['chartType', 'chartTitle', 'chartUnit', 'chartData', 'chartColors'].forEach(id =>
+        ['chartType', 'chartTitle', 'chartUnit', 'chartColors'].forEach(id =>
             document.getElementById(id).addEventListener('input', updateChartPreview));
 
         function openChartEditor(target) {
@@ -3423,10 +3598,10 @@
             document.getElementById('chartTitle').value = s.title || '';
             document.getElementById('chartUnit').value = s.unit || '';
             document.getElementById('chartColors').value = (s.colors || []).join(', ');
-            document.getElementById('chartData').value = chartToText(s);
+            chartGrid.setRows(chartToRows(s));
             document.getElementById('chartModal').classList.remove('hidden');
             updateChartPreview();
-            setTimeout(() => document.getElementById('chartData').focus(), 0);
+            setTimeout(() => chartGrid.focus(), 0);
         }
 
         function closeChartEditor() {
