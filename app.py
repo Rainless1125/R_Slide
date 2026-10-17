@@ -109,6 +109,26 @@ def call_openai_compatible(client: OpenAI, model: str, system_instruction: str, 
     return parse_json_reply(completion.choices[0].message.content, schema)
 
 
+def gemini_response_text(response) -> str:
+    """取出 Gemini 回覆文字；被安全機制擋下、沒有輸出或輸出被截斷時，改回傳說明原因的錯誤，
+    而不是讓 json.loads 失敗後被當成「格式有誤」（這類情況重試通常也沒用）。"""
+    feedback = getattr(response, "prompt_feedback", None)
+    block = getattr(feedback, "block_reason", None)
+    if block:
+        raise HTTPException(status_code=502, detail=f"模型拒絕回應: 提示內容被 Gemini 安全機制擋下（{getattr(block, 'name', block)}）")
+    candidates = getattr(response, "candidates", None) or []
+    finish = getattr(candidates[0], "finish_reason", None) if candidates else None
+    reason = getattr(finish, "name", None) or (str(finish) if finish else "")
+    if reason == "MAX_TOKENS":
+        raise HTTPException(status_code=502, detail="AI 輸出超過長度上限（MAX_TOKENS）")
+    text = response.text
+    if not text:
+        if reason in ("SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "RECITATION"):
+            raise HTTPException(status_code=502, detail=f"模型拒絕回應: 輸出被 Gemini 安全機制擋下（{reason}）")
+        raise HTTPException(status_code=502, detail=f"模型沒有回傳內容（{reason or '未知原因'}）")
+    return text
+
+
 def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
              schema: type[BaseModel], temperature: float) -> dict:
     """依平台呼叫 LLM，回傳符合 schema 的 dict。"""
@@ -131,7 +151,7 @@ def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
             system_instruction=system_instruction
         )
         response = client.models.generate_content(model=model, contents=prompt, config=config)
-        return json.loads(response.text)
+        return json.loads(gemini_response_text(response))
 
     return call_openai_compatible(client, model, system_instruction, prompt, schema,
                                   allow_fallback=provider == "databricks")

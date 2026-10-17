@@ -136,3 +136,16 @@ def test_oversized_upload_is_rejected():
 def test_missing_file_field_is_rejected():
     res = client.post("/api/extract", data={"other": "x"})
     assert res.status_code == 400
+
+
+def test_pdf_keeps_trailing_numbers_that_are_not_page_numbers():
+    res = upload("data.pdf", make_pdf([["Revenue 2023", "2023"], ["Revenue 2024", "2024"], ["Users", "350"]]))
+    assert res.status_code == 200
+    text = res.json()["text"]
+    assert "2023\n" in text and "2024\n" in text and text.endswith("350")
+
+
+def test_pdf_strips_offset_page_numbers_and_labels():
+    res = upload("deck.pdf", make_pdf([["Cover"], ["Intro", "2"], ["Plan", "3"], ["Page 4 of 4", "End"]]))
+    assert res.status_code == 200
+    assert res.json()["text"] == "Cover\n\nIntro\n\nPlan\n\nEnd"
