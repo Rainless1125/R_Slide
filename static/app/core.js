@@ -121,31 +121,83 @@ function fmtTime(ts) {
 }
 function isGenerating() { return document.getElementById('btnGenerate').disabled; }
 
-/* ===================== 歷史記錄（localStorage） ===================== */
-const HKEY = 'rslide_history_v1';
-const MAX_HISTORY = 30;
-let historyItems = loadHistory();
+/* ===================== 歷史記錄（伺服器 SQLite，依帳號區分） ===================== */
+// historyItems 只放摘要（id / title / createdAt / pages / input），投影片內容（data）開啟時才向伺服器讀取並快取
+const MAX_HISTORY = 200;                 // 與 store.py 的 MAX_HISTORY_PER_USER 一致
+const HISTORY_SAVE_DELAY = 800;          // 編輯時合併連續的修改，停手後才送出
+let historyItems = [];
+const pendingSaves = new Map();          // id -> { timer, patch }：尚未送出的修改
+const saveChains = new Map();            // id -> Promise：同一筆紀錄的請求依序送出，避免舊資料覆蓋新資料
+let inflightSaves = 0;
 
-function loadHistory() {
-    try {
-        const list = JSON.parse(localStorage.getItem(HKEY));
-        return Array.isArray(list) ? list : [];
-    } catch (e) { return []; }
+function historyError(err) {
+    if (err?.status === 413) return '簡報內容過大（圖片太多），無法儲存到歷史記錄';
+    return '歷史記錄同步失敗：' + friendlyError(err);
 }
-function saveHistory() {
-    historyItems = historyItems.slice(0, MAX_HISTORY);
-    let trimmed = false;
-    while (true) {
-        try {
-            localStorage.setItem(HKEY, JSON.stringify(historyItems));
-            if (trimmed) showToast('儲存空間不足，已移除最舊的紀錄', 'info');
-            return true;
-        } catch (e) {
-            if (historyItems.length <= 1) { showToast('瀏覽器儲存空間不足，無法儲存紀錄', 'error'); return false; }
-            historyItems.pop();
-            trimmed = true;
-        }
+
+async function historyFetch(method, path = '', body, opts = {}) {
+    const res = await fetch('/api/history' + path, {
+        method,
+        headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+        ...opts
+    });
+    if (res.status === 401) { onSessionExpired(); throw Object.assign(new Error('請先登入'), { status: 401, handled: true }); }
+    if (!res.ok) throw await readApiError(res);
+    return res.json();
+}
+
+function enqueueHistoryRequest(id, method, path, body) {
+    inflightSaves++;
+    const run = () => historyFetch(method, path, body);
+    const p = (saveChains.get(id) || Promise.resolve()).then(run, run);
+    const tail = p.catch(() => { }).finally(() => {
+        inflightSaves--;
+        if (saveChains.get(id) === tail) saveChains.delete(id);
+    });
+    saveChains.set(id, tail);
+    return p;
+}
+
+function queueHistorySave(id, patch) {
+    const p = pendingSaves.get(id) || { patch: {} };
+    clearTimeout(p.timer);
+    Object.assign(p.patch, patch);
+    p.timer = setTimeout(() => flushHistorySave(id), HISTORY_SAVE_DELAY);
+    pendingSaves.set(id, p);
+}
+function flushHistorySave(id) {
+    const p = pendingSaves.get(id);
+    if (!p) return Promise.resolve();
+    clearTimeout(p.timer);
+    pendingSaves.delete(id);
+    return enqueueHistoryRequest(id, 'PATCH', '/' + encodeURIComponent(id), p.patch)
+        .catch(err => { if (!err.handled) showToast(historyError(err), 'error', 6000); });
+}
+function cancelHistorySave(id) {
+    const p = pendingSaves.get(id);
+    if (p) { clearTimeout(p.timer); pendingSaves.delete(id); }
+}
+async function flushAllHistorySaves() {
+    await Promise.all([...pendingSaves.keys()].map(flushHistorySave));
+    await Promise.all([...saveChains.values()]);
+}
+// 還有修改沒送完就關閉分頁時：先送出，並請瀏覽器跳出「確定離開？」以免資料遺失
+window.addEventListener('beforeunload', e => {
+    if (!pendingSaves.size && !inflightSaves) return;
+    [...pendingSaves.keys()].forEach(flushHistorySave);
+    e.preventDefault();
+    e.returnValue = '';
+});
+
+async function loadHistory() {
+    try {
+        historyItems = await historyFetch('GET');
+    } catch (err) {
+        historyItems = [];
+        if (!err.handled) showToast('無法讀取歷史記錄：' + friendlyError(err), 'error', 6000);
     }
+    renderHistory(true);
 }
 
 function renderHistory(animate = false) {
@@ -170,7 +222,7 @@ function renderHistory(animate = false) {
     list.innerHTML = items.map(h => {
         const active = h.id === currentHistoryId;
         const style = (h.input?.style_preference || '').split(' (')[0];
-        const pages = h.data?.slides?.length || 0;
+        const pages = h.pages ?? h.data?.slides?.length ?? 0;
         return `
   <div data-id="${esc(h.id)}" data-act="open" class="hist-item group spot rounded-xl border p-3 cursor-pointer transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${active
                 ? 'border-black dark:border-white bg-zinc-50 dark:bg-zinc-800 shadow-sm'
@@ -197,14 +249,22 @@ function addHistory(input, data) {
         id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
         createdAt: Date.now(),
         title: data.presentation_title || '未命名簡報',
+        pages: data.slides?.length || 0,
         input,
         data
     };
     historyItems.unshift(entry);
+    historyItems = historyItems.slice(0, MAX_HISTORY);
     currentHistoryId = entry.id;
-    saveHistory();
-    if (!historyItems.some(h => h.id === currentHistoryId)) currentHistoryId = null;
     renderHistory(true);
+    const { pages, ...body } = entry;
+    enqueueHistoryRequest(entry.id, 'POST', '', body).catch(err => {
+        cancelHistorySave(entry.id);
+        historyItems = historyItems.filter(x => x !== entry);
+        if (currentHistoryId === entry.id) currentHistoryId = null;
+        renderHistory();
+        if (!err.handled) showToast(historyError(err), 'error', 6000);
+    });
 }
 
 function getCurrentGenerationInput() {
@@ -225,14 +285,27 @@ function syncCurrentPresentationToHistory() {
     if (!item) return;
     item.data = currentPresentationData;
     item.title = currentPresentationData.presentation_title || item.title;
-    saveHistory();
+    item.pages = currentPresentationData.slides?.length || 0;
+    queueHistorySave(item.id, { title: item.title, data: item.data });
     renderHistory();
 }
 
-function openHistory(id) {
+let openingHistoryId = null;
+async function openHistory(id) {
     if (isGenerating()) { showToast('正在生成中，請稍候', 'info'); return; }
     const h = historyItems.find(x => x.id === id);
-    if (!h || !h.data || !Array.isArray(h.data.slides)) { showToast('此紀錄資料已損毀', 'error'); return; }
+    if (!h || openingHistoryId) return;
+    if (!h.data) {
+        openingHistoryId = id;
+        try {
+            h.data = (await historyFetch('GET', '/' + encodeURIComponent(id))).data;
+        } catch (err) {
+            if (!err.handled) showToast('無法開啟此紀錄：' + friendlyError(err), 'error', 6000);
+            return;
+        } finally { openingHistoryId = null; }
+        if (!historyItems.includes(h)) return;           // 讀取期間被刪除或已登出
+    }
+    if (!h.data || !Array.isArray(h.data.slides)) { showToast('此紀錄資料已損毀', 'error'); return; }
     stopAutoplay();
     currentHistoryId = id;
     currentPresentationData = sanitizePresentation(h.data);
@@ -260,14 +333,17 @@ function renameHistory(id) {
     const t = name.trim();
     if (!t) return;
     h.title = t;
-    saveHistory();
+    queueHistorySave(id, { title: t });
+    flushHistorySave(id);
     renderHistory();
 }
 
 function deleteHistory(id, el) {
     const finish = () => {
         historyItems = historyItems.filter(x => x.id !== id);
-        saveHistory();
+        cancelHistorySave(id);
+        enqueueHistoryRequest(id, 'DELETE', '/' + encodeURIComponent(id))
+            .catch(err => { if (!err.handled) { showToast(historyError(err), 'error', 6000); loadHistory(); } });
         if (id === currentHistoryId) { currentHistoryId = null; resetWorkspace(false); }
         renderHistory();
     };
@@ -277,11 +353,16 @@ function deleteHistory(id, el) {
 function clearHistory() {
     if (!historyItems.length) { showToast('目前沒有歷史記錄', 'info', 1800); return; }
     if (!confirm('確定要清除所有歷史記錄嗎？此動作無法復原。')) return;
+    const ids = historyItems.map(h => h.id);
+    ids.forEach(cancelHistorySave);
     historyItems = [];
-    saveHistory();
     if (currentHistoryId) { currentHistoryId = null; }
     renderHistory();
-    showToast('已清除所有歷史記錄', 'success', 1800);
+    // 等這些紀錄尚未送完的請求結束後再清除，避免剛建立的紀錄在清除之後才寫入
+    Promise.all(ids.map(id => saveChains.get(id)))
+        .then(() => historyFetch('DELETE'))
+        .then(() => showToast('已清除所有歷史記錄', 'success', 1800))
+        .catch(err => { if (!err.handled) { showToast(historyError(err), 'error', 6000); loadHistory(); } });
 }
 
 document.getElementById('historyList').addEventListener('click', e => {

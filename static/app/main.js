@@ -8,6 +8,7 @@ window.addEventListener('resize', () => { positionToolbar(); hidePalette(); posi
 new ResizeObserver(() => positionToolbar()).observe(document.getElementById('slideCanvas'));
 
 document.addEventListener('keydown', (e) => {
+    if (isAuthOpen()) return;                     // 登入畫面開啟時不觸發任何快捷鍵
     if (!document.getElementById('chartModal').classList.contains('hidden')) {
         if (e.key === 'Escape') { e.preventDefault(); closeChartEditor(); }
         return;                                   // 圖表視窗開啟時不觸發換頁 / 刪除等快捷鍵
@@ -152,3 +153,4 @@ document.getElementById('btnGenerate').addEventListener('pointerdown', e => {
 setStep(1);
 renderHistory(true);
 restoreDraft();
+initAuth();
