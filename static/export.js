@@ -50,10 +50,23 @@ function _exportIsAllowedUrl(v) {
     return false;
 }
 
-/* 清理 CSS：移除 @import、@font-face、非白名單的 url() 以及 expression()/behavior */
+/* CSS 跳脫字元可拼出關鍵字繞過下列檢查（例如 \75rl( 就是 url(）。只還原成英文字母的跳脫：
+ * 字母的跳脫與字母本身在 CSS 中完全等價；其他跳脫（\f00c 圖示字碼、\[ 選擇器、開頭數字 \31、\\ 反斜線）保持原樣。
+ * 由左至右逐一比對「\ + 十六進位」或「\ + 單一字元」，因此 \\75 會被視為跳脫的反斜線加上 75，不會誤判 */
+function _exportUnescapeCssLetters(css) {
+    const isLetter = c => (c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a);
+    return css.replace(/\\(?:([0-9a-f]{1,6})(?:\r\n|[ \t\r\n\f])?|([\s\S]))/gi, (m, hex, ch) => {
+        const code = hex ? parseInt(hex, 16) : ch.charCodeAt(0);
+        return isLetter(code) ? String.fromCharCode(code) : m;
+    });
+}
+
+/* 清理 CSS：移除 @import、@font-face、image-set()、非白名單的 url() 以及 expression()/behavior */
 function _exportSanitizeCss(css) {
-    return String(css)
+    return _exportUnescapeCssLetters(String(css))
         .replace(/@import[^;]*;?/gi, '')
+        // image-set() 內可直接寫字串網址（不經過 url()），無法逐一檢查，整個移除
+        .replace(/(?:-webkit-)?image-set\((?:[^()]|\([^()]*\))*\)/gi, 'none')
         .replace(/@font-face\s*\{[^}]*\}/gi, '')
         .replace(/expression\s*\([^)]*\)/gi, 'none')
         .replace(/behavior\s*:[^;}]*/gi, '')

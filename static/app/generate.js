@@ -71,9 +71,10 @@ function setLoading(on) {
     }
 }
 
+// /api/models 失敗時的備用清單，需與 app.py 的 MODEL_CATALOG 一致（tests/test_model_catalog.py 會檢查）
 let modelCatalog = {
-    gemini: { models: ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'] },
-    openai: { models: ['gpt-4.1-mini', 'gpt-4.1', 'gpt-4o-mini', 'gpt-4o'] },
+    gemini: { models: ['gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-3.8-flash'] },
+    openai: { models: ['gpt-6-luna'] },
     databricks: { models: [] }   // 模型清單由後端 .env 的 DATABRICKS_MODELS 決定
 };
 

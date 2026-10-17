@@ -182,6 +182,9 @@ function stopAutoplay() {
     autoplayTimer = null;
     document.getElementById('autoIcon').className = 'fa-solid fa-play text-[10px]';
     document.getElementById('autoLabel').textContent = '自動播放';
+    // 播放中「下一頁」一律可按（最後一頁會繞回第一頁）；停止後恢復為一般的停用規則
+    const atEnd = !!currentPresentationData && currentSlideIdx >= currentPresentationData.slides.length - 1;
+    ['nextBtn', 'nextOverlay'].forEach(id => document.getElementById(id).disabled = atEnd);
 }
 
 /* ----- 全螢幕 ----- */
