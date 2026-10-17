@@ -114,10 +114,15 @@ def normalize_chart(raw) -> dict | None:
     }
 
 
-def normalize_charts(charts) -> list[dict]:
+def normalize_charts(charts, limit: int = MAX_CHARTS_PER_SLIDE) -> list[dict | None]:
+    """逐一正規化並保留原本的索引：HTML 以 data-rs-chart="索引" 對應，無法使用的圖表留下 None
+    （前端找不到資料時會移除該容器），不可直接濾掉，否則後面的圖表會對到錯的容器。"""
     if not isinstance(charts, list):
         return []
-    return [c for c in (normalize_chart(x) for x in charts[:MAX_CHARTS_PER_SLIDE]) if c]
+    out = [normalize_chart(x) for x in charts[:limit]]
+    while out and out[-1] is None:
+        out.pop()
+    return out
 
 
 CHART_RULES = """

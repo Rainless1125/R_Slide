@@ -11,7 +11,7 @@ from google.genai import types
 from openai import BadRequestError, OpenAI
 from starlette.datastructures import UploadFile
 
-from charts import CHART_RULES, ChartSpec, normalize_charts
+from charts import CHART_RULES, MAX_CHARTS_PER_SLIDE, ChartSpec, normalize_charts
 from exporter import ExportError, build_pptx
 from extract import MAX_UPLOAD_BYTES, ExtractError, extract_text
 
@@ -156,8 +156,9 @@ class AdaptiveSlide(BaseModel):
 
 
 class SlideInput(AdaptiveSlide):
-    """前端送回的投影片：舊版歷史紀錄沒有 charts / speaker_notes，且圖表資料已在前端正規化過，因此放寬驗證。"""
-    charts: list[dict] = Field(default_factory=list)
+    """前端送回的投影片：舊版歷史紀錄沒有 charts / speaker_notes，且圖表資料已在前端正規化過，因此放寬驗證。
+    charts 可能含 None（無法使用的圖表保留索引位置，見 normalize_charts）。"""
+    charts: list[dict | None] = Field(default_factory=list)
     speaker_notes: str = ""
 
 class AdaptivePresentation(BaseModel):
@@ -393,7 +394,8 @@ def regenerate_slide(req: RegenerateSlideRequest):
     try:
         data = call_llm(req.provider, req.model, system_instruction, prompt, AdaptiveSlide, 0.7)
         data["page_number"] = target_slide.page_number
-        data["charts"] = normalize_charts(data.get("charts"))
+        # 使用者可能自行插入超過 MAX_CHARTS_PER_SLIDE 張圖表：至少保留原頁的張數，避免重產後被截掉
+        data["charts"] = normalize_charts(data.get("charts"), max(MAX_CHARTS_PER_SLIDE, len(target_slide.charts)))
         return data
     except HTTPException:
         raise

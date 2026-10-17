@@ -27,6 +27,9 @@ const EXPORT_PLACEHOLDER_IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
 const EXPORT_DROP_TAGS = new Set([
     'script', 'iframe', 'frame', 'frameset', 'object', 'embed', 'applet',
     'link', 'meta', 'base', 'form', 'foreignobject', 'audio', 'video', 'source', 'track',
+    // 解析與序列化結果不一致、可造成 mXSS 的標籤：MathML 命名空間切換、noscript（DOMParser 不執行 script，
+    // 內容會被當成標記；插入頁面時則是純文字）、template（內容不在 querySelectorAll 範圍內）
+    'math', 'noscript', 'template',
 ]);
 
 /* 會載入資源的屬性 */
@@ -64,7 +67,21 @@ function _exportSanitizeCss(css) {
         });
 }
 
+// 清理結果會再被 innerHTML 重新解析；若某些結構在「解析 → 序列化 → 再解析」後會變形（mXSS），
+// 單次清理看到的 DOM 就不等於最後插入頁面的 DOM。因此重複清理直到結果不再變化，仍不穩定就整頁丟棄。
+const EXPORT_SANITIZE_MAX_PASSES = 4;
 function sanitizeSlideHtml(html) {
+    let out = _exportSanitizeOnce(html);
+    for (let i = 1; i < EXPORT_SANITIZE_MAX_PASSES; i++) {
+        const again = _exportSanitizeOnce(out);
+        if (again === out) return out;
+        out = again;
+    }
+    console.warn('[R Slide] 投影片 HTML 清理後仍不穩定，已移除內容');
+    return '';
+}
+
+function _exportSanitizeOnce(html) {
     // DOMParser 產生的文件是惰性的：不執行 script、不載入圖片
     const doc = new DOMParser().parseFromString(`<!DOCTYPE html><html><body>${String(html ?? '')}</body></html>`, 'text/html');
 

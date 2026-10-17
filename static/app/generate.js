@@ -444,6 +444,9 @@ async function regenerateSingleSlide(idx, customPrompt = '') {
         return;
     }
 
+    // 重產期間使用者仍可切換 / 新增 / 刪除簡報：記下發出請求時的簡報與頁面，回來後依物件找回位置
+    const deck = currentPresentationData;
+    const targetSlide = deck.slides[idx];
     regeneratingSlideIdx = idx;
     updateUndoButtons();
     setReviewRegenerateState(idx, true);
@@ -484,12 +487,17 @@ async function regenerateSingleSlide(idx, customPrompt = '') {
         const newSlide = sanitizeSlide(await res.json());
         newSlide.html_content = restoreSlideImages(newSlide.html_content, slim.images);
         await bakeSlideCharts([newSlide]);
-        const oldSlide = currentPresentationData.slides[idx];
+        const at = currentPresentationData === deck ? deck.slides.indexOf(targetSlide) : -1;
+        if (at < 0) {
+            if (modalOpen) closeRegenerateModal(true);
+            showToast('簡報已切換或此頁已不存在，已捨棄這次的重產結果', 'info', 3200);
+            return;
+        }
         pushUndoSnapshot();
-        currentPresentationData.slides[idx] = {
-            ...oldSlide,
+        deck.slides[at] = {
+            ...targetSlide,
             ...newSlide,
-            page_number: oldSlide.page_number || idx + 1
+            page_number: targetSlide.page_number || at + 1
         };
 
         syncCurrentPresentationToHistory();
@@ -498,12 +506,12 @@ async function regenerateSingleSlide(idx, customPrompt = '') {
         const inReview = !document.getElementById('sectionReview').classList.contains('hidden');
         if (inPlayer) {
             buildThumbnails();
-            if (idx === currentSlideIdx) renderSlide(idx, 'fade');
+            if (at === currentSlideIdx) renderSlide(at, 'fade');
             else updateThumbnails();
         }
         if (inReview) renderReviewSection(true);
         if (modalOpen) closeRegenerateModal(true);
-        showToast(`第 ${idx + 1} 頁已重產完成`, 'success', 2200);
+        showToast(`第 ${at + 1} 頁已重產完成`, 'success', 2200);
     } catch (err) {
         showToast(friendlyError(err), 'error', 8000, { label: '重試', onClick: () => regenerateSingleSlide(idx, customPrompt) });
     } finally {
