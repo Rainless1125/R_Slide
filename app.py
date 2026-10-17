@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
-from openai import OpenAI
+from openai import BadRequestError, OpenAI
 from starlette.datastructures import UploadFile
 
 from charts import CHART_RULES, ChartSpec, normalize_charts
@@ -19,18 +19,94 @@ load_dotenv()
 MY_GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 MY_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-if not MY_GEMINI_API_KEY and not MY_OPENAI_API_KEY:
-    raise ValueError("找不到 API Key，請在 .env 檔案中至少設定 GEMINI_API_KEY 或 OPENAI_API_KEY！")
+
+def parse_model_list(value: str | None) -> list[str]:
+    """以逗號分隔的模型清單（.env 用），去除空白與重複。"""
+    return list(dict.fromkeys(m.strip() for m in (value or "").split(",") if m.strip()))
+
+
+def databricks_base_url(host: str | None, base_url: str | None = None) -> str | None:
+    """Databricks 的 OpenAI 相容端點：有指定 DATABRICKS_BASE_URL 就直接使用，否則為 <workspace>/serving-endpoints。"""
+    if base_url and base_url.strip():
+        return base_url.strip().rstrip("/")
+    if not host or not host.strip():
+        return None
+    host = host.strip().rstrip("/")
+    if not host.startswith(("http://", "https://")):
+        host = "https://" + host
+    return host + "/serving-endpoints"
+
+
+# Databricks AI Gateway（Model Serving 端點）：以 OpenAI SDK 呼叫，模型名稱即端點名稱
+DATABRICKS_TOKEN = os.getenv("DATABRICKS_TOKEN")
+DATABRICKS_BASE_URL = databricks_base_url(os.getenv("DATABRICKS_HOST"), os.getenv("DATABRICKS_BASE_URL"))
+DATABRICKS_MODELS = parse_model_list(os.getenv("DATABRICKS_MODELS"))
+DATABRICKS_READY = bool(DATABRICKS_TOKEN and DATABRICKS_BASE_URL and DATABRICKS_MODELS)
+
+if not MY_GEMINI_API_KEY and not MY_OPENAI_API_KEY and not DATABRICKS_READY:
+    raise ValueError("找不到 API Key，請在 .env 檔案中至少設定 GEMINI_API_KEY、OPENAI_API_KEY，"
+                     "或 Databricks 的 DATABRICKS_HOST + DATABRICKS_TOKEN + DATABRICKS_MODELS！")
 
 gemini_client = genai.Client(api_key=MY_GEMINI_API_KEY) if MY_GEMINI_API_KEY else None
 openai_client = OpenAI(api_key=MY_OPENAI_API_KEY) if MY_OPENAI_API_KEY else None
+databricks_client = OpenAI(api_key=DATABRICKS_TOKEN, base_url=DATABRICKS_BASE_URL) if DATABRICKS_READY else None
 app = FastAPI(title="R Slide")
 
-# 各平台可選模型（第一個為預設）
+# 各平台可選模型（第一個為預設）；Databricks 的模型清單由 .env 的 DATABRICKS_MODELS 決定
 MODEL_CATALOG = {
     "gemini": ["gemini-3.5-flash", "gemini-3.7-flash", "gemini-3.8-flash"],
     "openai": ["gpt-6-luna"],
+    "databricks": DATABRICKS_MODELS,
 }
+MISSING_KEY_MSG = {
+    "gemini": "未設定 GEMINI_API_KEY",
+    "openai": "未設定 OPENAI_API_KEY",
+    "databricks": "未設定 Databricks（需要 DATABRICKS_HOST、DATABRICKS_TOKEN、DATABRICKS_MODELS）",
+}
+
+
+def provider_client(provider: str):
+    return {"gemini": gemini_client, "openai": openai_client, "databricks": databricks_client}.get(provider)
+
+
+def parse_json_reply(text: str, schema: type[BaseModel]) -> dict:
+    """從模型的文字回覆取出 JSON（容許 ```json 區塊或前後多餘文字），並以 schema 驗證。"""
+    text = (text or "").strip()
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end <= start:
+        raise ValueError("模型沒有回傳 JSON")
+    return schema.model_validate_json(text[start:end + 1]).model_dump()
+
+
+def call_openai_compatible(client: OpenAI, model: str, system_instruction: str, prompt: str,
+                           schema: type[BaseModel], allow_fallback: bool) -> dict:
+    messages = [
+        {"role": "system", "content": system_instruction},
+        {"role": "user", "content": prompt},
+    ]
+    try:
+        # 部分 OpenAI 模型（如推理類）只接受預設 temperature，故不傳入
+        completion = client.beta.chat.completions.parse(model=model, messages=messages, response_format=schema)
+        message = completion.choices[0].message
+        if message.refusal:
+            raise HTTPException(status_code=502, detail=f"模型拒絕回應: {message.refusal}")
+        if message.parsed is not None:
+            return message.parsed.model_dump()
+        if not allow_fallback:
+            raise HTTPException(status_code=502, detail="模型回傳的資料無法解析")
+        return parse_json_reply(message.content, schema)
+    except BadRequestError:
+        # Databricks 上部分模型不支援嚴格的 json_schema 結構化輸出：改為在提示詞附上 schema，回覆後再由後端驗證
+        if not allow_fallback:
+            raise
+    fallback_system = (system_instruction + "\n\n【輸出格式】：只輸出一個符合下列 JSON Schema 的 JSON 物件，"
+                       "不要加上 Markdown 區塊或任何說明文字。\n"
+                       + json.dumps(schema.model_json_schema(), ensure_ascii=False))
+    completion = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "system", "content": fallback_system}, {"role": "user", "content": prompt}],
+    )
+    return parse_json_reply(completion.choices[0].message.content, schema)
 
 
 def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
@@ -39,11 +115,14 @@ def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
     provider = (provider or "gemini").lower()
     if provider not in MODEL_CATALOG:
         raise HTTPException(status_code=400, detail=f"不支援的平台: {provider}")
+    client = provider_client(provider)
+    if client is None:
+        raise HTTPException(status_code=400, detail=MISSING_KEY_MSG[provider])
+    if provider == "databricks" and model and model not in MODEL_CATALOG["databricks"]:
+        raise HTTPException(status_code=400, detail=f"未開放的 Databricks 模型: {model}")
     model = model or MODEL_CATALOG[provider][0]
 
     if provider == "gemini":
-        if gemini_client is None:
-            raise HTTPException(status_code=400, detail="未設定 GEMINI_API_KEY")
         config = types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=schema,
@@ -51,24 +130,11 @@ def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
             thinking_config=types.ThinkingConfig(thinking_budget=0),
             system_instruction=system_instruction
         )
-        response = gemini_client.models.generate_content(model=model, contents=prompt, config=config)
+        response = client.models.generate_content(model=model, contents=prompt, config=config)
         return json.loads(response.text)
 
-    if openai_client is None:
-        raise HTTPException(status_code=400, detail="未設定 OPENAI_API_KEY")
-    completion = openai_client.beta.chat.completions.parse(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_instruction},
-            {"role": "user", "content": prompt},
-        ],
-        response_format=schema,
-        # 部分 OpenAI 模型（如推理類）只接受預設 temperature，故不傳入
-    )
-    message = completion.choices[0].message
-    if message.refusal:
-        raise HTTPException(status_code=502, detail=f"模型拒絕回應: {message.refusal}")
-    return message.parsed.model_dump()
+    return call_openai_compatible(client, model, system_instruction, prompt, schema,
+                                  allow_fallback=provider == "databricks")
 
 
 # 1. Pydantic 模型定義
@@ -161,8 +227,8 @@ class RegenerateSlideRequest(BaseModel):
 @app.get("/api/models")
 async def list_models():
     return {
-        "gemini": {"available": gemini_client is not None, "models": MODEL_CATALOG["gemini"]},
-        "openai": {"available": openai_client is not None, "models": MODEL_CATALOG["openai"]},
+        provider: {"available": provider_client(provider) is not None, "models": models}
+        for provider, models in MODEL_CATALOG.items()
     }
 
 @app.post("/api/generate")
