@@ -234,7 +234,7 @@ function renderHistory(animate = false) {
       ${styleThumbHtml(styleColors(h.input?.style_preference || ''))}
       <div class="min-w-0 flex-1">
         <div class="text-sm font-semibold truncate ${active ? 'text-violet-700 dark:text-violet-200' : ''}" title="${esc(h.title)}">${esc(h.title)}</div>
-        <div class="text-[11px] text-zinc-400 mt-0.5 truncate">${fmtTime(h.createdAt)} · ${pages} 頁${style ? ' · ' + esc(style) : ''}</div>
+        <div class="text-[11px] text-zinc-400 mt-0.5 truncate">${fmtTime(h.createdAt)} · ${pages} 頁 · ${DECK_MODE_SHORT[normDeckMode(h.input?.deck_mode)]}${style ? ' · ' + esc(style) : ''}</div>
       </div>
       <div class="flex flex-col gap-1 lg:opacity-0 lg:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
         <button data-act="rename" class="icon-btn w-6 h-6 rounded-md text-[11px] text-zinc-400 hover:text-blue-500 hover:bg-zinc-100 dark:hover:bg-zinc-700" title="重新命名" aria-label="重新命名"><i class="fa-solid fa-pen"></i></button>
@@ -278,6 +278,27 @@ function getCurrentGenerationInput() {
         style_preference: getStylePreference(),
         deck_mode: getDeckMode()
     };
+}
+
+// 目前開啟的簡報所用的模式（重產時沿用；舊紀錄沒有此欄位時視為演講型）
+function currentDeckMode() { return normDeckMode(getCurrentGenerationInput().deck_mode); }
+function updateDeckModeBadges() {
+    const mode = currentDeckMode();
+    document.querySelectorAll('[data-deck-mode-badge]').forEach(el => {
+        el.textContent = DECK_MODE_SHORT[mode];
+        el.dataset.mode = mode;
+        el.title = mode === 'document' ? '詳細模式（閱讀型）：單頁重產會沿用此模式' : '簡易模式（演講型）：單頁重產會沿用此模式';
+    });
+}
+// 重產時改用另一種模式：寫回這份簡報的生成設定，之後的重產都沿用
+function setCurrentDeckMode(mode) {
+    const item = historyItems.find(x => x.id === currentHistoryId);
+    if (!item) return;
+    item.input = { ...item.input, deck_mode: normDeckMode(mode) };
+    queueHistorySave(item.id, { input: item.input });
+    setDeckMode(mode);
+    renderHistory();
+    updateDeckModeBadges();
 }
 
 function syncCurrentPresentationToHistory() {

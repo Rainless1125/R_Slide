@@ -55,3 +55,15 @@ def test_regenerate_follows_deck_mode(monkeypatch):
     assert res.status_code == 200
     assert "Document Deck" in captured["system"]
     assert app_module.DECK_MODE_LABELS["document"] in captured["prompt"]
+
+
+def test_fixed_page_count_forbids_extra_pages(monkeypatch):
+    res, captured = generate(monkeypatch, deck_mode="document", num_pages=4)
+    assert res.status_code == 200
+    assert "必須剛好 4 頁" in captured["prompt"] and "不可增加頁數" in captured["prompt"]
+
+
+def test_ai_decided_page_count_has_no_fixed_hint(monkeypatch):
+    res, captured = generate(monkeypatch, num_pages=0)
+    assert res.status_code == 200
+    assert "自行決定" in captured["prompt"] and "必須剛好" not in captured["prompt"]

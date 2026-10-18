@@ -217,11 +217,15 @@ def add_history(user_id: int, items: list[dict], replace: bool = True):
         _trim(conn, user_id)
 
 
-def update_history(user_id: int, item_id: str, title: str | None = None, data: dict | None = None) -> bool:
+def update_history(user_id: int, item_id: str, title: str | None = None, data: dict | None = None,
+                   input: dict | None = None) -> bool:
     sets, args = ["updated_at = ?"], [now_ms()]
     if title is not None:
         sets.append("title = ?")
         args.append(title)
+    if input is not None:
+        sets.append("input_json = ?")
+        args.append(json.dumps(input, ensure_ascii=False))
     if data is not None:
         sets += ["data_json = ?", "pages = ?"]
         args += [json.dumps(data, ensure_ascii=False), _pages(data)]

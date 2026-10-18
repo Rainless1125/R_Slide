@@ -95,6 +95,7 @@ class HistoryImport(BaseModel):
 
 class HistoryPatch(BaseModel):
     title: str | None = Field(None, min_length=1, max_length=200)
+    input: dict | None = None      # 生成設定（例如重產時改用另一種簡報模式）
     data: dict | None = None
 
 
@@ -149,7 +150,7 @@ async def history_import(request: Request, user: dict = Depends(current_user)):
 @router.patch("/api/history/{item_id}")
 async def history_update(item_id: str, request: Request, user: dict = Depends(current_user)):
     patch = await read_body(request, HistoryPatch)
-    ok = await run_in_threadpool(store.update_history, user["id"], item_id, patch.title, patch.data)
+    ok = await run_in_threadpool(store.update_history, user["id"], item_id, patch.title, patch.data, patch.input)
     if not ok:
         raise HTTPException(status_code=404, detail="找不到此紀錄")
     return {"ok": True}

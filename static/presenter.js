@@ -8,6 +8,8 @@
 const NOTES_PANEL_KEY = 'rslide_notes';
 const PRESENTER_FONT_KEY = 'rslide_presenter_fs';
 let notesSlide = null;      // 備註區目前對應的投影片物件（換頁後仍能把修改寫回正確的頁）
+let notesCommitTimer = null;
+const NOTES_COMMIT_DELAY = 1000;   // 打字停手後自動寫回，不必等輸入框失焦
 let presenterWin = null;
 
 function slideNotes(slide) {
@@ -37,6 +39,7 @@ function renderNotes() {
 }
 
 function commitNotes() {
+    clearTimeout(notesCommitTimer);
     const input = document.getElementById('notesInput');
     const slide = notesSlide;
     if (!input || !slide || !currentPresentationData?.slides.includes(slide)) return;
@@ -50,11 +53,18 @@ function commitNotes() {
 (function initNotesPanel() {
     const input = document.getElementById('notesInput');
     input.addEventListener('change', commitNotes);
-    input.addEventListener('input', () => updatePresenter(input.value));
+    input.addEventListener('input', () => {
+        updatePresenter(input.value);
+        clearTimeout(notesCommitTimer);
+        notesCommitTimer = setTimeout(commitNotes, NOTES_COMMIT_DELAY);
+    });
     input.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); input.blur(); } });
     let saved = null;
     try { saved = localStorage.getItem(NOTES_PANEL_KEY); } catch (e) { }
     setNotesPanel(saved === '1');
+    // 重新整理 / 關閉分頁不會觸發 change：先寫回，交給 core.js 的 beforeunload 送出並提醒尚未存完
+    // （presenter.js 比 core.js 先載入，這個監聽會先執行）
+    window.addEventListener('beforeunload', commitNotes);
 })();
 
 /* ----- 講者檢視視窗 ----- */

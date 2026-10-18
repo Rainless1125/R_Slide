@@ -195,12 +195,20 @@ function getStylePreference() {
     return v === CUSTOM_STYLE ? buildCustomStyle(customColors) : v;
 }
 // 簡報模式：speaker = 簡易模式（演講型），document = 詳細模式（閱讀型）；舊紀錄沒有此欄位時視為演講型
+const DECK_MODE_SHORT = { speaker: '演講型', document: '閱讀型' };
+function normDeckMode(mode) { return mode === 'document' ? 'document' : 'speaker'; }
 function getDeckMode() {
     return document.querySelector('input[name="deckMode"]:checked')?.value || 'speaker';
 }
 function setDeckMode(mode) {
-    const radio = document.querySelector(`input[name="deckMode"][value="${mode === 'document' ? 'document' : 'speaker'}"]`);
+    const radio = document.querySelector(`input[name="deckMode"][value="${normDeckMode(mode)}"]`);
     if (radio) radio.checked = true;
+    updatePagesHint();
+}
+// 詳細模式每頁資訊較多：頁數固定時提醒可改由 AI 決定頁數
+function updatePagesHint() {
+    const fixed = document.getElementById('numPages').value !== '0';
+    document.getElementById('pagesHint').classList.toggle('hidden', !(fixed && getDeckMode() === 'document'));
 }
 function setStylePreference(value) {
     const sel = document.getElementById('stylePreference');
@@ -322,5 +330,7 @@ function restoreDraft() {
 }
 ['inputContent', 'targetAudience'].forEach(id => document.getElementById(id).addEventListener('input', saveDraft));
 ['numPages', 'stylePreference'].forEach(id => document.getElementById(id).addEventListener('change', saveDraft));
-document.querySelectorAll('input[name="deckMode"]').forEach(r => r.addEventListener('change', saveDraft));
+document.querySelectorAll('input[name="deckMode"]').forEach(r => r.addEventListener('change', () => { saveDraft(); updatePagesHint(); }));
+document.getElementById('numPages').addEventListener('change', updatePagesHint);
 initStyleCards();
+updatePagesHint();
