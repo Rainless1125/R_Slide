@@ -22,8 +22,10 @@ class ExportError(Exception):
     """可直接顯示給使用者的匯出錯誤。"""
 
 
-def _decode_image(data_url: str, page: int) -> bytes:
-    m = DATA_URL_RE.fullmatch(data_url or "")
+def _decode_image(data_url, page: int) -> bytes:
+    if not isinstance(data_url, str):
+        raise ExportError(f"第 {page} 頁的圖片格式不正確")
+    m = DATA_URL_RE.fullmatch(data_url)
     if not m:
         raise ExportError(f"第 {page} 頁的圖片格式不正確")
     try:
@@ -39,6 +41,8 @@ def _decode_image(data_url: str, page: int) -> bytes:
             if max(img.size) > MAX_IMAGE_SIDE:
                 raise ExportError(f"第 {page} 頁的圖片尺寸過大")
             img.verify()
+    except Image.DecompressionBombError as e:   # 像素數遠超上限：PIL 在開檔時就拒絕，視同尺寸過大
+        raise ExportError(f"第 {page} 頁的圖片尺寸過大") from e
     except (UnidentifiedImageError, OSError, SyntaxError) as e:
         raise ExportError(f"第 {page} 頁的圖片資料損毀") from e
     return raw
@@ -59,7 +63,8 @@ def build_pptx(title: str, slides: list[dict]) -> bytes:
     for i, (slide_data, raw) in enumerate(zip(slides, images), 1):
         slide = prs.slides.add_slide(blank)
         pic = slide.shapes.add_picture(io.BytesIO(raw), 0, 0, SLIDE_WIDTH, SLIDE_HEIGHT)
-        slide_title = (slide_data.get("title") or "").strip() or f"第 {i} 頁"
+        slide_title = slide_data.get("title")
+        slide_title = (slide_title.strip() if isinstance(slide_title, str) else "") or f"第 {i} 頁"
         pic.name = f"Slide {i}"
         pic._element.nvPicPr.cNvPr.set("descr", slide_title)
         notes = slide_data.get("notes")

@@ -71,9 +71,10 @@ function setLoading(on) {
     }
 }
 
+// /api/models 失敗時的備用清單，需與 app.py 的 MODEL_CATALOG 一致（tests/test_model_catalog.py 會檢查）
 let modelCatalog = {
-    gemini: { models: ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'] },
-    openai: { models: ['gpt-4.1-mini', 'gpt-4.1', 'gpt-4o-mini', 'gpt-4o'] },
+    gemini: { models: ['gemini-3.5-flash', 'gemini-3.7-flash', 'gemini-3.8-flash'] },
+    openai: { models: ['gpt-6-luna'] },
     databricks: { models: [] }   // 模型清單由後端 .env 的 DATABRICKS_MODELS 決定
 };
 
@@ -329,7 +330,7 @@ function renderReviewSection(quiet = false) {
         container.appendChild(card);
     });
     fitReviewThumbs();
-    if (regeneratingSlideIdx !== null) setReviewRegenerateState(regeneratingSlideIdx, true);
+    if (regeneratingSlideIdx !== null && regeneratingDeck === currentPresentationData) setReviewRegenerateState(regeneratingSlideIdx, true);
 
     if (!quiet) review.scrollIntoView({ behavior: 'smooth' });
 }
@@ -444,7 +445,11 @@ async function regenerateSingleSlide(idx, customPrompt = '') {
         return;
     }
 
+    // 重產期間使用者仍可切換 / 新增 / 刪除簡報：記下發出請求時的簡報與頁面，回來後依物件找回位置
+    const deck = currentPresentationData;
+    const targetSlide = deck.slides[idx];
     regeneratingSlideIdx = idx;
+    regeneratingDeck = deck;
     updateUndoButtons();
     setReviewRegenerateState(idx, true);
     setCurrentRegenerateState(true);
@@ -484,12 +489,17 @@ async function regenerateSingleSlide(idx, customPrompt = '') {
         const newSlide = sanitizeSlide(await res.json());
         newSlide.html_content = restoreSlideImages(newSlide.html_content, slim.images);
         await bakeSlideCharts([newSlide]);
-        const oldSlide = currentPresentationData.slides[idx];
+        const at = currentPresentationData === deck ? deck.slides.indexOf(targetSlide) : -1;
+        if (at < 0) {
+            if (modalOpen) closeRegenerateModal(true);
+            showToast('簡報已切換或此頁已不存在，已捨棄這次的重產結果', 'info', 3200);
+            return;
+        }
         pushUndoSnapshot();
-        currentPresentationData.slides[idx] = {
-            ...oldSlide,
+        deck.slides[at] = {
+            ...targetSlide,
             ...newSlide,
-            page_number: oldSlide.page_number || idx + 1
+            page_number: targetSlide.page_number || at + 1
         };
 
         syncCurrentPresentationToHistory();
@@ -498,18 +508,19 @@ async function regenerateSingleSlide(idx, customPrompt = '') {
         const inReview = !document.getElementById('sectionReview').classList.contains('hidden');
         if (inPlayer) {
             buildThumbnails();
-            if (idx === currentSlideIdx) renderSlide(idx, 'fade');
+            if (at === currentSlideIdx) renderSlide(at, 'fade');
             else updateThumbnails();
         }
         if (inReview) renderReviewSection(true);
         if (modalOpen) closeRegenerateModal(true);
-        showToast(`第 ${idx + 1} 頁已重產完成`, 'success', 2200);
+        showToast(`第 ${at + 1} 頁已重產完成`, 'success', 2200);
     } catch (err) {
         showToast(friendlyError(err), 'error', 8000, { label: '重試', onClick: () => regenerateSingleSlide(idx, customPrompt) });
     } finally {
         setReviewRegenerateState(idx, false);
         setCurrentRegenerateState(false);
         regeneratingSlideIdx = null;
+        regeneratingDeck = null;
         updateUndoButtons();
         modalConfirmBtn.disabled = false;
         modalCancelBtn.disabled = false;

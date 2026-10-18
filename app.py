@@ -1,5 +1,6 @@
 import os
 import json
+from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
@@ -11,9 +12,12 @@ from google.genai import types
 from openai import BadRequestError, OpenAI
 from starlette.datastructures import UploadFile
 
-from charts import CHART_RULES, ChartSpec, normalize_charts
+from charts import CHART_RULES, MAX_CHARTS_PER_SLIDE, ChartSpec, normalize_charts
 from exporter import ExportError, build_pptx
 from extract import MAX_UPLOAD_BYTES, ExtractError, extract_text
+
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"   # 以本檔所在位置為基準，從其他目錄啟動 uvicorn 也找得到
 
 load_dotenv()
 MY_GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -109,6 +113,26 @@ def call_openai_compatible(client: OpenAI, model: str, system_instruction: str, 
     return parse_json_reply(completion.choices[0].message.content, schema)
 
 
+def gemini_response_text(response) -> str:
+    """取出 Gemini 回覆文字；被安全機制擋下、沒有輸出或輸出被截斷時，改回傳說明原因的錯誤，
+    而不是讓 json.loads 失敗後被當成「格式有誤」（這類情況重試通常也沒用）。"""
+    feedback = getattr(response, "prompt_feedback", None)
+    block = getattr(feedback, "block_reason", None)
+    if block:
+        raise HTTPException(status_code=502, detail=f"模型拒絕回應: 提示內容被 Gemini 安全機制擋下（{getattr(block, 'name', block)}）")
+    candidates = getattr(response, "candidates", None) or []
+    finish = getattr(candidates[0], "finish_reason", None) if candidates else None
+    reason = getattr(finish, "name", None) or (str(finish) if finish else "")
+    if reason == "MAX_TOKENS":
+        raise HTTPException(status_code=502, detail="AI 輸出超過長度上限（MAX_TOKENS）")
+    text = response.text
+    if not text:
+        if reason in ("SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "RECITATION"):
+            raise HTTPException(status_code=502, detail=f"模型拒絕回應: 輸出被 Gemini 安全機制擋下（{reason}）")
+        raise HTTPException(status_code=502, detail=f"模型沒有回傳內容（{reason or '未知原因'}）")
+    return text
+
+
 def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
              schema: type[BaseModel], temperature: float) -> dict:
     """依平台呼叫 LLM，回傳符合 schema 的 dict。"""
@@ -131,7 +155,7 @@ def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
             system_instruction=system_instruction
         )
         response = client.models.generate_content(model=model, contents=prompt, config=config)
-        return json.loads(response.text)
+        return json.loads(gemini_response_text(response))
 
     return call_openai_compatible(client, model, system_instruction, prompt, schema,
                                   allow_fallback=provider == "databricks")
@@ -156,8 +180,9 @@ class AdaptiveSlide(BaseModel):
 
 
 class SlideInput(AdaptiveSlide):
-    """前端送回的投影片：舊版歷史紀錄沒有 charts / speaker_notes，且圖表資料已在前端正規化過，因此放寬驗證。"""
-    charts: list[dict] = Field(default_factory=list)
+    """前端送回的投影片：舊版歷史紀錄沒有 charts / speaker_notes，且圖表資料已在前端正規化過，因此放寬驗證。
+    charts 可能含 None（無法使用的圖表保留索引位置，見 normalize_charts）。"""
+    charts: list[dict | None] = Field(default_factory=list)
     speaker_notes: str = ""
 
 class AdaptivePresentation(BaseModel):
@@ -393,22 +418,23 @@ def regenerate_slide(req: RegenerateSlideRequest):
     try:
         data = call_llm(req.provider, req.model, system_instruction, prompt, AdaptiveSlide, 0.7)
         data["page_number"] = target_slide.page_number
-        data["charts"] = normalize_charts(data.get("charts"))
+        # 使用者可能自行插入超過 MAX_CHARTS_PER_SLIDE 張圖表：至少保留原頁的張數，避免重產後被截掉
+        data["charts"] = normalize_charts(data.get("charts"), max(MAX_CHARTS_PER_SLIDE, len(target_slide.charts)))
         return data
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
-    return FileResponse("static/favicon.svg", media_type="image/svg+xml")
+    return FileResponse(STATIC_DIR / "favicon.svg", media_type="image/svg+xml")
 
 @app.get("/")
 async def root():
-    return FileResponse("static/index.html")
+    return FileResponse(STATIC_DIR / "index.html")
 
 if __name__ == "__main__":
     import uvicorn

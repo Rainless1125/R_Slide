@@ -28,17 +28,67 @@ def _clean_text(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
-PAGE_NUMBER_RE = re.compile(r"(?:-\s*)?(?:page\s*)?\d{1,4}(?:\s*/\s*\d{1,4})?(?:\s*-)?|第\s*\d{1,4}\s*頁", re.I)
+# 有明確頁碼格式的行（Page 3、- 3 -、3 / 10、第 3 頁）一律視為頁碼
+PAGE_LABEL_RE = re.compile(r"page\s*\d{1,4}(?:\s*(?:/|of)\s*\d{1,4})?|-\s*\d{1,4}\s*-|\d{1,4}\s*/\s*\d{1,4}|第\s*\d{1,4}\s*頁", re.I)
+# 只有數字的行可能是內文數據（年份、金額），需確認它跟著頁序遞增才移除
+BARE_NUMBER_RE = re.compile(r"\d{1,4}")
+# 頁碼與頁序的差值上限（封面、目錄不編號或以羅馬數字編號造成的位移）；
+# 連續頁面結尾剛好是 2023、2024 這類遞增數據時，差值會大到不合理，不視為頁碼
+MAX_PAGE_OFFSET = 100
 
 
-def _strip_page_number(page_text: str) -> str:
-    """只移除每頁頭尾的頁碼行，避免誤刪內文中單獨成行的數據。"""
-    lines = page_text.strip().split("\n")
-    if lines and PAGE_NUMBER_RE.fullmatch(lines[-1].strip()):
-        lines.pop()
-    if lines and PAGE_NUMBER_RE.fullmatch(lines[0].strip()):
-        lines.pop(0)
-    return "\n".join(lines).strip()
+def _page_number_offset(pages: list[list[str]]) -> int | None:
+    """找出「頁首 / 頁尾數字 − 頁序」最常見的差值（容許封面不編號等固定位移）。
+    至少一半的頁面（且至少 2 頁；單頁 PDF 則必須剛好是 1）符合才視為頁碼，否則回傳 None。"""
+    counts: dict[int, int] = {}
+    for i, lines in enumerate(pages, 1):
+        ends = {lines[0].strip(), lines[-1].strip()} if lines else set()
+        offsets = {int(line) - i for line in ends if BARE_NUMBER_RE.fullmatch(line)}
+        offsets = {off for off in offsets if abs(off) <= MAX_PAGE_OFFSET}
+        for off in offsets:
+            counts[off] = counts.get(off, 0) + 1
+    if not counts:
+        return None
+    if len(pages) == 1:
+        return 0 if 0 in counts else None
+    offset, hits = max(counts.items(), key=lambda kv: kv[1])
+    return offset if hits >= max(2, (len(pages) + 1) // 2) else None
+
+
+def _running_numbers(pages: list[list[str]], pos: int) -> set[str]:
+    """每頁同一位置（第一行 / 最後一行）都出現的相同數字，例如頁首 / 頁尾的年份「2024」。
+    至少 3 頁、且 60% 以上的頁面相同才算，避免把少數頁面剛好相同的數據當成頁首 / 頁尾。"""
+    if len(pages) < 3:
+        return set()
+    counts: dict[str, int] = {}
+    for lines in pages:
+        line = lines[pos].strip() if lines else ""
+        if BARE_NUMBER_RE.fullmatch(line):
+            counts[line] = counts.get(line, 0) + 1
+    need = max(3, -(-len(pages) * 3 // 5))   # ceil(60%)
+    return {v for v, c in counts.items() if c >= need}
+
+
+def _strip_page_numbers(pages: list[str]) -> list[str]:
+    """只移除每頁頭尾的頁碼與頁首 / 頁尾行，避免誤刪內文中單獨成行的數據。"""
+    split = [p.strip().split("\n") for p in pages]
+    offset = _page_number_offset(split)
+    running = {-1: _running_numbers(split, -1), 0: _running_numbers(split, 0)}
+
+    def is_page_number(line: str, page: int, pos: int) -> bool:
+        line = line.strip()
+        if PAGE_LABEL_RE.fullmatch(line) or line in running[pos]:
+            return True
+        return offset is not None and bool(BARE_NUMBER_RE.fullmatch(line)) and int(line) - page == offset
+
+    out = []
+    for i, lines in enumerate(split, 1):
+        if lines and is_page_number(lines[-1], i, -1):
+            lines = lines[:-1]
+        if lines and is_page_number(lines[0], i, 0):
+            lines = lines[1:]
+        out.append("\n".join(lines).strip())
+    return out
 
 
 def _extract_pdf(data: bytes) -> tuple[str, int]:
@@ -51,7 +101,7 @@ def _extract_pdf(data: bytes) -> tuple[str, int]:
         raise
     except (PdfReadError, ValueError, KeyError, TypeError) as e:
         raise ExtractError("無法讀取此 PDF，檔案可能已損毀") from e
-    text = "\n\n".join(p for p in map(_strip_page_number, pages) if p)
+    text = "\n\n".join(p for p in _strip_page_numbers(pages) if p)
     if not text:
         raise ExtractError("此 PDF 抽不到文字，可能是掃描影像檔，目前不支援", 422)
     return text, len(pages)

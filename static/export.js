@@ -27,6 +27,9 @@ const EXPORT_PLACEHOLDER_IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
 const EXPORT_DROP_TAGS = new Set([
     'script', 'iframe', 'frame', 'frameset', 'object', 'embed', 'applet',
     'link', 'meta', 'base', 'form', 'foreignobject', 'audio', 'video', 'source', 'track',
+    // 解析與序列化結果不一致、可造成 mXSS 的標籤：MathML 命名空間切換、noscript（DOMParser 不執行 script，
+    // 內容會被當成標記；插入頁面時則是純文字）、template（內容不在 querySelectorAll 範圍內）
+    'math', 'noscript', 'template',
 ]);
 
 /* 會載入資源的屬性 */
@@ -47,10 +50,23 @@ function _exportIsAllowedUrl(v) {
     return false;
 }
 
-/* 清理 CSS：移除 @import、@font-face、非白名單的 url() 以及 expression()/behavior */
+/* CSS 跳脫字元可拼出關鍵字繞過下列檢查（例如 \75rl( 就是 url(）。只還原成英文字母的跳脫：
+ * 字母的跳脫與字母本身在 CSS 中完全等價；其他跳脫（\f00c 圖示字碼、\[ 選擇器、開頭數字 \31、\\ 反斜線）保持原樣。
+ * 由左至右逐一比對「\ + 十六進位」或「\ + 單一字元」，因此 \\75 會被視為跳脫的反斜線加上 75，不會誤判 */
+function _exportUnescapeCssLetters(css) {
+    const isLetter = c => (c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a);
+    return css.replace(/\\(?:([0-9a-f]{1,6})(?:\r\n|[ \t\r\n\f])?|([\s\S]))/gi, (m, hex, ch) => {
+        const code = hex ? parseInt(hex, 16) : ch.charCodeAt(0);
+        return isLetter(code) ? String.fromCharCode(code) : m;
+    });
+}
+
+/* 清理 CSS：移除 @import、@font-face、image-set()、非白名單的 url() 以及 expression()/behavior */
 function _exportSanitizeCss(css) {
-    return String(css)
+    return _exportUnescapeCssLetters(String(css))
         .replace(/@import[^;]*;?/gi, '')
+        // image-set() 內可直接寫字串網址（不經過 url()），無法逐一檢查，整個移除
+        .replace(/(?:-webkit-)?image-set\((?:[^()]|\([^()]*\))*\)/gi, 'none')
         .replace(/@font-face\s*\{[^}]*\}/gi, '')
         .replace(/expression\s*\([^)]*\)/gi, 'none')
         .replace(/behavior\s*:[^;}]*/gi, '')
@@ -64,7 +80,21 @@ function _exportSanitizeCss(css) {
         });
 }
 
+// 清理結果會再被 innerHTML 重新解析；若某些結構在「解析 → 序列化 → 再解析」後會變形（mXSS），
+// 單次清理看到的 DOM 就不等於最後插入頁面的 DOM。因此重複清理直到結果不再變化，仍不穩定就整頁丟棄。
+const EXPORT_SANITIZE_MAX_PASSES = 4;
 function sanitizeSlideHtml(html) {
+    let out = _exportSanitizeOnce(html);
+    for (let i = 1; i < EXPORT_SANITIZE_MAX_PASSES; i++) {
+        const again = _exportSanitizeOnce(out);
+        if (again === out) return out;
+        out = again;
+    }
+    console.warn('[R Slide] 投影片 HTML 清理後仍不穩定，已移除內容');
+    return '';
+}
+
+function _exportSanitizeOnce(html) {
     // DOMParser 產生的文件是惰性的：不執行 script、不載入圖片
     const doc = new DOMParser().parseFromString(`<!DOCTYPE html><html><body>${String(html ?? '')}</body></html>`, 'text/html');
 
@@ -99,6 +129,7 @@ function sanitizeSlideHtml(html) {
             const u = _exportNormalizeUrl(value);
             if (name === 'srcset') { el.removeAttribute(attr.name); continue; }
             if (/^(javascript|vbscript):/.test(u)) { el.removeAttribute(attr.name); continue; }
+            if (tag === 'img' && name === 'src' && value === EXPORT_PLACEHOLDER_IMG) continue;   // 先前清理放入的佔位圖（固定內容的 SVG）
             if (u.startsWith('data:') && !(u.startsWith('data:image/') && !u.startsWith('data:image/svg'))) {
                 el.removeAttribute(attr.name); continue;           // data:text/html、data:image/svg+xml 等
             }
