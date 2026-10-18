@@ -164,6 +164,47 @@ body.sb-open #sidebar {
     }
 }
 
+/* ---------- 自訂風格色票 ---------- */
+.custom-color {
+    width: 100%;
+    height: 32px;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, .12);
+    border-radius: 8px;
+    background: none;
+    cursor: pointer;
+}
+
+.dark .custom-color {
+    border-color: rgba(255, 255, 255, .18);
+}
+
+.custom-color::-webkit-color-swatch-wrapper {
+    padding: 3px;
+}
+
+.custom-color::-webkit-color-swatch {
+    border: none;
+    border-radius: 5px;
+}
+
+.custom-color::-moz-color-swatch {
+    border: none;
+    border-radius: 5px;
+}
+
+/* 目前開啟的紀錄：左側品牌漸層條（::before 已被 .spot 使用） */
+.hist-active::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 10px;
+    bottom: 10px;
+    width: 3px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, #3b82f6, #a855f7, #ec4899);
+}
+
 .hist-out {
     animation: itemOut .35s ease-in forwards;
     overflow: hidden;

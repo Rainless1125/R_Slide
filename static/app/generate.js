@@ -227,7 +227,7 @@ async function startGeneration() {
     const content = ta.value.trim();
     const targetAudience = document.getElementById('targetAudience').value;
     const numPages = parseInt(document.getElementById('numPages').value);
-    const stylePreference = document.getElementById('stylePreference').value; // 讀取選擇的風格
+    const stylePreference = getStylePreference(); // 讀取選擇的風格（自訂風格會組成含四色的描述）
 
     if (importing) { showToast('檔案匯入中，請稍候', 'info'); return; }
     if (!content) {

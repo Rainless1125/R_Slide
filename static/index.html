@@ -25,7 +25,7 @@
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/app/app.css?v=4">
+    <link rel="stylesheet" href="/static/app/app.css?v=5">
 </head>
 
 <body
@@ -141,7 +141,7 @@
 
             <!-- 步驟 1: 輸入區 -->
             <section id="sectionInput"
-                class="reveal card-elevated bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-[1.25rem] p-8 transition-all duration-300">
+                class="reveal relative z-20 card-elevated bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-[1.25rem] p-8 transition-all duration-300">
                 <div class="flex flex-wrap items-center justify-between gap-3 mb-1">
                     <h2 class="text-2xl font-bold tracking-tight">構思您的簡報</h2>
                     <div id="modelDropdown" class="relative">
@@ -262,7 +262,12 @@
                                 <option
                                     value="瑞士雜誌排版 (淺冷灰底 bg-zinc-100、巨大粗黑字 text-black、國際鮮紅標籤 bg-red-600 text-white、強烈網格對齊)">
                                     瑞士雜誌 (Swiss Editorial)</option>
+
+                                <!-- 自訂四色：實際送出的描述由 getStylePreference() 組成 -->
+                                <option value="__custom__">自訂風格 (Custom)</option>
                             </select>
+                            <div id="customStylePanel"
+                                class="hidden mt-2 p-3 grid grid-cols-4 gap-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950"></div>
                         </div>
                     </div>
 
@@ -646,9 +651,9 @@
     <script src="/static/export.js?v=7"></script>
     <script src="/static/presenter.js?v=2"></script>
     <script src="/static/icons.js?v=1"></script>
-    <script src="/static/app/core.js?v=2"></script>
-    <script src="/static/app/input.js?v=1"></script>
-    <script src="/static/app/generate.js?v=3"></script>
+    <script src="/static/app/core.js?v=3"></script>
+    <script src="/static/app/input.js?v=2"></script>
+    <script src="/static/app/generate.js?v=4"></script>
     <script src="/static/app/editor.js?v=2"></script>
     <script src="/static/app/media.js?v=2"></script>
     <script src="/static/app/player.js?v=2"></script>

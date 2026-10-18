@@ -227,15 +227,13 @@ function renderHistory(animate = false) {
         const style = (h.input?.style_preference || '').split(' (')[0];
         const pages = h.pages ?? h.data?.slides?.length ?? 0;
         return `
-  <div data-id="${esc(h.id)}" data-act="open" class="hist-item group spot rounded-xl border p-3 cursor-pointer transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${active
-                ? 'border-black dark:border-white bg-zinc-50 dark:bg-zinc-800 shadow-sm'
-                : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600'}">
-    <div class="relative flex items-start gap-2.5">
-      <div class="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-xs ${active ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'}">
-        <i class="fa-solid fa-display"></i>
-      </div>
+  <div data-id="${esc(h.id)}" data-act="open" class="hist-item group spot rounded-xl p-2.5 cursor-pointer transition-all duration-300 ${active
+                ? 'hist-active bg-violet-50 dark:bg-violet-500/10 ring-1 ring-violet-300/70 dark:ring-violet-400/30'
+                : 'hover:bg-zinc-100 dark:hover:bg-zinc-800/70'}">
+    <div class="relative flex items-center gap-3">
+      ${styleThumbHtml(styleColors(h.input?.style_preference || ''))}
       <div class="min-w-0 flex-1">
-        <div class="text-sm font-semibold truncate" title="${esc(h.title)}">${esc(h.title)}</div>
+        <div class="text-sm font-semibold truncate ${active ? 'text-violet-700 dark:text-violet-200' : ''}" title="${esc(h.title)}">${esc(h.title)}</div>
         <div class="text-[11px] text-zinc-400 mt-0.5 truncate">${fmtTime(h.createdAt)} · ${pages} 頁${style ? ' · ' + esc(style) : ''}</div>
       </div>
       <div class="flex flex-col gap-1 lg:opacity-0 lg:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
@@ -277,7 +275,7 @@ function getCurrentGenerationInput() {
         content: document.getElementById('inputContent').value.trim(),
         target_audience: document.getElementById('targetAudience').value,
         num_pages: parseInt(document.getElementById('numPages').value) || (currentPresentationData?.slides?.length || 3),
-        style_preference: document.getElementById('stylePreference').value
+        style_preference: getStylePreference()
     };
 }
 
@@ -318,9 +316,8 @@ async function openHistory(id) {
     document.getElementById('inputContent').value = h.input?.content || '';
     document.getElementById('targetAudience').value = h.input?.target_audience || '';
     if (h.input?.num_pages != null) document.getElementById('numPages').value = String(h.input.num_pages);
-    if (h.input?.style_preference) document.getElementById('stylePreference').value = h.input.style_preference;
+    if (h.input?.style_preference) setStylePreference(h.input.style_preference);
     updateCount();
-    syncStyleCards();
 
     renderHistory();
     confirmAndPlay();
