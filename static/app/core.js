@@ -226,15 +226,19 @@ function renderHistory(animate = false) {
         const active = h.id === currentHistoryId;
         const style = (h.input?.style_preference || '').split(' (')[0];
         const pages = h.pages ?? h.data?.slides?.length ?? 0;
+        const mode = normDeckMode(h.input?.deck_mode);
         return `
   <div data-id="${esc(h.id)}" data-act="open" class="hist-item group spot rounded-xl p-2.5 cursor-pointer transition-all duration-300 ${active
                 ? 'hist-active bg-violet-50 dark:bg-violet-500/10 ring-1 ring-violet-300/70 dark:ring-violet-400/30'
                 : 'hover:bg-zinc-100 dark:hover:bg-zinc-800/70'}">
     <div class="relative flex items-center gap-3">
-      ${styleThumbHtml(styleColors(h.input?.style_preference || ''))}
+      <div class="w-14 shrink-0 flex flex-col items-center gap-1">
+        ${styleThumbHtml(styleColors(h.input?.style_preference || ''))}
+        <span class="deck-mode-badge hist-mode" data-mode="${mode}">${DECK_MODE_SHORT[mode]}</span>
+      </div>
       <div class="min-w-0 flex-1">
         <div class="text-sm font-semibold truncate ${active ? 'text-violet-700 dark:text-violet-200' : ''}" title="${esc(h.title)}">${esc(h.title)}</div>
-        <div class="text-[11px] text-zinc-400 mt-0.5 truncate">${fmtTime(h.createdAt)} · ${pages} 頁 · ${DECK_MODE_SHORT[normDeckMode(h.input?.deck_mode)]}${style ? ' · ' + esc(style) : ''}</div>
+        <div class="text-[11px] text-zinc-400 mt-0.5 truncate">${fmtTime(h.createdAt)} · ${pages} 頁${style ? ' · ' + esc(style) : ''}</div>
       </div>
       <div class="flex flex-col gap-1 lg:opacity-0 lg:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
         <button data-act="rename" class="icon-btn w-6 h-6 rounded-md text-[11px] text-zinc-400 hover:text-blue-500 hover:bg-zinc-100 dark:hover:bg-zinc-700" title="重新命名" aria-label="重新命名"><i class="fa-solid fa-pen"></i></button>

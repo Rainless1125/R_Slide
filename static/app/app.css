@@ -811,6 +811,13 @@ body.sb-open #sidebar {
     background: rgb(139 92 246 / .25);
 }
 
+/* 歷史記錄縮圖下方的模式標籤：縮小以配合縮圖寬度 */
+.deck-mode-badge.hist-mode {
+    font-size: .625rem;
+    line-height: 1.4;
+    padding: 0 .375rem;
+}
+
 /* 重產視窗的模式切換 */
 .regen-mode {
     display: flex;
