@@ -9,7 +9,7 @@ function setStep(n) {
         const active = i === n;
         const done = i < n;
         el.className = 'transition-all duration-300 ' + (active
-            ? 'text-black dark:text-white scale-110'
+            ? 'text-violet-600 dark:text-violet-300 scale-110'
             : done ? 'text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white' : 'text-zinc-400 dark:text-zinc-600');
     }
     document.getElementById('stepLine1').style.width = n >= 2 ? '100%' : '0%';
