@@ -18,7 +18,20 @@ def chart(**kw):
 
 
 def test_valid_chart_passes_through():
-    assert normalize_chart(chart()) == chart(datasets=[{"label": "營收", "values": [1.0, 2.0, 3.0]}])
+    assert normalize_chart(chart()) == chart(datasets=[{"label": "營收", "values": [1.0, 2.0, 3.0]}], ref_lines=[])
+
+
+def test_ref_lines_are_cleaned_and_limited():
+    c = normalize_chart(chart(ref_lines=[{"label": "目標", "value": "2.5"}, {"label": "上限", "value": 4, "color": "#dc2626"},
+                                         {"label": "壞色", "value": 1, "color": "red"}, {"label": "無值"}, "x",
+                                         {"label": "第四條", "value": 9}]))
+    assert c["ref_lines"] == [{"label": "目標", "value": 2.5}, {"label": "上限", "value": 4.0, "color": "#dc2626"},
+                              {"label": "壞色", "value": 1.0}]
+
+
+def test_pie_has_no_ref_lines():
+    c = normalize_chart(chart(type="doughnut", ref_lines=[{"label": "目標", "value": 2}]))
+    assert c["ref_lines"] == []
 
 
 def test_values_are_aligned_to_labels_and_coerced():
@@ -91,8 +104,23 @@ def test_regenerate_accepts_old_slides_without_charts_and_normalizes(monkeypatch
     assert res.status_code == 200
     data = res.json()
     assert data["page_number"] == 1
-    assert [c["type"] for c in data["charts"]] == ["bar"]
+    assert data["charts"][0] is None and data["charts"][1]["type"] == "bar"  # 保留索引，對應 data-rs-chart="1"
     assert "原圖表資料" in captured["prompt"] and "（無）" in captured["prompt"]
+
+
+def test_normalize_charts_keeps_indices_of_valid_charts():
+    out = normalize_charts([chart(type="radar"), chart(title="第二張"), chart(labels=[])])
+    assert out[0] is None
+    assert out[1]["title"] == "第二張"
+    assert len(out) == 2  # 結尾無效的圖表不需要佔位
+
+
+def test_regenerate_keeps_user_charts_beyond_default_limit(monkeypatch):
+    charts = [chart(title=f"圖{i}") for i in range(3)]
+    res, _ = regenerate(monkeypatch, [{**SLIDE, "charts": [*charts[:1], None, *charts[1:]]}],
+                        {**SLIDE, "charts": [*charts, chart(title="多的")]})
+    assert res.status_code == 200
+    assert [c["title"] for c in res.json()["charts"]] == ["圖0", "圖1", "圖2", "多的"]
 
 
 def test_regenerate_sends_existing_chart_data_to_llm(monkeypatch):

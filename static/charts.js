@@ -4,7 +4,8 @@
  *   - 編輯、縮圖、撤銷都沿用既有流程（圖表就是 HTML 的一部分）
  *   - 匯出 HTML 時 sanitizeSlideHtml 不必放行 Chart.js；PDF / PPTX 由 html-to-image 直接截圖
  *
- *   renderChartSvg(spec, w, h)   以 w×h（投影片座標 px）畫出 SVG 字串
+ *   renderChartSvg(spec, w, h, scale)   以 w×h（投影片座標 px）畫出 SVG 字串；scale 為文字縮放倍率（預設 1）
+ *   chartFontScale(el)           依容器的字級（格式工具列的 text-xs ~ text-4xl）換算文字縮放倍率
  *   fillChartPlaceholders(root, charts, measure)  把容器內容換成對應的 SVG
  *   bakeSlideCharts(slides)      新投影片進入應用時呼叫：量測容器尺寸後畫入圖表
  */
@@ -13,6 +14,39 @@
 const RS_CHART_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
 const RS_CHART_TYPES = ['bar', 'horizontal_bar', 'line', 'pie', 'doughnut'];
 const RS_CHART_DEFAULT_W = 560, RS_CHART_DEFAULT_H = 300;
+/* 參考線（目標、規格上下限、門檻）：只畫在有數值軸的圖；圓餅 / 環圈是占比，沒有可對照的軸 */
+const RS_REF_LINE_TYPES = ['bar', 'horizontal_bar', 'line'];
+const RS_REF_LINE_COLOR = '#dc2626';
+const RS_REF_LINE_MAX = 3;
+
+function _cRefLines(spec) {
+    if (!RS_REF_LINE_TYPES.includes(spec?.type)) return [];
+    return (spec.ref_lines || [])
+        .filter(l => l && l.value !== '' && l.value != null && Number.isFinite(Number(l.value)))
+        .slice(0, RS_REF_LINE_MAX)
+        .map(l => ({
+            label: String(l.label || ''),
+            value: Number(l.value),
+            color: /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(l.color || '').trim()) ? String(l.color).trim() : RS_REF_LINE_COLOR
+        }));
+}
+
+/* 圖表文字以 text-base（16px）為 1 倍；容器明確設定字級時（工具列放大 / 縮小字級）依比例縮放。
+ * 只看容器自己的 class / inline style，不讀 computed style：不受父層字級影響，容器尚未掛到 DOM 時也能算 */
+const RS_CHART_SIZE_PX = { xs: 12, sm: 14, base: 16, lg: 18, xl: 20, '2xl': 24, '3xl': 30, '4xl': 36, '5xl': 48, '6xl': 60, '7xl': 72, '8xl': 96, '9xl': 128 };
+const RS_CHART_SCALE_MIN = 0.75, RS_CHART_SCALE_MAX = 2.25;
+
+function chartFontScale(el) {
+    let px = null;
+    for (const c of el?.classList || []) {
+        const m = /^text-(xs|sm|base|lg|xl|[2-9]xl)$/.exec(c) || /^text-\[(\d*\.?\d+)px\]$/.exec(c);
+        if (m) px = RS_CHART_SIZE_PX[m[1]] ?? Number(m[1]);
+    }
+    const inline = /^(\d*\.?\d+)px$/.exec(el?.style?.fontSize || '');
+    if (inline) px = Number(inline[1]);
+    if (!px) return 1;
+    return Math.min(RS_CHART_SCALE_MAX, Math.max(RS_CHART_SCALE_MIN, px / 16));
+}
 
 function _cEsc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -71,16 +105,17 @@ function _cLegend(items, x, y, maxW, size) {
     let cx = x, cy = y, out = '';
     for (const it of items) {
         const label = _cFit(it.label, maxW - 18, size);
-        const w = 14 + _cTextW(label, size) + 14;
+        const sw = _cNum(size * 0.84), gap = sw + 4;
+        const w = gap + _cTextW(label, size) + 14;
         if (cx > x && cx + w > x + maxW) { cx = x; cy += size + 8; }
-        out += `<rect x="${_cNum(cx)}" y="${_cNum(cy + size * 0.1)}" width="10" height="10" rx="2" fill="${it.color}"/>` +
-            `<text x="${_cNum(cx + 14)}" y="${_cNum(cy + size * 0.85)}" font-size="${size}" fill="currentColor" fill-opacity=".8">${_cEsc(label)}</text>`;
+        out += `<rect x="${_cNum(cx)}" y="${_cNum(cy + size * 0.1)}" width="${sw}" height="${sw}" rx="2" fill="${it.color}"/>` +
+            `<text x="${_cNum(cx + gap)}" y="${_cNum(cy + size * 0.85)}" font-size="${size}" fill="currentColor" fill-opacity=".8">${_cEsc(label)}</text>`;
         cx += w;
     }
     return { svg: out, height: cy - y + size + 8 };
 }
 
-function renderChartSvg(spec, width, height) {
+function renderChartSvg(spec, width, height, scale = 1) {
     const W = Math.max(160, Math.round(width || RS_CHART_DEFAULT_W));
     const H = Math.max(120, Math.round(height || RS_CHART_DEFAULT_H));
     const type = RS_CHART_TYPES.includes(spec?.type) ? spec.type : 'bar';
@@ -88,28 +123,31 @@ function renderChartSvg(spec, width, height) {
     const datasets = (spec?.datasets || []).filter(d => d && Array.isArray(d.values));
     const unit = String(spec?.unit || '');
     const title = String(spec?.title || '');
-    const fs = W < 360 ? 11 : 12;
+    const k = Math.min(RS_CHART_SCALE_MAX, Math.max(RS_CHART_SCALE_MIN, Number(scale) || 1));
+    const fs = _cNum((W < 360 ? 11 : 12) * k);
+    const titleFs = _cNum(15 * k), noteFs = _cNum(11 * k);
     let body = '';
     let top = 4;
 
     if (title) {
-        body += `<text x="0" y="${top + 15}" font-size="15" font-weight="600" fill="currentColor">${_cEsc(_cFit(title, W * 0.75, 15))}</text>`;
+        body += `<text x="0" y="${top + titleFs}" font-size="${titleFs}" font-weight="600" fill="currentColor">${_cEsc(_cFit(title, W * 0.75, titleFs))}</text>`;
     }
     if (unit.length > 2) {
-        body += `<text x="${W}" y="${top + (title ? 15 : 11)}" text-anchor="end" font-size="11" fill="currentColor" fill-opacity=".6">單位：${_cEsc(_cFit(unit, W * 0.25, 11))}</text>`;
+        body += `<text x="${W}" y="${top + (title ? titleFs : noteFs)}" text-anchor="end" font-size="${noteFs}" fill="currentColor" fill-opacity=".6">單位：${_cEsc(_cFit(unit, W * 0.25, noteFs))}</text>`;
     }
-    if (title || unit.length > 2) top += title ? 26 : 18;
+    if (title || unit.length > 2) top += title ? titleFs + 11 : noteFs + 7;
 
-    const empty = msg => `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" font-size="13" fill="currentColor" fill-opacity=".5">${msg}</text>`;
+    const empty = msg => `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" font-size="${_cNum(13 * k)}" fill="currentColor" fill-opacity=".5">${msg}</text>`;
     if (!labels.length || !datasets.length) body += empty('無圖表資料');
-    else if (type === 'pie' || type === 'doughnut') body += _cPie(type, labels, datasets[0], unit, spec, W, H, top, fs) || empty('無可顯示的數值');
-    else body += _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs);
+    else if (type === 'pie' || type === 'doughnut') body += _cPie(type, labels, datasets[0], unit, spec, W, H, top, fs, k) || empty('無可顯示的數值');
+    else body += _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs, k);
 
-    const aria = [title || '圖表', ...labels.map((l, i) => `${l} ${datasets.map(d => _cFmt(d.values[i] ?? 0, unit)).join(' / ')}`)].join('；');
+    const aria = [title || '圖表', ...labels.map((l, i) => `${l} ${datasets.map(d => _cFmt(d.values[i] ?? 0, unit)).join(' / ')}`),
+        ..._cRefLines({ ...spec, type }).map(l => `${l.label || '參考線'} ${_cFmt(l.value, unit)}`)].join('；');
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${_cEsc(aria)}" style="display:block;overflow:visible;font-family:inherit">${body}</svg>`;
 }
 
-function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs) {
+function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs, k = 1) {
     const colors = _cColors(spec, datasets.length);
     const multi = datasets.length > 1;
     let out = '';
@@ -118,21 +156,27 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs) {
         out += lg.svg;
         top += lg.height;
     }
-    const all = datasets.flatMap(d => d.values.slice(0, labels.length).map(v => Number(v) || 0));
+    const refs = _cRefLines({ ...spec, type });
+    // 參考線的數值也納入刻度範圍，門檻高於所有資料時仍看得到
+    const all = [...datasets.flatMap(d => d.values.slice(0, labels.length).map(v => Number(v) || 0)), ...refs.map(l => l.value)];
     const sc = _cNiceScale(Math.min(0, ...all), Math.max(0, ...all));
     const ticks = [];
     for (let v = sc.lo; v <= sc.hi + sc.step / 2; v += sc.step) ticks.push(_cNum(v));
     const n = labels.length;
     const tip = (i, d) => `${labels[i]}${multi ? ' · ' + (d.label || '') : ''}：${_cFmt(d.values[i] ?? 0, unit)}${unit.length > 2 ? ' ' + unit : ''}`;
     const showValues = n * datasets.length <= 16;
+    const refText = l => `${l.label ? l.label + ' ' : ''}${_cFmt(l.value, unit)}`;
+    const refTip = l => `${l.label || '參考線'}：${_cFmt(l.value, unit)}${unit.length > 2 ? ' ' + unit : ''}`;
 
     if (type === 'horizontal_bar') {
         const labelW = Math.min(W * 0.32, Math.max(...labels.map(l => _cTextW(l, fs))) + 8);
-        const left = labelW, right = W - 8 - (showValues ? 44 : 0), bottom = H - 20;
+        if (refs.length) top += fs + 6;            // 參考線名稱寫在線的上端
+        const valueW = showValues ? Math.max(...datasets.flatMap(d => d.values.slice(0, n).map(v => _cTextW(_cFmt(Number(v) || 0, unit), fs - 1)))) + 8 : 0;
+        const left = labelW, right = W - 8 - valueW, bottom = H - fs - 8;
         const px = v => left + (v - sc.lo) / (sc.hi - sc.lo) * (right - left);
         ticks.forEach(t => {
             out += `<line x1="${_cNum(px(t))}" x2="${_cNum(px(t))}" y1="${top}" y2="${bottom}" stroke="currentColor" stroke-opacity="${t === 0 ? .35 : .12}"/>` +
-                `<text x="${_cNum(px(t))}" y="${bottom + 15}" text-anchor="middle" font-size="${fs - 1}" fill="currentColor" fill-opacity=".6">${_cFmt(t, unit)}</text>`;
+                `<text x="${_cNum(px(t))}" y="${_cNum(bottom + fs + 3)}" text-anchor="middle" font-size="${fs - 1}" fill="currentColor" fill-opacity=".6">${_cFmt(t, unit)}</text>`;
         });
         const band = (bottom - top) / n;
         const groupH = Math.min(band * 0.72, 36 * datasets.length);
@@ -148,12 +192,24 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs) {
                 if (showValues) out += `<text x="${_cNum(v >= 0 ? x1 + 4 : x0 - 4)}" y="${_cNum(y + barH / 2 + fs * .35)}" text-anchor="${v >= 0 ? 'start' : 'end'}" font-size="${fs - 1}" fill="currentColor" fill-opacity=".85">${_cFmt(v, unit)}</text>`;
             });
         });
+        refs.forEach(l => {
+            const x = _cNum(px(l.value));
+            const text = _cFit(refText(l), Math.max(60, (right - left) * 0.45), fs - 1);
+            const tw = _cTextW(text, fs - 1);
+            const anchor = x - tw / 2 < 0 ? 'start' : x + tw / 2 > W ? 'end' : 'middle';
+            out += `<g><title>${_cEsc(refTip(l))}</title>` +
+                `<line x1="${x}" x2="${x}" y1="${top - 2}" y2="${bottom}" stroke="${l.color}" stroke-width="1.5" stroke-dasharray="6 4"/>` +
+                `<text x="${x}" y="${top - 6}" text-anchor="${anchor}" font-size="${fs - 1}" font-weight="600" fill="${l.color}">${_cEsc(text)}</text></g>`;
+        });
         return out;
     }
 
     const axisW = Math.max(...ticks.map(t => _cTextW(_cFmt(t, unit), fs - 1))) + 8;
-    const left = axisW, right = W - (type === 'line' ? 12 : 4), bottom = H - 22;
-    const plotTop = top + (showValues ? 14 : 4);
+    // 參考線名稱寫在繪圖區右側外面，避免和長條、數值標籤重疊
+    const refLabels = refs.map(l => _cFit(refText(l), W * 0.22, fs - 1));
+    const refGutter = refs.length ? Math.max(...refLabels.map(t => _cTextW(t, fs - 1))) + 10 : 0;
+    const left = axisW, right = W - (type === 'line' ? 12 : 4) - refGutter, bottom = H - fs - 10;
+    const plotTop = top + (showValues ? fs + 2 : 4);
     const py = v => bottom - (v - sc.lo) / (sc.hi - sc.lo) * (bottom - plotTop);
     ticks.forEach(t => {
         out += `<line x1="${left}" x2="${right}" y1="${_cNum(py(t))}" y2="${_cNum(py(t))}" stroke="currentColor" stroke-opacity="${t === 0 ? .35 : .12}"/>` +
@@ -161,13 +217,27 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs) {
     });
     const band = (right - left) / n;
     const xLabelSize = fs;
+    // 水平參考虛線；名稱在右側欄與線同高，數值相近時往上下推開避免重疊
+    const refSvg = () => {
+        const items = refs.map((l, i) => ({ l, text: refLabels[i], y: py(l.value), ty: py(l.value) }))
+            .sort((a, b) => a.y - b.y);
+        const gapY = fs + 2;
+        for (let i = 1; i < items.length; i++) items[i].ty = Math.max(items[i].ty, items[i - 1].ty + gapY);
+        for (let i = items.length - 1; i >= 0; i--) {
+            items[i].ty = Math.min(items[i].ty, i === items.length - 1 ? bottom : items[i + 1].ty - gapY);
+        }
+        const lineEnd = type === 'line' ? right + 8 : right;
+        return items.map(({ l, text, y, ty }) => `<g><title>${_cEsc(refTip(l))}</title>` +
+            `<line x1="${left}" x2="${_cNum(lineEnd)}" y1="${_cNum(y)}" y2="${_cNum(y)}" stroke="${l.color}" stroke-width="1.5" stroke-dasharray="6 4"/>` +
+            `<text x="${_cNum(lineEnd + 6)}" y="${_cNum(ty + (fs - 1) * .35)}" font-size="${fs - 1}" font-weight="600" fill="${l.color}">${_cEsc(text)}</text></g>`).join('');
+    };
     const labelEvery = Math.max(1, Math.ceil(Math.max(...labels.map(l => _cTextW(l, xLabelSize))) / Math.max(band, 1) * 0.6));
 
     if (type === 'line') {
         const cx = i => n === 1 ? (left + right) / 2 : left + 8 + i * (right - left - 16) / (n - 1);
         labels.forEach((l, i) => {
             if (i % labelEvery) return;
-            out += `<text x="${_cNum(cx(i))}" y="${bottom + 16}" text-anchor="middle" font-size="${xLabelSize}" fill="currentColor" fill-opacity=".8">${_cEsc(_cFit(l, Math.max(band * labelEvery - 4, 24), xLabelSize))}</text>`;
+            out += `<text x="${_cNum(cx(i))}" y="${_cNum(bottom + fs + 4)}" text-anchor="middle" font-size="${xLabelSize}" fill="currentColor" fill-opacity=".8">${_cEsc(_cFit(l, Math.max(band * labelEvery - 4, 24), xLabelSize))}</text>`;
         });
         datasets.forEach((d, k) => {
             const pts = labels.map((_, i) => [cx(i), py(Number(d.values[i]) || 0)]);
@@ -177,15 +247,15 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs) {
             }
             out += `<polyline points="${line}" fill="none" stroke="${colors[k]}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
             pts.forEach((p, i) => {
-                out += `<circle cx="${_cNum(p[0])}" cy="${_cNum(p[1])}" r="4" fill="${colors[k]}"><title>${_cEsc(tip(i, d))}</title></circle>`;
+                out += `<circle cx="${_cNum(p[0])}" cy="${_cNum(p[1])}" r="${_cNum(Math.max(3, 4 * Math.min(k, 1.5)))}" fill="${colors[k]}"><title>${_cEsc(tip(i, d))}</title></circle>`;
             });
             // 直接標註：單一系列標每個點（點數不多時），多系列只標最後一點
             const labelIdx = !multi && showValues ? labels.map((_, i) => i) : [n - 1];
             labelIdx.forEach(i => {
-                out += `<text x="${_cNum(pts[i][0])}" y="${_cNum(pts[i][1] - 9)}" text-anchor="middle" font-size="${fs - 1}" fill="currentColor" fill-opacity=".85">${_cFmt(d.values[i] ?? 0, unit)}</text>`;
+                out += `<text x="${_cNum(pts[i][0])}" y="${_cNum(pts[i][1] - fs * 0.75)}" text-anchor="middle" font-size="${fs - 1}" fill="currentColor" fill-opacity=".85">${_cFmt(d.values[i] ?? 0, unit)}</text>`;
             });
         });
-        return out;
+        return out + refSvg();
     }
 
     // 直條圖（分組）
@@ -194,7 +264,7 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs) {
     labels.forEach((l, i) => {
         const gx = left + band * i + (band - groupW) / 2;
         if (!(i % labelEvery)) {
-            out += `<text x="${_cNum(left + band * (i + .5))}" y="${bottom + 16}" text-anchor="middle" font-size="${xLabelSize}" fill="currentColor" fill-opacity=".8">${_cEsc(_cFit(l, Math.max(band * labelEvery - 4, 24), xLabelSize))}</text>`;
+            out += `<text x="${_cNum(left + band * (i + .5))}" y="${_cNum(bottom + fs + 4)}" text-anchor="middle" font-size="${xLabelSize}" fill="currentColor" fill-opacity=".8">${_cEsc(_cFit(l, Math.max(band * labelEvery - 4, 24), xLabelSize))}</text>`;
         }
         datasets.forEach((d, k) => {
             const v = Number(d.values[i]) || 0;
@@ -204,10 +274,11 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs) {
             if (showValues) out += `<text x="${_cNum(x + barW / 2)}" y="${_cNum(v >= 0 ? y0 - 5 : y1 + fs)}" text-anchor="middle" font-size="${fs - 1}" fill="currentColor" fill-opacity=".85">${_cFmt(v, unit)}</text>`;
         });
     });
-    return out;
+    return out + refSvg();
 }
 
-function _cPie(type, labels, ds, unit, spec, W, H, top, fs) {
+function _cPie(type, labels, ds, unit, spec, W, H, top, fs, k = 1) {
+    const noteFs = _cNum(11 * k);
     const values = labels.map((_, i) => Math.max(0, Number(ds.values[i]) || 0));
     const total = values.reduce((a, b) => a + b, 0);
     if (!total) return '';
@@ -216,15 +287,16 @@ function _cPie(type, labels, ds, unit, spec, W, H, top, fs) {
     const legendItems = labels.map((l, i) => ({ label: `${l}  ${Math.round(values[i] / total * 1000) / 10}%`, color: colors[i] }));
     let legendSvg = '', cx, cy, r;
     if (side) {
-        const legendW = Math.min(W * 0.42, Math.max(...legendItems.map(it => _cTextW(it.label, fs))) + 22);
+        const legendW = Math.min(W * 0.42, Math.max(...legendItems.map(it => _cTextW(it.label, fs))) + fs + 10);
         r = Math.max(10, Math.min((W - legendW - 24) / 2, (H - top - 8) / 2));
         cx = r + 4; cy = top + (H - top) / 2;
         const lx = cx + r + 24;
         const rowH = fs + 10;
         const ly = cy - legendItems.length * rowH / 2;
         legendItems.forEach((it, i) => {
-            legendSvg += `<rect x="${_cNum(lx)}" y="${_cNum(ly + i * rowH + 1)}" width="10" height="10" rx="2" fill="${it.color}"/>` +
-                `<text x="${_cNum(lx + 16)}" y="${_cNum(ly + i * rowH + fs * .85)}" font-size="${fs}" fill="currentColor" fill-opacity=".85">${_cEsc(_cFit(it.label, W - lx - 16, fs))}</text>`;
+            const sw = _cNum(fs * 0.84);
+            legendSvg += `<rect x="${_cNum(lx)}" y="${_cNum(ly + i * rowH + fs * 0.1)}" width="${sw}" height="${sw}" rx="2" fill="${it.color}"/>` +
+                `<text x="${_cNum(lx + sw + 6)}" y="${_cNum(ly + i * rowH + fs * .85)}" font-size="${fs}" fill="currentColor" fill-opacity=".85">${_cEsc(_cFit(it.label, W - lx - sw - 6, fs))}</text>`;
         });
     } else {
         const lg = _cLegend(legendItems, 0, 0, W, fs);
@@ -257,8 +329,9 @@ function _cPie(type, labels, ds, unit, spec, W, H, top, fs) {
         a += sweep;
     });
     if (inner && inner >= 30 && unit !== '%') {   // 百分比加總恆為 100%，中央不顯示合計
-        out += `<text x="${_cNum(cx)}" y="${_cNum(cy - 2)}" text-anchor="middle" font-size="${Math.min(20, inner / 2.4)}" font-weight="700" fill="currentColor">${_cFmt(total, unit)}</text>` +
-            `<text x="${_cNum(cx)}" y="${_cNum(cy + 16)}" text-anchor="middle" font-size="11" fill="currentColor" fill-opacity=".6">${_cEsc(_cFit(ds.label || '合計', inner * 1.5, 11))}</text>`;
+        const subFs = _cNum(Math.min(noteFs, inner / 3));
+        out += `<text x="${_cNum(cx)}" y="${_cNum(cy - 2)}" text-anchor="middle" font-size="${_cNum(Math.min(20 * k, inner / 2.4))}" font-weight="700" fill="currentColor">${_cFmt(total, unit)}</text>` +
+            `<text x="${_cNum(cx)}" y="${_cNum(cy + subFs + 5)}" text-anchor="middle" font-size="${subFs}" fill="currentColor" fill-opacity=".6">${_cEsc(_cFit(ds.label || '合計', inner * 1.5, subFs))}</text>`;
     }
     return out + legendSvg;
 }
@@ -274,7 +347,7 @@ function fillChartPlaceholders(root, charts, measure) {
         const w = size.w >= 80 ? size.w : RS_CHART_DEFAULT_W;
         const h = size.h >= 60 ? size.h : RS_CHART_DEFAULT_H;
         if (!(size.h >= 60)) el.style.height = h + 'px'; // 容器沒有高度（LLM 漏寫）時給固定高度
-        el.innerHTML = renderChartSvg(spec, w, h);
+        el.innerHTML = renderChartSvg(spec, w, h, chartFontScale(el));
     });
 }
 

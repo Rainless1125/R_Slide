@@ -4,4 +4,8 @@ __pycache__
 __pycache__/app.cpython-313.pyc
 .venv
 .pytest_cache
+<<<<<<< HEAD
 data/
+=======
+data/
+>>>>>>> ed5414a3f4d707e83370611871c28321fc6548dc

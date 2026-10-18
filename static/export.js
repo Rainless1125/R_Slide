@@ -27,6 +27,9 @@ const EXPORT_PLACEHOLDER_IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
 const EXPORT_DROP_TAGS = new Set([
     'script', 'iframe', 'frame', 'frameset', 'object', 'embed', 'applet',
     'link', 'meta', 'base', 'form', 'foreignobject', 'audio', 'video', 'source', 'track',
+    // 解析與序列化結果不一致、可造成 mXSS 的標籤：MathML 命名空間切換、noscript（DOMParser 不執行 script，
+    // 內容會被當成標記；插入頁面時則是純文字）、template（內容不在 querySelectorAll 範圍內）
+    'math', 'noscript', 'template',
 ]);
 
 /* 會載入資源的屬性 */
@@ -47,10 +50,23 @@ function _exportIsAllowedUrl(v) {
     return false;
 }
 
-/* 清理 CSS：移除 @import、@font-face、非白名單的 url() 以及 expression()/behavior */
+/* CSS 跳脫字元可拼出關鍵字繞過下列檢查（例如 \75rl( 就是 url(）。只還原成英文字母的跳脫：
+ * 字母的跳脫與字母本身在 CSS 中完全等價；其他跳脫（\f00c 圖示字碼、\[ 選擇器、開頭數字 \31、\\ 反斜線）保持原樣。
+ * 由左至右逐一比對「\ + 十六進位」或「\ + 單一字元」，因此 \\75 會被視為跳脫的反斜線加上 75，不會誤判 */
+function _exportUnescapeCssLetters(css) {
+    const isLetter = c => (c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a);
+    return css.replace(/\\(?:([0-9a-f]{1,6})(?:\r\n|[ \t\r\n\f])?|([\s\S]))/gi, (m, hex, ch) => {
+        const code = hex ? parseInt(hex, 16) : ch.charCodeAt(0);
+        return isLetter(code) ? String.fromCharCode(code) : m;
+    });
+}
+
+/* 清理 CSS：移除 @import、@font-face、image-set()、非白名單的 url() 以及 expression()/behavior */
 function _exportSanitizeCss(css) {
-    return String(css)
+    return _exportUnescapeCssLetters(String(css))
         .replace(/@import[^;]*;?/gi, '')
+        // image-set() 內可直接寫字串網址（不經過 url()），無法逐一檢查，整個移除
+        .replace(/(?:-webkit-)?image-set\((?:[^()]|\([^()]*\))*\)/gi, 'none')
         .replace(/@font-face\s*\{[^}]*\}/gi, '')
         .replace(/expression\s*\([^)]*\)/gi, 'none')
         .replace(/behavior\s*:[^;}]*/gi, '')
@@ -64,7 +80,21 @@ function _exportSanitizeCss(css) {
         });
 }
 
+// 清理結果會再被 innerHTML 重新解析；若某些結構在「解析 → 序列化 → 再解析」後會變形（mXSS），
+// 單次清理看到的 DOM 就不等於最後插入頁面的 DOM。因此重複清理直到結果不再變化，仍不穩定就整頁丟棄。
+const EXPORT_SANITIZE_MAX_PASSES = 4;
 function sanitizeSlideHtml(html) {
+    let out = _exportSanitizeOnce(html);
+    for (let i = 1; i < EXPORT_SANITIZE_MAX_PASSES; i++) {
+        const again = _exportSanitizeOnce(out);
+        if (again === out) return out;
+        out = again;
+    }
+    console.warn('[R Slide] 投影片 HTML 清理後仍不穩定，已移除內容');
+    return '';
+}
+
+function _exportSanitizeOnce(html) {
     // DOMParser 產生的文件是惰性的：不執行 script、不載入圖片
     const doc = new DOMParser().parseFromString(`<!DOCTYPE html><html><body>${String(html ?? '')}</body></html>`, 'text/html');
 
@@ -99,6 +129,7 @@ function sanitizeSlideHtml(html) {
             const u = _exportNormalizeUrl(value);
             if (name === 'srcset') { el.removeAttribute(attr.name); continue; }
             if (/^(javascript|vbscript):/.test(u)) { el.removeAttribute(attr.name); continue; }
+            if (tag === 'img' && name === 'src' && value === EXPORT_PLACEHOLDER_IMG) continue;   // 先前清理放入的佔位圖（固定內容的 SVG）
             if (u.startsWith('data:') && !(u.startsWith('data:image/') && !u.startsWith('data:image/svg'))) {
                 el.removeAttribute(attr.name); continue;           // data:text/html、data:image/svg+xml 等
             }
@@ -175,6 +206,9 @@ body{box-sizing:border-box;min-height:100vh;font-family:"PingFang TC","Microsoft
 .bar button:hover:not(:disabled){background:#f4f4f5}
 .bar button:disabled{opacity:.4;cursor:not-allowed}
 #counter{font:12px ui-monospace,monospace;width:60px;text-align:center}
+#notes{flex:none;box-sizing:border-box;width:100%;max-width:1024px;max-height:30vh;overflow:auto;margin:0;padding:12px 16px;white-space:pre-wrap;font-size:14px;line-height:1.7;background:#fff;border:1px solid #e4e4e7;border-radius:12px}
+#notes.empty{color:#a1a1aa;font-style:italic}
+@media (prefers-color-scheme:dark){#notes{background:#18181b;border-color:#27272a}}
 #thumbs{flex:none;display:flex;gap:12px;width:100%;max-width:1024px;overflow-x:auto;padding:6px 4px;scrollbar-width:none}
 #thumbs::-webkit-scrollbar{display:none}
 .thumb{position:relative;flex:0 0 176px;padding:0;overflow:hidden;background:#fff;border:1px solid #e4e4e7;border-radius:8px;cursor:pointer;opacity:.6;transition:all .3s;color:inherit;font:inherit}
@@ -201,9 +235,11 @@ body{box-sizing:border-box;min-height:100vh;font-family:"PingFang TC","Microsoft
   <button id="next" aria-label="下一頁">&#8594;</button>
   <button id="auto" aria-label="自動播放">&#9654; 自動播放</button>
   <button id="fs" aria-label="全螢幕">全螢幕</button>
+  <button id="notesBtn" aria-label="講者備註" aria-pressed="false" hidden>備註</button>
 </div>
+<p id="notes" hidden></p>
 <div id="thumbs"></div>
-<p class="hint">快捷鍵：← → 換頁　F 全螢幕　空白鍵 自動播放　Home / End 首尾頁</p>
+<p class="hint">快捷鍵：← → 換頁　F 全螢幕　空白鍵 自動播放　Home / End 首尾頁<span id="notesHint" hidden>　N 講者備註</span></p>
 <footer class="ex-footer"><i class="fa-solid fa-chalkboard" style="margin-right:4px"></i>R_Slide　·　<i class="fa-brands fa-github" style="margin-right:4px"></i>Rainless1125/R_Slide</footer>
 <script>
 (function () {
@@ -228,6 +264,9 @@ body{box-sizing:border-box;min-height:100vh;font-family:"PingFang TC","Microsoft
     document.getElementById('next').disabled = i === SLIDES.length - 1 && !timer;
     var ts = document.querySelectorAll('.thumb');
     for (var k = 0; k < ts.length; k++) ts[k].classList.toggle('on', k === i);
+    var nt = document.getElementById('notes');
+    nt.textContent = SLIDES[i].notes || '此頁沒有講者備註';
+    nt.classList.toggle('empty', !SLIDES[i].notes);
     if (ts[i] && ts[i].scrollIntoView) ts[i].scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', inline: 'center', block: 'nearest' });
   }
   var prev = function () { show(cur - 1); }, next = function () { show(cur + 1); };
@@ -271,6 +310,17 @@ body{box-sizing:border-box;min-height:100vh;font-family:"PingFang TC","Microsoft
   document.getElementById('next').onclick = next;
   document.getElementById('auto').onclick = toggleAuto;
   document.getElementById('fs').onclick = toggleFs;
+  // 講者備註：預設隱藏，只有至少一頁有備註時才顯示開關
+  var hasNotes = SLIDES.some(function (s) { return s.notes; });
+  function toggleNotes() {
+    if (!hasNotes) return;
+    var nt = document.getElementById('notes');
+    nt.hidden = !nt.hidden;
+    document.getElementById('notesBtn').setAttribute('aria-pressed', String(!nt.hidden));
+  }
+  document.getElementById('notesBtn').hidden = !hasNotes;
+  document.getElementById('notesHint').hidden = !hasNotes;
+  document.getElementById('notesBtn').onclick = toggleNotes;
   document.addEventListener('fullscreenchange', function () { setTimeout(fit, 50); });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'ArrowLeft') prev();
@@ -278,6 +328,7 @@ body{box-sizing:border-box;min-height:100vh;font-family:"PingFang TC","Microsoft
     else if (e.key === 'Home') show(0);
     else if (e.key === 'End') show(SLIDES.length - 1);
     else if (e.key.toLowerCase() === 'f') toggleFs();
+    else if (e.key.toLowerCase() === 'n') toggleNotes();
     else if (e.key === ' ') { e.preventDefault(); toggleAuto(); }
   });
   var sx = 0, sy = 0;
@@ -297,6 +348,7 @@ function buildExportHtml(title, slides) {
     const data = (slides || []).map(s => ({
         title: String(s.slide_title ?? ''),
         html: sanitizeSlideHtml(s.html_content),
+        notes: typeof s.speaker_notes === 'string' ? s.speaker_notes.trim() : '',
     }));
     // 用函式取代，避免 $& 等特殊序列被 String.replace 解讀
     const fill = { '{{TITLE}}': _exportEscHtml(title || '未命名簡報'), '{{FA_CSS}}': EXPORT_CDN.fontAwesome, '{{TAILWIND_JS}}': EXPORT_CDN.tailwind };
@@ -454,7 +506,7 @@ function exportPresentationPptx() {
         const res = await fetch('/api/export/pptx', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, slides: slides.map((s, i) => ({ title: s.slide_title, image: images[i] })) })
+            body: JSON.stringify({ title, slides: slides.map((s, i) => ({ title: s.slide_title, notes: s.speaker_notes || '', image: images[i] })) })
         });
         if (!res.ok) throw await readApiError(res);
         return res.blob();

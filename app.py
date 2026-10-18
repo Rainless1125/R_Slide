@@ -1,5 +1,6 @@
 import os
 import json
+from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
@@ -8,29 +9,129 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
-from openai import OpenAI
+from openai import BadRequestError, OpenAI
 from starlette.datastructures import UploadFile
 
-from charts import CHART_RULES, ChartSpec, normalize_charts
+from accounts import router as accounts_router
+from charts import CHART_RULES, MAX_CHARTS_PER_SLIDE, ChartSpec, normalize_charts
 from exporter import ExportError, build_pptx
 from extract import MAX_UPLOAD_BYTES, ExtractError, extract_text
+
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"   # 以本檔所在位置為基準，從其他目錄啟動 uvicorn 也找得到
 
 load_dotenv()
 MY_GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 MY_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-if not MY_GEMINI_API_KEY and not MY_OPENAI_API_KEY:
-    raise ValueError("找不到 API Key，請在 .env 檔案中至少設定 GEMINI_API_KEY 或 OPENAI_API_KEY！")
+
+def parse_model_list(value: str | None) -> list[str]:
+    """以逗號分隔的模型清單（.env 用），去除空白與重複。"""
+    return list(dict.fromkeys(m.strip() for m in (value or "").split(",") if m.strip()))
+
+
+def databricks_base_url(host: str | None, base_url: str | None = None) -> str | None:
+    """Databricks 的 OpenAI 相容端點：有指定 DATABRICKS_BASE_URL 就直接使用，否則為 <workspace>/serving-endpoints。"""
+    if base_url and base_url.strip():
+        return base_url.strip().rstrip("/")
+    if not host or not host.strip():
+        return None
+    host = host.strip().rstrip("/")
+    if not host.startswith(("http://", "https://")):
+        host = "https://" + host
+    return host + "/serving-endpoints"
+
+
+# Databricks AI Gateway（Model Serving 端點）：以 OpenAI SDK 呼叫，模型名稱即端點名稱
+DATABRICKS_TOKEN = os.getenv("DATABRICKS_TOKEN")
+DATABRICKS_BASE_URL = databricks_base_url(os.getenv("DATABRICKS_HOST"), os.getenv("DATABRICKS_BASE_URL"))
+DATABRICKS_MODELS = parse_model_list(os.getenv("DATABRICKS_MODELS"))
+DATABRICKS_READY = bool(DATABRICKS_TOKEN and DATABRICKS_BASE_URL and DATABRICKS_MODELS)
+
+if not MY_GEMINI_API_KEY and not MY_OPENAI_API_KEY and not DATABRICKS_READY:
+    raise ValueError("找不到 API Key，請在 .env 檔案中至少設定 GEMINI_API_KEY、OPENAI_API_KEY，"
+                     "或 Databricks 的 DATABRICKS_HOST + DATABRICKS_TOKEN + DATABRICKS_MODELS！")
 
 gemini_client = genai.Client(api_key=MY_GEMINI_API_KEY) if MY_GEMINI_API_KEY else None
 openai_client = OpenAI(api_key=MY_OPENAI_API_KEY) if MY_OPENAI_API_KEY else None
+databricks_client = OpenAI(api_key=DATABRICKS_TOKEN, base_url=DATABRICKS_BASE_URL) if DATABRICKS_READY else None
 app = FastAPI(title="R Slide")
 
-# 各平台可選模型（第一個為預設）
+# 各平台可選模型（第一個為預設）；Databricks 的模型清單由 .env 的 DATABRICKS_MODELS 決定
 MODEL_CATALOG = {
     "gemini": ["gemini-3.5-flash", "gemini-3.7-flash", "gemini-3.8-flash"],
     "openai": ["gpt-6-luna"],
+    "databricks": DATABRICKS_MODELS,
 }
+MISSING_KEY_MSG = {
+    "gemini": "未設定 GEMINI_API_KEY",
+    "openai": "未設定 OPENAI_API_KEY",
+    "databricks": "未設定 Databricks（需要 DATABRICKS_HOST、DATABRICKS_TOKEN、DATABRICKS_MODELS）",
+}
+
+
+def provider_client(provider: str):
+    return {"gemini": gemini_client, "openai": openai_client, "databricks": databricks_client}.get(provider)
+
+
+def parse_json_reply(text: str, schema: type[BaseModel]) -> dict:
+    """從模型的文字回覆取出 JSON（容許 ```json 區塊或前後多餘文字），並以 schema 驗證。"""
+    text = (text or "").strip()
+    start, end = text.find("{"), text.rfind("}")
+    if start < 0 or end <= start:
+        raise ValueError("模型沒有回傳 JSON")
+    return schema.model_validate_json(text[start:end + 1]).model_dump()
+
+
+def call_openai_compatible(client: OpenAI, model: str, system_instruction: str, prompt: str,
+                           schema: type[BaseModel], allow_fallback: bool) -> dict:
+    messages = [
+        {"role": "system", "content": system_instruction},
+        {"role": "user", "content": prompt},
+    ]
+    try:
+        # 部分 OpenAI 模型（如推理類）只接受預設 temperature，故不傳入
+        completion = client.beta.chat.completions.parse(model=model, messages=messages, response_format=schema)
+        message = completion.choices[0].message
+        if message.refusal:
+            raise HTTPException(status_code=502, detail=f"模型拒絕回應: {message.refusal}")
+        if message.parsed is not None:
+            return message.parsed.model_dump()
+        if not allow_fallback:
+            raise HTTPException(status_code=502, detail="模型回傳的資料無法解析")
+        return parse_json_reply(message.content, schema)
+    except BadRequestError:
+        # Databricks 上部分模型不支援嚴格的 json_schema 結構化輸出：改為在提示詞附上 schema，回覆後再由後端驗證
+        if not allow_fallback:
+            raise
+    fallback_system = (system_instruction + "\n\n【輸出格式】：只輸出一個符合下列 JSON Schema 的 JSON 物件，"
+                       "不要加上 Markdown 區塊或任何說明文字。\n"
+                       + json.dumps(schema.model_json_schema(), ensure_ascii=False))
+    completion = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "system", "content": fallback_system}, {"role": "user", "content": prompt}],
+    )
+    return parse_json_reply(completion.choices[0].message.content, schema)
+
+
+def gemini_response_text(response) -> str:
+    """取出 Gemini 回覆文字；被安全機制擋下、沒有輸出或輸出被截斷時，改回傳說明原因的錯誤，
+    而不是讓 json.loads 失敗後被當成「格式有誤」（這類情況重試通常也沒用）。"""
+    feedback = getattr(response, "prompt_feedback", None)
+    block = getattr(feedback, "block_reason", None)
+    if block:
+        raise HTTPException(status_code=502, detail=f"模型拒絕回應: 提示內容被 Gemini 安全機制擋下（{getattr(block, 'name', block)}）")
+    candidates = getattr(response, "candidates", None) or []
+    finish = getattr(candidates[0], "finish_reason", None) if candidates else None
+    reason = getattr(finish, "name", None) or (str(finish) if finish else "")
+    if reason == "MAX_TOKENS":
+        raise HTTPException(status_code=502, detail="AI 輸出超過長度上限（MAX_TOKENS）")
+    text = response.text
+    if not text:
+        if reason in ("SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "RECITATION"):
+            raise HTTPException(status_code=502, detail=f"模型拒絕回應: 輸出被 Gemini 安全機制擋下（{reason}）")
+        raise HTTPException(status_code=502, detail=f"模型沒有回傳內容（{reason or '未知原因'}）")
+    return text
 
 
 def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
@@ -39,11 +140,14 @@ def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
     provider = (provider or "gemini").lower()
     if provider not in MODEL_CATALOG:
         raise HTTPException(status_code=400, detail=f"不支援的平台: {provider}")
+    client = provider_client(provider)
+    if client is None:
+        raise HTTPException(status_code=400, detail=MISSING_KEY_MSG[provider])
+    if provider == "databricks" and model and model not in MODEL_CATALOG["databricks"]:
+        raise HTTPException(status_code=400, detail=f"未開放的 Databricks 模型: {model}")
     model = model or MODEL_CATALOG[provider][0]
 
     if provider == "gemini":
-        if gemini_client is None:
-            raise HTTPException(status_code=400, detail="未設定 GEMINI_API_KEY")
         config = types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=schema,
@@ -51,24 +155,11 @@ def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
             thinking_config=types.ThinkingConfig(thinking_budget=0),
             system_instruction=system_instruction
         )
-        response = gemini_client.models.generate_content(model=model, contents=prompt, config=config)
-        return json.loads(response.text)
+        response = client.models.generate_content(model=model, contents=prompt, config=config)
+        return json.loads(gemini_response_text(response))
 
-    if openai_client is None:
-        raise HTTPException(status_code=400, detail="未設定 OPENAI_API_KEY")
-    completion = openai_client.beta.chat.completions.parse(
-        model=model,
-        messages=[
-            {"role": "system", "content": system_instruction},
-            {"role": "user", "content": prompt},
-        ],
-        response_format=schema,
-        # 部分 OpenAI 模型（如推理類）只接受預設 temperature，故不傳入
-    )
-    message = completion.choices[0].message
-    if message.refusal:
-        raise HTTPException(status_code=502, detail=f"模型拒絕回應: {message.refusal}")
-    return message.parsed.model_dump()
+    return call_openai_compatible(client, model, system_instruction, prompt, schema,
+                                  allow_fallback=provider == "databricks")
 
 
 # 1. Pydantic 模型定義
@@ -86,11 +177,14 @@ class AdaptiveSlide(BaseModel):
         """
     )
     charts: list[ChartSpec] = Field(description="此頁的圖表資料，依 data-rs-chart 索引對應；沒有圖表時為空陣列")
+    speaker_notes: str = Field(description="講者備註：講者上台時照著說的口語講稿（純文字，不含 HTML），規則見【講者備註】")
 
 
 class SlideInput(AdaptiveSlide):
-    """前端送回的投影片：舊版歷史紀錄沒有 charts，且圖表資料已在前端正規化過，因此放寬驗證。"""
-    charts: list[dict] = Field(default_factory=list)
+    """前端送回的投影片：舊版歷史紀錄沒有 charts / speaker_notes，且圖表資料已在前端正規化過，因此放寬驗證。
+    charts 可能含 None（無法使用的圖表保留索引位置，見 normalize_charts）。"""
+    charts: list[dict | None] = Field(default_factory=list)
+    speaker_notes: str = ""
 
 class AdaptivePresentation(BaseModel):
     presentation_title: str = Field(description="整份簡報的大標題")
@@ -124,6 +218,17 @@ SLIDE_LAYOUT_RULES = """
 """
 
 
+# 講者備註只出現在播放器的備註區與 PPTX 備忘稿，不會畫在投影片上，因此不受版面字數限制
+SPEAKER_NOTES_RULES = """
+    【講者備註（speaker_notes）】：
+    1. 每頁都要提供講者備註：講者上台時可以直接照著念的口語講稿，使用與原始素材相同的語言。
+    2. 長度約 80 ~ 200 字，2 ~ 5 句；封面與結尾頁可較短。
+    3. 內容要補充畫面上沒有寫出的脈絡、數據來源、舉例或轉場，不要逐字重複投影片上的文字。
+    4. 最後一句可以自然帶出下一頁的主題（最後一頁則做總結或呼籲行動）。
+    5. 只輸出純文字，不要 HTML、Markdown 符號或 emoji；換段可使用換行。
+"""
+
+
 class GenerateRequest(BaseModel):
     content: str
     target_audience: str = "商務主管 / 技術決策者"
@@ -148,8 +253,8 @@ class RegenerateSlideRequest(BaseModel):
 @app.get("/api/models")
 async def list_models():
     return {
-        "gemini": {"available": gemini_client is not None, "models": MODEL_CATALOG["gemini"]},
-        "openai": {"available": openai_client is not None, "models": MODEL_CATALOG["openai"]},
+        provider: {"available": provider_client(provider) is not None, "models": models}
+        for provider, models in MODEL_CATALOG.items()
     }
 
 @app.post("/api/generate")
@@ -173,7 +278,7 @@ def generate_slides(req: GenerateRequest):
        - 僅輸出 Tailwind CSS class。
        - 禁止使用emoji，請一律使用font-awesome圖示。
        - 【重要】你必須絕對服從使用者指定的「視覺風格」。如果要求明亮風，請多用 bg-white/bg-slate-50；如果要求科技風，才使用深色底 bg-slate-900 搭配螢光點綴色。
-    """ + SLIDE_LAYOUT_RULES + CHART_RULES
+    """ + SLIDE_LAYOUT_RULES + CHART_RULES + SPEAKER_NOTES_RULES
 
     pages_hint = f"{req.num_pages} 頁" if req.num_pages > 0 else "由你依內容多寡與重點自行決定（建議 3~8 頁）"
     prompt = f"""
@@ -279,7 +384,8 @@ def regenerate_slide(req: RegenerateSlideRequest):
     5. 使用者的額外需求若會讓內容超出畫面（例如要求加入更多內容），請以精簡文字的方式達成，不可違反版面尺寸限制。
     6. 原 HTML 中 <img data-rs-img src="rs-img:數字"> 是使用者上傳的圖片：除非使用者要求移除，否則請保留該 <img> 標籤與 src 原樣，
        可調整它的位置與大小。原 HTML 中的 data-rs-chart 容器內容已省略，圖表資料請參考【原圖表資料】。
-    """ + SLIDE_LAYOUT_RULES + CHART_RULES
+    7. 講者備註需配合新版面重新撰寫；使用者的額外需求若只針對版面，仍可沿用【原講者備註】的重點。
+    """ + SLIDE_LAYOUT_RULES + CHART_RULES + SPEAKER_NOTES_RULES
 
     prompt = f"""
     【簡報標題】：{req.presentation_title}
@@ -300,6 +406,8 @@ def regenerate_slide(req: RegenerateSlideRequest):
     {target_slide.html_content}
     - 原圖表資料（JSON，可沿用、修改或刪除）：
     {json.dumps(target_slide.charts, ensure_ascii=False) if target_slide.charts else "（無）"}
+    - 原講者備註：
+    {target_slide.speaker_notes.strip() or "（無）"}
 
     【使用者額外重產需求】：
     {req.custom_prompt.strip() if req.custom_prompt.strip() else "（無，請你自行優化此頁）"}
@@ -311,22 +419,24 @@ def regenerate_slide(req: RegenerateSlideRequest):
     try:
         data = call_llm(req.provider, req.model, system_instruction, prompt, AdaptiveSlide, 0.7)
         data["page_number"] = target_slide.page_number
-        data["charts"] = normalize_charts(data.get("charts"))
+        # 使用者可能自行插入超過 MAX_CHARTS_PER_SLIDE 張圖表：至少保留原頁的張數，避免重產後被截掉
+        data["charts"] = normalize_charts(data.get("charts"), max(MAX_CHARTS_PER_SLIDE, len(target_slide.charts)))
         return data
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.include_router(accounts_router)
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
-    return FileResponse("static/favicon.svg", media_type="image/svg+xml")
+    return FileResponse(STATIC_DIR / "favicon.svg", media_type="image/svg+xml")
 
 @app.get("/")
 async def root():
-    return FileResponse("static/index.html")
+    return FileResponse(STATIC_DIR / "index.html")
 
 if __name__ == "__main__":
     import uvicorn

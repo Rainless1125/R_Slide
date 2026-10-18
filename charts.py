@@ -14,6 +14,8 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 CHART_TYPES = ("bar", "horizontal_bar", "line", "pie", "doughnut")
+REF_LINE_TYPES = ("bar", "horizontal_bar", "line")   # 有數值軸的圖才有參考線；圓餅 / 環圈是占比，不適用
+MAX_REF_LINES = 3
 MAX_CHARTS_PER_SLIDE = 2
 MAX_LABELS = 12
 MAX_DATASETS = 4
@@ -28,6 +30,11 @@ class ChartDataset(BaseModel):
     values: list[float] = Field(description="數值，順序與數量必須和 labels 一一對應；只寫純數字，不含單位或千分位符號")
 
 
+class ChartRefLine(BaseModel):
+    label: str = Field(description="參考線名稱，例如「目標」「規格上限」「平均」（10 字內）")
+    value: float = Field(description="參考線的數值，與資料同單位；只寫純數字")
+
+
 class ChartSpec(BaseModel):
     type: Literal["bar", "horizontal_bar", "line", "pie", "doughnut"] = Field(
         description="bar=直條（類別比較）、horizontal_bar=橫條（類別名稱較長或排名）、line=折線（時間趨勢）、"
@@ -38,6 +45,10 @@ class ChartSpec(BaseModel):
     labels: list[str] = Field(description="類別或時間點標籤（最多 12 個，每個 10 字內）")
     datasets: list[ChartDataset] = Field(description="資料系列（1~3 個）")
     colors: list[str] = Field(description="各系列（圓餅圖為各扇形）的 HEX 色碼，需符合視覺風格，例如 #2563eb；可為空陣列使用預設配色")
+    ref_lines: list[ChartRefLine] = Field(
+        description="參考線（虛線），用於目標值、規格上下限、門檻或平均值；只適用 bar / horizontal_bar / line，"
+                    "最多 3 條；內容沒有提到門檻或目標時給空陣列"
+    )
 
 
 def _clean_text(value, limit: int = MAX_TEXT) -> str:
@@ -80,6 +91,18 @@ def normalize_chart(raw) -> dict | None:
         datasets = datasets[:1]
 
     colors = [c for c in (raw.get("colors") or []) if isinstance(c, str) and HEX_COLOR_RE.fullmatch(c.strip())]
+    ref_lines = []
+    if chart_type in REF_LINE_TYPES:
+        for line in (raw.get("ref_lines") or []):
+            if not isinstance(line, dict) or line.get("value") in (None, ""):
+                continue
+            item = {"label": _clean_text(line.get("label"), 16), "value": _clean_number(line.get("value"))}
+            color = line.get("color")
+            if isinstance(color, str) and HEX_COLOR_RE.fullmatch(color.strip()):
+                item["color"] = color.strip()
+            ref_lines.append(item)
+            if len(ref_lines) >= MAX_REF_LINES:
+                break
     return {
         "type": chart_type,
         "title": _clean_text(raw.get("title")),
@@ -87,13 +110,19 @@ def normalize_chart(raw) -> dict | None:
         "labels": labels,
         "datasets": datasets,
         "colors": [c.strip() for c in colors][:MAX_LABELS],
+        "ref_lines": ref_lines,
     }
 
 
-def normalize_charts(charts) -> list[dict]:
+def normalize_charts(charts, limit: int = MAX_CHARTS_PER_SLIDE) -> list[dict | None]:
+    """逐一正規化並保留原本的索引：HTML 以 data-rs-chart="索引" 對應，無法使用的圖表留下 None
+    （前端找不到資料時會移除該容器），不可直接濾掉，否則後面的圖表會對到錯的容器。"""
     if not isinstance(charts, list):
         return []
-    return [c for c in (normalize_chart(x) for x in charts[:MAX_CHARTS_PER_SLIDE]) if c]
+    out = [normalize_chart(x) for x in charts[:limit]]
+    while out and out[-1] is None:
+        out.pop()
+    return out
 
 
 CHART_RULES = """
@@ -108,5 +137,7 @@ CHART_RULES = """
     4. 每頁最多 2 張圖表；每張圖最多 8 個類別、最多 3 個資料系列。數值只寫純數字，單位放在 unit。
     5. 圖表的文字顏色會繼承佔位容器的文字顏色，請在容器或其父層設定符合視覺風格的 text-xxx；
        colors 請給與視覺風格協調、彼此容易區分的 HEX 色碼。
-    6. 該頁沒有圖表時，charts 請輸出空陣列 []。
+    6. 內容提到目標值、規格上下限、門檻、及格線或平均值時，用 ref_lines 畫成參考虛線（只用於 bar / horizontal_bar / line），
+       讓觀眾一眼看出哪些資料達標；沒有這類數值時 ref_lines 給空陣列，不要自己編造門檻。
+    7. 該頁沒有圖表時，charts 請輸出空陣列 []。
 """

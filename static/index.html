@@ -8,6 +8,9 @@
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <script>
         tailwind.config = {
@@ -15,942 +18,18 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['"PingFang TC"', '"Microsoft JhengHei"', '"Noto Sans TC"', 'sans-serif'],
+                        // 英數用 Inter，中文用 Noto Sans TC；避免 Windows 以微軟正黑體的英文字形顯示
+                        sans: ['Inter', '"Noto Sans TC"', '"PingFang TC"', '"Microsoft JhengHei"', 'sans-serif'],
                     }
                 }
             }
         }
     </script>
-    <style>
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-
-        html {
-            scroll-behavior: smooth;
-        }
-
-        /* ---------- 背景動態光暈 ---------- */
-        .blob {
-            position: fixed;
-            border-radius: 9999px;
-            filter: blur(90px);
-            opacity: .35;
-            pointer-events: none;
-            z-index: 0;
-            animation: float 18s ease-in-out infinite;
-        }
-
-        .dark .blob {
-            opacity: .18;
-        }
-
-        .blob-1 {
-            width: 380px;
-            height: 380px;
-            top: -80px;
-            left: -60px;
-            background: #93c5fd;
-        }
-
-        .blob-2 {
-            width: 340px;
-            height: 340px;
-            bottom: -80px;
-            right: -40px;
-            background: #f9a8d4;
-            animation-delay: -6s;
-        }
-
-        .blob-3 {
-            width: 280px;
-            height: 280px;
-            top: 45%;
-            left: 55%;
-            background: #86efac;
-            animation-delay: -12s;
-        }
-
-        @keyframes float {
-
-            0%,
-            100% {
-                transform: translate(0, 0) scale(1);
-            }
-
-            33% {
-                transform: translate(40px, -30px) scale(1.08);
-            }
-
-            66% {
-                transform: translate(-30px, 30px) scale(.95);
-            }
-        }
-
-        header,
-        main {
-            position: relative;
-            z-index: 1;
-        }
-
-        header {
-            position: sticky;
-        }
-
-        /* ---------- 捲動進度條 ---------- */
-        #scrollProgress {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 3px;
-            width: 0;
-            background: linear-gradient(90deg, #3b82f6, #a855f7, #ec4899);
-            z-index: 100;
-            transition: width .1s linear;
-        }
-
-        /* ---------- 側邊欄 ---------- */
-        #sidebar {
-            position: fixed;
-            top: 4rem;
-            left: 0;
-            bottom: 0;
-            width: 18rem;
-            z-index: 40;
-            transform: translateX(-100%);
-            transition: transform .35s cubic-bezier(.2, .8, .2, 1);
-        }
-
-        body.sb-open #sidebar {
-            transform: none;
-            box-shadow: 8px 0 30px rgba(0, 0, 0, .08);
-        }
-
-        #mainWrap {
-            transition: padding-left .35s cubic-bezier(.2, .8, .2, 1);
-        }
-
-        @media (min-width: 1024px) {
-            body.sb-open #mainWrap {
-                padding-left: 18rem;
-            }
-        }
-
-        #sbOverlay {
-            display: none;
-            position: fixed;
-            inset: 4rem 0 0 0;
-            background: rgba(0, 0, 0, .4);
-            z-index: 39;
-            backdrop-filter: blur(2px);
-        }
-
-        @media (max-width: 1023px) {
-            body.sb-open #sbOverlay {
-                display: block;
-                animation: fadeIn .3s both;
-            }
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-
-            to {
-                opacity: 1;
-            }
-        }
-
-        @keyframes itemOut {
-            to {
-                opacity: 0;
-                transform: translateX(-30px) scale(.95);
-                height: 0;
-                padding: 0;
-                margin: 0;
-                border-width: 0;
-            }
-        }
-
-        .hist-out {
-            animation: itemOut .35s ease-in forwards;
-            overflow: hidden;
-        }
-
-        /* ---------- 進場動畫 ---------- */
-        @keyframes fadeUp {
-            from {
-                opacity: 0;
-                transform: translateY(24px) scale(.985);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
-        }
-
-        .reveal {
-            animation: fadeUp .6s cubic-bezier(.2, .8, .2, 1) both;
-        }
-
-        .stagger>* {
-            animation: fadeUp .55s cubic-bezier(.2, .8, .2, 1) both;
-        }
-
-        .stagger>*:nth-child(1) {
-            animation-delay: .04s;
-        }
-
-        .stagger>*:nth-child(2) {
-            animation-delay: .10s;
-        }
-
-        .stagger>*:nth-child(3) {
-            animation-delay: .16s;
-        }
-
-        .stagger>*:nth-child(4) {
-            animation-delay: .22s;
-        }
-
-        .stagger>*:nth-child(5) {
-            animation-delay: .28s;
-        }
-
-        .stagger>*:nth-child(n+6) {
-            animation-delay: .34s;
-        }
-
-        /* ---------- 投影片切換 ---------- */
-        @keyframes slideInRight {
-            from {
-                opacity: 0;
-                transform: translateX(48px) scale(.98);
-            }
-
-            to {
-                opacity: 1;
-                transform: none;
-            }
-        }
-
-        @keyframes slideInLeft {
-            from {
-                opacity: 0;
-                transform: translateX(-48px) scale(.98);
-            }
-
-            to {
-                opacity: 1;
-                transform: none;
-            }
-        }
-
-        @keyframes slideFade {
-            from {
-                opacity: 0;
-                transform: scale(.96);
-            }
-
-            to {
-                opacity: 1;
-                transform: none;
-            }
-        }
-
-        .slide-in-right {
-            animation: slideInRight .5s cubic-bezier(.2, .8, .2, 1) both;
-        }
-
-        .slide-in-left {
-            animation: slideInLeft .5s cubic-bezier(.2, .8, .2, 1) both;
-        }
-
-        .slide-in-fade {
-            animation: slideFade .5s cubic-bezier(.2, .8, .2, 1) both;
-        }
-
-        .slide-anim {
-            width: 100%;
-            height: 100%;
-        }
-
-        .slide-scaler {
-            position: relative;
-            width: 1024px;
-            height: 576px;
-            transform-origin: top left;
-        }
-
-        /* ---------- 全螢幕 ---------- */
-        #slideStage:fullscreen {
-            background: #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        #slideStage:fullscreen #slideCanvas {
-            width: min(100vw, calc(100vh * 16 / 9));
-            max-width: none;
-            border-radius: 0;
-            border: 0;
-            box-shadow: none;
-        }
-
-        #slideStage:fullscreen .stage-ui {
-            display: none;
-        }
-
-        #slideStage.idle {
-            cursor: none;
-        }
-
-        /* ---------- 光斑 hover ---------- */
-        .spot {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .spot::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-            opacity: 0;
-            background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), rgba(99, 102, 241, .16), transparent 60%);
-            transition: opacity .3s;
-        }
-
-        .spot:hover::before {
-            opacity: 1;
-        }
-
-        /* ---------- 漣漪 ---------- */
-        .ripple-btn {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .ripple {
-            position: absolute;
-            border-radius: 9999px;
-            background: currentColor;
-            opacity: .25;
-            transform: scale(0);
-            animation: ripple .6s ease-out forwards;
-            pointer-events: none;
-        }
-
-        @keyframes ripple {
-            to {
-                transform: scale(4);
-                opacity: 0;
-            }
-        }
-
-        /* ---------- 粒子爆發按鈕 ---------- */
-        #btnGenerate:not(:disabled):hover {
-            box-shadow: 0 8px 22px rgba(124, 92, 255, .35);
-        }
-
-        #btnGenerate .dots {
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-        }
-
-        #btnGenerate .dots i {
-            position: absolute;
-            bottom: -6px;
-            width: 4px;
-            height: 4px;
-            border-radius: 50%;
-            background: #ffb23e;
-            opacity: 0;
-        }
-
-        #btnGenerate:disabled .dots i {
-            animation: dotRise 1.4s ease-in infinite;
-        }
-
-        #btnGenerate .dots i:nth-child(1) { left: 12%; background: #7c5cff; }
-        #btnGenerate .dots i:nth-child(2) { left: 30%; animation-delay: .35s; }
-        #btnGenerate .dots i:nth-child(3) { left: 50%; animation-delay: .7s; background: #22d3ee; }
-        #btnGenerate .dots i:nth-child(4) { left: 68%; animation-delay: .15s; background: #ff5ca8; }
-        #btnGenerate .dots i:nth-child(5) { left: 86%; animation-delay: .55s; }
-
-        @keyframes dotRise {
-            0% { transform: translateY(0); opacity: 0; }
-            20% { opacity: 1; }
-            100% { transform: translateY(-46px); opacity: 0; }
-        }
-
-        #fxCanvas {
-            position: fixed;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 9999;
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-            #btnGenerate .dots i { animation: none !important; }
-        }
-
-        /* ---------- 骨架屏 ---------- */
-        .skeleton {
-            background: linear-gradient(90deg, rgba(161, 161, 170, .15) 25%, rgba(161, 161, 170, .32) 50%, rgba(161, 161, 170, .15) 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.4s infinite linear;
-            border-radius: .5rem;
-        }
-
-        @keyframes shimmer {
-            to {
-                background-position: -200% 0;
-            }
-        }
-
-        /* ---------- 搖晃 ---------- */
-        @keyframes shake {
-
-            0%,
-            100% {
-                transform: translateX(0);
-            }
-
-            20% {
-                transform: translateX(-8px);
-            }
-
-            40% {
-                transform: translateX(7px);
-            }
-
-            60% {
-                transform: translateX(-5px);
-            }
-
-            80% {
-                transform: translateX(3px);
-            }
-        }
-
-        .shake {
-            animation: shake .45s;
-        }
-
-        /* ---------- Toast ---------- */
-        #toastRoot {
-            position: fixed;
-            top: 76px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 200;
-            display: flex;
-            flex-direction: column;
-            gap: .5rem;
-            align-items: center;
-            pointer-events: none;
-        }
-
-        .toast {
-            pointer-events: auto;
-            padding: .65rem 1rem;
-            border-radius: .75rem;
-            font-size: .85rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: .5rem;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, .18);
-            background: #18181b;
-            color: #fff;
-            animation: toastIn .35s cubic-bezier(.2, .8, .2, 1) both;
-        }
-
-        .dark .toast {
-            background: #fafafa;
-            color: #18181b;
-        }
-
-        .toast.out {
-            animation: toastOut .3s ease-in forwards;
-        }
-
-        @keyframes toastIn {
-            from {
-                opacity: 0;
-                transform: translateY(-14px) scale(.95);
-            }
-
-            to {
-                opacity: 1;
-                transform: none;
-            }
-        }
-
-        @keyframes toastOut {
-            to {
-                opacity: 0;
-                transform: translateY(-10px) scale(.95);
-            }
-        }
-
-        /* ---------- 其他 ---------- */
-        .theme-pop {
-            animation: themePop .4s ease;
-        }
-
-        @keyframes themePop {
-            0% {
-                transform: scale(.92);
-            }
-
-            60% {
-                transform: scale(1.04);
-            }
-
-            100% {
-                transform: scale(1);
-            }
-        }
-
-        .pulse-dot {
-            animation: pulseDot 1.2s infinite;
-        }
-
-        @keyframes pulseDot {
-
-            0%,
-            100% {
-                transform: scale(1);
-                opacity: 1;
-            }
-
-            50% {
-                transform: scale(1.6);
-                opacity: .5;
-            }
-        }
-
-        .step-fill {
-            transition: width .6s cubic-bezier(.2, .8, .2, 1);
-        }
-
-        .icon-btn {
-            transition: transform .2s, background-color .2s, color .2s;
-        }
-
-        .icon-btn:hover:not(:disabled) {
-            transform: translateY(-1px) scale(1.06);
-        }
-
-        .icon-btn:active:not(:disabled) {
-            transform: scale(.94);
-        }
-
-        .icon-btn:disabled {
-            opacity: .35;
-            cursor: not-allowed;
-        }
-
-        .stage-nav-btn:hover:not(:disabled) {
-            transform: translateY(-50%) scale(1.06);
-        }
-
-        .stage-nav-btn:active:not(:disabled) {
-            transform: translateY(-50%) scale(.94);
-        }
-
-        .chip {
-            transition: transform .2s, background-color .2s, border-color .2s;
-        }
-
-        .chip:hover {
-            transform: translateY(-2px);
-        }
-
-        /* 匯出選單 */
-        .export-item {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            gap: .75rem;
-            padding: .5rem .75rem;
-            border-radius: .5rem;
-            text-align: left;
-            font-size: .8125rem;
-        }
-
-        .export-item:hover,
-        .export-item:focus-visible {
-            background: rgb(244 244 245);
-            outline: none;
-        }
-
-        .dark .export-item:hover,
-        .dark .export-item:focus-visible {
-            background: rgb(39 39 42);
-        }
-
-        .export-item>i {
-            width: 1.25rem;
-            text-align: center;
-            font-size: 1.05rem;
-        }
-
-        .export-item small {
-            display: block;
-            font-size: .6875rem;
-            color: rgb(113 113 122);
-        }
-
-        /* 檔案拖放 / 匯入中的遮罩 */
-        #dropOverlay {
-            opacity: 0;
-            transition: opacity .15s;
-        }
-
-        #inputDropZone.dragging #dropOverlay,
-        #inputDropZone.importing #dropOverlay {
-            opacity: 1;
-        }
-
-        .thumb:hover {
-            transform: translateY(-3px);
-        }
-
-        /* ---------- 行內文字編輯 ---------- */
-        /* 編輯模式：滑過顯示虛線（只標示最內層）、選取為藍框、文字編輯中為實線 */
-        #slideCanvas.editing .slide-scaler * {
-            cursor: default;
-        }
-
-        #slideCanvas.editing .slide-scaler *:hover:not(:has(:hover)) {
-            outline: 1px dashed rgba(59, 130, 246, .8);
-            outline-offset: 1px;
-        }
-
-        /* 編輯模式隱藏左右懸浮箭頭，避免蓋住投影片邊緣的元素（控制列與方向鍵仍可換頁） */
-        #slideCanvas.editing~.stage-nav-btn {
-            display: none;
-        }
-
-        #slideCanvas.editing [data-rs-sel] {
-            outline: 2px solid #3b82f6 !important;
-            outline-offset: 2px;
-        }
-
-        #slideCanvas.editing .slide-scaler>[data-rs-sel] {
-            outline-offset: -3px;
-        }
-
-        #slideCanvas.editing [contenteditable] {
-            cursor: text !important;
-            outline-style: solid !important;
-            background-image: linear-gradient(rgba(59, 130, 246, .08), rgba(59, 130, 246, .08));
-        }
-
-        /* ---------- 浮動格式工具列 ---------- */
-        #fmtToolbar {
-            position: fixed;
-            z-index: 55;
-            display: none;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 2px;
-            max-width: calc(100vw - 16px);
-            padding: 4px 6px;
-            border-radius: 14px;
-            border: 1px solid rgb(228 228 231);
-            background: rgba(255, 255, 255, .97);
-            color: #18181b;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, .18);
-            backdrop-filter: blur(8px);
-            font-size: 12px;
-        }
-
-        .dark #fmtToolbar {
-            border-color: rgb(63 63 70);
-            background: rgba(24, 24, 27, .97);
-            color: #f4f4f5;
-        }
-
-        #fmtToolbar.open {
-            display: flex;
-        }
-
-        #fmtToolbar .fb {
-            min-width: 28px;
-            height: 28px;
-            padding: 0 6px;
-            border-radius: 8px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 4px;
-            font-weight: 600;
-            white-space: nowrap;
-        }
-
-        #fmtToolbar .fb:hover:not(:disabled) {
-            background: rgba(128, 128, 128, .18);
-        }
-
-        #fmtToolbar .fb:disabled {
-            opacity: .35;
-            cursor: not-allowed;
-        }
-
-        #fmtToolbar .fb[aria-pressed="true"] {
-            background: #3b82f6;
-            color: #fff;
-        }
-
-        #fmtToolbar .fb.danger:hover:not(:disabled) {
-            background: rgba(239, 68, 68, .15);
-            color: #ef4444;
-        }
-
-        #fmtToolbar select {
-            height: 28px;
-            border-radius: 8px;
-            border: 1px solid rgba(128, 128, 128, .35);
-            background: transparent;
-            color: inherit;
-            font-size: 12px;
-            padding: 0 4px;
-        }
-
-        #fmtToolbar select option {
-            color: #18181b;
-        }
-
-        #fmtToolbar .sep {
-            width: 1px;
-            height: 18px;
-            margin: 0 4px;
-            background: rgba(128, 128, 128, .35);
-        }
-
-        #fmtToolbar .chipbox {
-            width: 14px;
-            height: 14px;
-            border-radius: 4px;
-            border: 1px solid rgba(128, 128, 128, .5);
-        }
-
-        #fmtPalette {
-            position: fixed;
-            z-index: 56;
-            display: none;
-            width: 236px;
-            max-height: 340px;
-            overflow-y: auto;
-            padding: 8px;
-            border-radius: 12px;
-            border: 1px solid rgb(228 228 231);
-            background: #fff;
-            color: #18181b;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, .22);
-        }
-
-        .dark #fmtPalette {
-            border-color: rgb(63 63 70);
-            background: #18181b;
-            color: #f4f4f5;
-        }
-
-        #fmtPalette.open {
-            display: block;
-        }
-
-        #fmtPalette .pal-row {
-            display: flex;
-            gap: 2px;
-            margin-top: 2px;
-        }
-
-        #fmtPalette .pal-chip {
-            width: 18px;
-            height: 18px;
-            border-radius: 4px;
-            border: 1px solid rgba(128, 128, 128, .3);
-        }
-
-        #fmtPalette .pal-chip:hover {
-            transform: scale(1.25);
-            border-color: #3b82f6;
-        }
-
-        #editBtn[aria-pressed="true"] {
-            background: #3b82f6;
-            color: #fff;
-        }
-
-        /* ---------- 圖片 / 圖表：可拖曳移動、拖曳控制點縮放 ---------- */
-        #slideCanvas.editing [data-rs-float] {
-            cursor: move !important;
-            -webkit-user-drag: none;
-            user-select: none;
-        }
-
-        #slideCanvas.editing [data-rs-chart] svg * {
-            cursor: inherit !important;
-            outline: none !important;
-        }
-
-        #slideCanvas.drop-target {
-            outline: 3px dashed #3b82f6;
-            outline-offset: 3px;
-        }
-
-        #floatBox {
-            position: fixed;
-            z-index: 54;
-            display: none;
-            pointer-events: none;
-        }
-
-        #floatBox.open {
-            display: block;
-        }
-
-        #floatBox .fh {
-            position: absolute;
-            width: 12px;
-            height: 12px;
-            margin: -6px 0 0 -6px;
-            border-radius: 3px;
-            border: 2px solid #3b82f6;
-            background: #fff;
-            pointer-events: auto;
-            touch-action: none;
-        }
-
-        #floatBox .fh[data-h="nw"] { left: 0; top: 0; cursor: nwse-resize; }
-        #floatBox .fh[data-h="ne"] { left: 100%; top: 0; cursor: nesw-resize; }
-        #floatBox .fh[data-h="sw"] { left: 0; top: 100%; cursor: nesw-resize; }
-        #floatBox .fh[data-h="se"] { left: 100%; top: 100%; cursor: nwse-resize; }
-
-        #floatBox .fsize {
-            position: absolute;
-            left: 50%;
-            top: 100%;
-            transform: translate(-50%, 10px);
-            padding: 1px 6px;
-            border-radius: 4px;
-            background: #3b82f6;
-            color: #fff;
-            font: 10px ui-monospace, monospace;
-            white-space: nowrap;
-        }
-
-        .slide-title-edit {
-            cursor: text;
-            border-radius: 4px;
-            outline: 1px dashed transparent;
-            outline-offset: 2px;
-        }
-
-        .slide-title-edit:hover {
-            outline-color: rgba(59, 130, 246, .6);
-        }
-
-        .slide-title-edit:focus {
-            outline: 2px solid #3b82f6;
-            text-overflow: clip;
-        }
-
-        .drag-handle {
-            cursor: grab;
-        }
-
-        .rv-card.drag-over {
-            outline: 2px dashed #3b82f6;
-            outline-offset: 2px;
-        }
-
-        .rv-card.dragging {
-            opacity: .45;
-        }
-
-        /* ---------- Toast 動作按鈕 ---------- */
-        .toast-action {
-            margin-left: .5rem;
-            padding: .15rem .65rem;
-            border-radius: 9999px;
-            border: 1px solid currentColor;
-            font-size: .75rem;
-            font-weight: 700;
-            opacity: .9;
-            transition: opacity .2s, background-color .2s;
-        }
-
-        .toast-action:hover {
-            opacity: 1;
-            background: rgba(128, 128, 128, .25);
-        }
-
-        /* ---------- 版面審查：縮圖網格 ---------- */
-        .rv-thumb {
-            position: relative;
-            width: 100%;
-            aspect-ratio: 16 / 9;
-            overflow: hidden;
-            border-radius: .75rem;
-            border: 1px solid rgb(228 228 231);
-            background: #fff;
-            cursor: pointer;
-        }
-
-        .dark .rv-thumb {
-            border-color: rgb(39 39 42);
-        }
-
-        .rv-thumb .slide-scaler {
-            pointer-events: none;
-            user-select: none;
-        }
-
-        .rv-thumb::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: transparent;
-            transition: background-color .2s;
-        }
-
-        .rv-thumb:hover::after {
-            background: rgba(0, 0, 0, .06);
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-
-            *,
-            *::before,
-            *::after {
-                animation-duration: .01ms !important;
-                animation-iteration-count: 1 !important;
-                transition-duration: .01ms !important;
-                scroll-behavior: auto !important;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="/static/app/app.css?v=5">
 </head>
 
 <body
-    class="bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors duration-300 min-h-screen flex flex-col">
+    class="antialiased bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors duration-300 min-h-screen flex flex-col">
 
     <div id="scrollProgress"></div>
     <div class="blob blob-1"></div>
@@ -970,7 +49,7 @@
                 </button>
                 <div class="flex items-center gap-3 group cursor-default">
                     <div
-                        class="w-8 h-8 bg-black dark:bg-white text-white dark:text-black rounded-md flex items-center justify-center font-black text-lg transition-transform duration-500 group-hover:rotate-[360deg] group-hover:scale-110">
+                        class="w-8 h-8 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 text-white shadow-md shadow-purple-500/30 rounded-md flex items-center justify-center font-black text-lg transition-transform duration-500 group-hover:rotate-[360deg] group-hover:scale-110">
                         R</div>
                     <div class="flex flex-col leading-tight">
                         <span class="font-bold text-lg tracking-tight">R Slide</span>
@@ -980,6 +59,17 @@
                 </div>
             </div>
 
+            <div class="flex items-center gap-1 sm:gap-2 min-w-0">
+            <div id="userChip" class="hidden flex items-center gap-1 min-w-0">
+                <span class="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-600 dark:text-zinc-300 min-w-0">
+                    <i class="fa-solid fa-circle-user text-zinc-400"></i><span id="userName" class="truncate max-w-[10rem]"></span>
+                </span>
+                <button onclick="logout()"
+                    class="icon-btn w-9 h-9 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-red-500 focus:outline-none"
+                    aria-label="登出" title="登出">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
+            </div>
             <button id="themeBtn" onclick="toggleTheme()"
                 class="icon-btn h-9 px-3 shrink-0 whitespace-nowrap rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-2 text-sm font-semibold text-zinc-600 dark:text-zinc-300 focus:outline-none"
                 aria-label="切換深色／淺色模式" title="切換深色／淺色模式">
@@ -988,6 +78,7 @@
                 <span class="hidden dark:inline">深色模式</span>
                 <span class="inline dark:hidden">淺色模式</span>
             </button>
+            </div>
         </div>
     </header>
 
@@ -1005,7 +96,7 @@
                 <i
                     class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400"></i>
                 <input id="historySearch" type="text" placeholder="搜尋歷史記錄"
-                    class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow">
+                    class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow">
             </div>
         </div>
         <div
@@ -1015,10 +106,14 @@
             <button onclick="clearHistory()" class="icon-btn hover:text-red-500 transition-colors" title="清除全部"
                 aria-label="清除全部歷史記錄"><i class="fa-regular fa-trash-can"></i></button>
         </div>
-        <div id="historyList" class="flex-1 overflow-y-auto no-scrollbar px-3 pb-4 space-y-2"></div>
+        <div id="historyList" class="flex-1 overflow-y-auto no-scrollbar px-3 pt-1 pb-4 space-y-2"></div>
+        <button id="legacyImportBtn" type="button" onclick="importLegacyHistory(true)"
+            class="hidden mx-3 mb-2 px-3 py-2 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-center gap-1.5 transition-colors">
+            <i class="fa-solid fa-file-import"></i><span id="legacyImportLabel">匯入此瀏覽器的舊紀錄</span>
+        </button>
         <div
             class="p-3 border-t border-zinc-100 dark:border-zinc-800 text-[11px] text-zinc-400 flex items-center gap-1.5">
-            <i class="fa-solid fa-database"></i> 資料僅儲存於此瀏覽器
+            <i class="fa-solid fa-database"></i> 紀錄儲存於伺服器，僅你的帳號可見
         </div>
     </aside>
     <div id="sbOverlay" onclick="toggleSidebar()"></div>
@@ -1028,16 +123,16 @@
             <!-- 步驟條 -->
             <div class="flex items-center justify-center mb-10 text-xs font-semibold tracking-wide reveal">
                 <button id="stepTag1" onclick="goStep(1)"
-                    class="transition-all duration-300 text-black dark:text-white"><i
+                    class="transition-all duration-300 text-violet-600 dark:text-violet-300"><i
                         class="fa-solid fa-pen-to-square mr-1"></i>01 / 輸入</button>
                 <div class="w-8 sm:w-12 h-[2px] bg-zinc-300 dark:bg-zinc-700 mx-3 sm:mx-4 rounded overflow-hidden">
-                    <div id="stepLine1" class="step-fill h-full w-0 bg-black dark:bg-white"></div>
+                    <div id="stepLine1" class="step-fill h-full w-0 bg-gradient-to-r from-blue-500 to-purple-500"></div>
                 </div>
                 <button id="stepTag2" onclick="goStep(2)"
                     class="transition-all duration-300 text-zinc-400 dark:text-zinc-600"><i
                         class="fa-solid fa-list-check mr-1"></i>02 / 審查</button>
                 <div class="w-8 sm:w-12 h-[2px] bg-zinc-300 dark:bg-zinc-700 mx-3 sm:mx-4 rounded overflow-hidden">
-                    <div id="stepLine2" class="step-fill h-full w-0 bg-black dark:bg-white"></div>
+                    <div id="stepLine2" class="step-fill h-full w-0 bg-gradient-to-r from-blue-500 to-purple-500"></div>
                 </div>
                 <button id="stepTag3" onclick="goStep(3)"
                     class="transition-all duration-300 text-zinc-400 dark:text-zinc-600"><i
@@ -1046,19 +141,20 @@
 
             <!-- 步驟 1: 輸入區 -->
             <section id="sectionInput"
-                class="reveal bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 shadow-sm hover:shadow-lg transition-all duration-300">
+                class="reveal relative z-20 card-elevated bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-[1.25rem] p-8 transition-all duration-300">
                 <div class="flex flex-wrap items-center justify-between gap-3 mb-1">
-                    <h2 class="text-xl font-bold">構思您的簡報</h2>
+                    <h2 class="text-2xl font-bold tracking-tight">構思您的簡報</h2>
                     <div id="modelDropdown" class="relative">
                         <button type="button" id="modelBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="modelList"
                             aria-label="選擇 AI 模型"
-                            class="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl pl-3 pr-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow"></button>
+                            class="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-full pl-3 pr-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow"></button>
                         <ul id="modelList" role="listbox" aria-label="AI 模型"
                             class="hidden absolute z-30 right-0 mt-1 w-72 max-w-[calc(100vw-2rem)] max-h-80 overflow-y-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1"></ul>
                         <!-- 實際值仍存在這兩個隱藏的 select，供 getLlmChoice() 等既有邏輯讀取 -->
                         <select id="providerSelect" class="hidden" tabindex="-1" aria-hidden="true">
                             <option value="gemini">Gemini</option>
                             <option value="openai">OpenAI</option>
+                            <option value="databricks">Databricks</option>
                         </select>
                         <select id="modelSelect" class="hidden" tabindex="-1" aria-hidden="true"></select>
                     </div>
@@ -1069,7 +165,7 @@
                     <div>
                         <div id="inputDropZone" class="relative">
                             <textarea id="inputContent" rows="10" maxlength="50000"
-                                class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 pb-8 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow resize-none"
+                                class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 pb-8 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow resize-none"
                                 placeholder="輸入素材內容，或拖放 PDF / Word / Markdown / TXT 檔案至此...（Ctrl / ⌘ + Enter 快速生成）"></textarea>
                             <span id="charCount"
                                 class="absolute bottom-2 right-3 text-[11px] text-zinc-400 dark:text-zinc-500 tabular-nums transition-colors">0
@@ -1110,7 +206,7 @@
                                 class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider"><i
                                     class="fa-solid fa-users mr-1"></i>目標受眾</label>
                             <input type="text" id="targetAudience" value="" placeholder="目標受眾（可點下方快速選擇）"
-                                class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow">
+                                class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow">
                             <div id="audienceChips" class="flex flex-wrap gap-1.5 mt-2"></div>
                         </div>
                         <div>
@@ -1118,7 +214,7 @@
                                 class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider"><i
                                     class="fa-regular fa-file-lines mr-1"></i>頁數設定</label>
                             <select id="numPages"
-                                class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow appearance-none cursor-pointer">
+                                class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow appearance-none cursor-pointer">
                                 <option value="0">由 AI 決定</option>
                                 <option value="2" selected>2 頁 (2 Pages)</option>
                                 <option value="3">3 頁 (3 Pages)</option>
@@ -1133,7 +229,7 @@
                                     class="fa-solid fa-palette mr-1"></i>簡報風格 (AI 動態配色)</label>
                             <div id="styleDropdown" class="relative">
                                 <button type="button" id="styleBtn" aria-haspopup="listbox" aria-expanded="false"
-                                    class="w-full flex items-center justify-between gap-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-left focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow"></button>
+                                    class="w-full flex items-center justify-between gap-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-left focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow"></button>
                                 <ul id="styleList" role="listbox" aria-label="簡報風格"
                                     class="hidden absolute z-30 left-0 right-0 mt-1 max-h-72 overflow-y-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1"></ul>
                             </div>
@@ -1166,13 +262,18 @@
                                 <option
                                     value="瑞士雜誌排版 (淺冷灰底 bg-zinc-100、巨大粗黑字 text-black、國際鮮紅標籤 bg-red-600 text-white、強烈網格對齊)">
                                     瑞士雜誌 (Swiss Editorial)</option>
+
+                                <!-- 自訂四色：實際送出的描述由 getStylePreference() 組成 -->
+                                <option value="__custom__">自訂風格 (Custom)</option>
                             </select>
+                            <div id="customStylePanel"
+                                class="hidden mt-2 p-3 grid grid-cols-4 gap-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950"></div>
                         </div>
                     </div>
 
                     <div class="flex justify-end pt-4">
                         <button id="btnGenerate" onclick="startGeneration()"
-                            class="ripple-btn bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black font-semibold px-6 py-2.5 rounded-lg flex items-center gap-2 transition-all hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:scale-95 disabled:opacity-70 disabled:cursor-wait disabled:hover:translate-y-0">
+                            class="ripple-btn btn-flow text-white font-semibold px-6 py-2.5 rounded-xl flex items-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 disabled:opacity-70 disabled:cursor-wait disabled:hover:translate-y-0">
                             <span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
                             <i id="btnIcon" class="fa-solid fa-wand-magic-sparkles"></i>
                             <span id="btnLabel">生成排版</span>
@@ -1184,7 +285,7 @@
 
             <!-- 載入骨架屏 -->
             <section id="sectionSkeleton" aria-hidden="true"
-                class="hidden mt-6 bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 sm:p-8 shadow-sm">
+                class="hidden mt-6 card-elevated bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-[1.25rem] p-4 sm:p-8">
                 <div class="flex items-center justify-between mb-6 gap-4">
                     <div>
                         <div class="skeleton h-6 w-28 mb-2"></div>
@@ -1201,10 +302,10 @@
 
             <!-- 步驟 2: AI 版面構思審查 -->
             <section id="sectionReview"
-                class="hidden bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 sm:p-8 shadow-sm transition-colors mt-6">
+                class="hidden card-elevated bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-[1.25rem] p-4 sm:p-8 transition-colors mt-6">
                 <div class="flex flex-wrap items-center justify-between mb-6 gap-4">
                     <div class="min-w-0 basis-56 flex-1">
-                        <h2 class="text-xl font-bold mb-1">版面審查</h2>
+                        <h2 class="text-2xl font-bold tracking-tight mb-1">版面審查</h2>
                         <p class="text-sm text-zinc-500 dark:text-zinc-400">確認 R Slide 分配的結構與版型，隨後進入播放模式。</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
@@ -1281,6 +382,16 @@
                         aria-label="全螢幕">
                         <i id="fsIcon" class="fa-solid fa-expand text-[11px]"></i><span class="hidden sm:inline" id="fsLabel">全螢幕</span>
                     </button>
+                    <button id="notesBtn" onclick="toggleNotesPanel()" aria-pressed="false"
+                        class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
+                        aria-label="講者備註" title="顯示 / 隱藏講者備註 (N)">
+                        <i class="fa-regular fa-note-sticky text-[11px]"></i><span class="hidden sm:inline">備註</span>
+                    </button>
+                    <button onclick="openPresenterView()"
+                        class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
+                        aria-label="講者檢視" title="另開視窗顯示目前頁、下一頁、講者備註與計時器 (P)">
+                        <i class="fa-solid fa-person-chalkboard text-[11px]"></i><span class="hidden lg:inline">講者檢視</span>
+                    </button>
                     <button id="editBtn" onclick="toggleEditMode()" aria-pressed="false"
                         class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
                         aria-label="編輯投影片" title="直接修改投影片上的文字、圖片與圖表（不呼叫 AI）">
@@ -1289,17 +400,22 @@
                     <button onclick="insertTextBox()" data-edit-only
                         class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
                         aria-label="插入文字" title="插入可自由移動的文字方塊">
-                        <i class="fa-solid fa-font text-[11px]"></i><span class="hidden xl:inline">插入文字</span>
+                        <i class="fa-solid fa-font text-[11px]"></i><span class="hidden xl:inline">文字</span>
                     </button>
                     <button onclick="pickSlideImage()" data-edit-only
                         class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
                         aria-label="插入圖片" title="插入圖片（也可直接把圖片拖到投影片上）">
-                        <i class="fa-regular fa-image text-[11px]"></i><span class="hidden xl:inline">插入圖片</span>
+                        <i class="fa-regular fa-image text-[11px]"></i><span class="hidden xl:inline">圖片</span>
                     </button>
                     <button onclick="openChartEditor(null)" data-edit-only
                         class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
                         aria-label="插入圖表" title="輸入數據插入圖表">
-                        <i class="fa-solid fa-chart-column text-[11px]"></i><span class="hidden xl:inline">插入圖表</span>
+                        <i class="fa-solid fa-chart-column text-[11px]"></i><span class="hidden xl:inline">圖表</span>
+                    </button>
+                    <button id="iconPickerBtn" onclick="toggleIconPicker()" data-edit-only aria-haspopup="dialog" aria-expanded="false" aria-controls="iconPicker"
+                        class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
+                        aria-label="插入圖示" title="從常用圖示中快速插入（可搜尋關鍵字）">
+                        <i class="fa-solid fa-icons text-[11px]"></i><span class="hidden xl:inline">圖示</span>
                     </button>
                     <input id="slideImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" class="hidden">
                     <button id="regenCurrentBtn" onclick="regenerateCurrentSlide()"
@@ -1323,7 +439,7 @@
                             </button>
                             <button type="button" role="menuitem" data-export="pptx" class="export-item">
                                 <i class="fa-solid fa-file-powerpoint text-orange-500"></i>
-                                <span><b>PowerPoint（PPTX）</b><small>每頁為一張圖片，文字無法再編輯</small></span>
+                                <span><b>PowerPoint（PPTX）</b><small>每頁為一張圖片，文字無法再編輯；講者備註寫入備忘稿</small></span>
                             </button>
                             <button type="button" role="menuitem" data-export="html" class="export-item">
                                 <i class="fa-solid fa-file-code text-sky-500"></i>
@@ -1342,18 +458,64 @@
                     </button>
                 </div>
 
+                <!-- 講者備註 -->
+                <div id="notesPanel" class="hidden w-full max-w-[1024px] mt-4">
+                    <div class="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-3 shadow-sm">
+                        <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-2">
+                            <label for="notesInput" class="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+                                <i class="fa-regular fa-note-sticky mr-1"></i>講者備註<span id="notesPage" class="ml-2 font-mono font-normal text-zinc-400"></span>
+                            </label>
+                            <span class="text-[11px] text-zinc-400">不會顯示在投影片上；會出現在講者檢視與 PPTX 備忘稿</span>
+                        </div>
+                        <textarea id="notesInput" rows="4" spellcheck="false"
+                            class="w-full resize-y bg-transparent text-sm leading-relaxed text-zinc-800 dark:text-zinc-100 placeholder:text-zinc-400 outline-none"
+                            placeholder="此頁尚無講者備註，可直接輸入；重產此頁時 AI 也會一併產生。"></textarea>
+                    </div>
+                </div>
+
                 <!-- 縮圖導航列 -->
                 <div class="w-full max-w-[1024px] mt-6 relative">
                     <div id="thumbnailContainer" class="flex items-center gap-4 overflow-x-auto no-scrollbar py-2 px-1">
                     </div>
                 </div>
                 <p class="text-[11px] text-zinc-400 mt-2 hidden md:block"><i
-                        class="fa-regular fa-keyboard mr-1"></i>快捷鍵：← → 換頁　F 全螢幕　空白鍵 自動播放　Home / End 首尾頁</p>
+                        class="fa-regular fa-keyboard mr-1"></i>快捷鍵：← → 換頁　F 全螢幕　空白鍵 自動播放　Home / End 首尾頁　N 講者備註　P 講者檢視</p>
             </section>
         </main>
         <footer class="w-full py-6 px-6 text-center text-[11px] tracking-wide text-zinc-400 dark:text-zinc-600 select-none">
             <i class="fa-solid fa-chalkboard mr-1"></i>R_Slide　·　<i class="fa-brands fa-github mr-1"></i>Rainless1125/R_Slide
         </footer>
+    </div>
+
+    <!-- 登入 / 註冊（static/app/auth.js） -->
+    <div id="authModal" role="dialog" aria-modal="true" aria-labelledby="authTitle"
+        class="hidden fixed inset-0 z-[100] bg-zinc-100/80 dark:bg-zinc-950/85 backdrop-blur-md p-4 flex items-center justify-center">
+        <form onsubmit="submitAuth(event)" novalidate
+            class="w-full max-w-sm rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-6 sm:p-7">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-9 h-9 bg-black dark:bg-white text-white dark:text-black rounded-md flex items-center justify-center font-black text-lg">R</div>
+                <div>
+                    <h3 id="authTitle" class="text-lg font-bold leading-tight">登入 R Slide</h3>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400">歷史記錄會依帳號分開保存</p>
+                </div>
+            </div>
+            <label for="authUsername" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">帳號</label>
+            <input id="authUsername" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="32"
+                class="mt-1.5 mb-4 w-full h-10 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow">
+            <label for="authPassword" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">密碼</label>
+            <input id="authPassword" type="password" autocomplete="current-password" maxlength="128"
+                class="mt-1.5 w-full h-10 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow">
+            <p id="authHint" class="hidden mt-2 text-[11px] text-zinc-500 dark:text-zinc-400">帳號 2~32 字（文字、數字與 . _ - @），密碼至少 6 個字元</p>
+            <p id="authError" role="alert" class="min-h-[1.25rem] mt-2 text-xs text-red-500"></p>
+            <button id="authSubmit" type="submit"
+                class="mt-2 w-full h-10 rounded-lg bg-black text-white dark:bg-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 text-sm font-semibold disabled:opacity-50 transition-colors">
+                <span id="authSubmitLabel">登入</span>
+            </button>
+            <p id="authSwitch" class="mt-4 text-center text-xs text-zinc-500 dark:text-zinc-400">
+                <span id="authSwitchText">還沒有帳號？</span>
+                <button id="authSwitchBtn" type="button" onclick="toggleAuthMode()" class="font-semibold text-black dark:text-white hover:underline">註冊新帳號</button>
+            </p>
+        </form>
     </div>
 
     <!-- 重產此頁 Modal -->
@@ -1374,7 +536,7 @@
             <div class="mt-4">
                 <label for="regenPromptInput" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">重產提示詞（選填）</label>
                 <textarea id="regenPromptInput" rows="4"
-                    class="mt-1.5 w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow resize-y"
+                    class="mt-1.5 w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow resize-y"
                     placeholder="例如：請改成更商務、重點三點式、減少文字並加上 KPI 資訊卡"></textarea>
             </div>
             <div class="mt-5 flex items-center justify-end gap-2">
@@ -1389,6 +551,24 @@
                 </button>
             </div>
         </div>
+    </div>
+
+    <!-- 插入圖示面板（static/icons.js 的清單，由 media.js 建立格狀按鈕） -->
+    <div id="iconPicker" role="dialog" aria-label="插入圖示"
+        class="hidden fixed z-[80] flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl">
+        <div class="p-2.5 border-b border-zinc-200 dark:border-zinc-800">
+            <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400"></i>
+                <input id="iconSearch" type="search" autocomplete="off" spellcheck="false"
+                    placeholder="搜尋圖示，例如 cash、會議、成長" aria-label="搜尋圖示" aria-describedby="iconCount"
+                    class="w-full h-9 pl-8 pr-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100">
+            </div>
+            <div class="mt-1.5 flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
+                <span id="iconCount" aria-live="polite"></span>
+                <span class="hidden sm:inline">Enter 插入第一個 · Esc 關閉</span>
+            </div>
+        </div>
+        <div id="iconGrid" class="flex-1 min-h-0 overflow-y-auto p-2.5"></div>
     </div>
 
     <!-- 圖表資料 Modal -->
@@ -1425,12 +605,24 @@
                     <label class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">標題（選填）
                         <input id="chartTitle" maxlength="40" class="mt-1 w-full h-9 px-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm text-zinc-900 dark:text-zinc-100">
                     </label>
-                    <label class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">數據
-                        <textarea id="chartData" rows="8" spellcheck="false"
-                            class="mt-1 w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 text-sm font-mono text-zinc-900 dark:text-zinc-100 resize-y"></textarea>
-                    </label>
+                    <div>
+                        <div id="chartDataLabel" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">數據</div>
+                        <div id="chartData" role="group" aria-labelledby="chartDataLabel" class="mt-1"></div>
+                    </div>
                     <p class="text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400 -mt-1">
-                        第一列為「類別, 系列名稱…」，之後每列為「標籤, 數值…」。可直接貼上 Excel 表格（以 Tab 分隔，數字可含千分位）。圓餅 / 環圈圖只使用第一個數值欄。</p>
+                        第一列填系列名稱、第一欄填類別標籤。直接打字輸入，方向鍵 / Tab / Enter 移動，雙擊或 F2 修改；可從 Excel、Google 試算表複製多格後貼上（數字可含千分位）。圓餅 / 環圈圖只使用第一個系列。</p>
+                    <div id="chartRefSection">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">參考線（選填）</span>
+                            <button type="button" id="chartRefAdd" onclick="addChartRefRow()"
+                                class="icon-btn h-6 px-2.5 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
+                                <i class="fa-solid fa-plus text-[10px]"></i>新增參考線
+                            </button>
+                        </div>
+                        <div id="chartRefList" class="mt-1.5 flex flex-col gap-1.5"></div>
+                        <p id="chartRefHint" class="mt-1 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                            以虛線標示目標、規格上下限或門檻，一眼看出哪些資料達標（最多 3 條）。</p>
+                    </div>
                     <label class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">顏色（選填，以逗號分隔的 HEX 色碼）
                         <input id="chartColors" placeholder="#2563eb, #f97316" class="mt-1 w-full h-9 px-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm font-mono text-zinc-900 dark:text-zinc-100">
                     </label>
@@ -1454,2370 +646,19 @@
         </div>
     </div>
 
-    <script src="/static/charts.js?v=1"></script>
-    <script src="/static/export.js?v=5"></script>
-    <script>
-        /* ===================== 主題 ===================== */
-        function initTheme() {
-            if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-        }
-        function toggleTheme() {
-            const html = document.documentElement;
-            if (html.classList.contains('dark')) {
-                html.classList.remove('dark');
-                localStorage.setItem('theme', 'light');
-            } else {
-                html.classList.add('dark');
-                localStorage.setItem('theme', 'dark');
-            }
-            const btn = document.getElementById('themeBtn');
-            btn.classList.remove('theme-pop');
-            void btn.offsetWidth;
-            btn.classList.add('theme-pop');
-        }
-        initTheme();
-
-        /* ===================== 狀態 ===================== */
-        let currentPresentationData = null;
-        let currentSlideIdx = 0;
-        let currentHistoryId = null;
-        let autoplayTimer = null;
-        let loadingTimer = null;
-        let regeneratingSlideIdx = null;
-        let regenerateModalSlideIdx = null;
-        let currentStep = 1;
-
-        /* ===================== 小工具 ===================== */
-        // AI 產生的 HTML 不可信（可能被素材中的提示注入影響）：進入應用前先清理，
-        // 移除 script / 事件屬性 / meta refresh / iframe / 非白名單的外部資源（與匯出共用 sanitizeSlideHtml）
-        function sanitizeSlide(slide) {
-            if (slide && typeof slide.html_content === 'string') slide.html_content = sanitizeSlideHtml(slide.html_content);
-            return slide;
-        }
-        function sanitizePresentation(data) {
-            if (data && Array.isArray(data.slides)) data.slides.forEach(sanitizeSlide);
-            return data;
-        }
-        function esc(s) {
-            return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-        }
-        function pad(n) { return String(n).padStart(2, '0'); }
-        function animateIn(el, cls = 'reveal') {
-            el.classList.remove(cls);
-            void el.offsetWidth;
-            el.classList.add(cls);
-        }
-        function showToast(msg, type = 'info', ms = 3200, action = null) {
-            const root = document.getElementById('toastRoot');
-            const icon = {
-                info: 'fa-circle-info text-sky-400',
-                error: 'fa-triangle-exclamation text-amber-400',
-                success: 'fa-circle-check text-emerald-400'
-            }[type] || 'fa-circle-info';
-            const t = document.createElement('div');
-            t.className = 'toast';
-            t.innerHTML = `<i class="fa-solid ${icon}"></i><span>${esc(msg)}</span>`;
-            const dismiss = () => { t.classList.add('out'); setTimeout(() => t.remove(), 320); };
-            if (action) {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'toast-action';
-                btn.textContent = action.label;
-                btn.onclick = () => { dismiss(); action.onClick(); };
-                t.appendChild(btn);
-            }
-            root.appendChild(t);
-            setTimeout(dismiss, ms);
-        }
-
-        /* ===================== 錯誤訊息白話化 ===================== */
-        // 讀出後端回傳的錯誤字串（FastAPI 的 {"detail": "..."} 或純文字）
-        async function readApiError(res) {
-            let raw = '';
-            try { raw = await res.text(); } catch (_) { }
-            try {
-                const j = JSON.parse(raw);
-                const d = j?.detail;
-                raw = typeof d === 'string' ? d : (d ? JSON.stringify(d) : raw);
-            } catch (_) { }
-            const err = new Error(raw || ('HTTP ' + res.status));
-            err.status = res.status;
-            return err;
-        }
-
-        // 將常見的 LLM / 網路錯誤轉成使用者看得懂的說明
-        function friendlyError(err) {
-            const raw = String(err?.message || err || '');
-            const status = err?.status || 0;
-            const has = re => re.test(raw);
-            let msg;
-            if (err?.name === 'TypeError' && has(/fetch|network/i)) msg = '無法連線到伺服器，請確認網路或服務是否仍在執行。';
-            else if (status === 413) msg = '檔案過大，超過伺服器允許的上傳大小。';
-            else if (has(/未設定\s*(GEMINI|OPENAI)_API_KEY/i)) msg = '尚未設定此平台的 API Key，請改選其他平台，或到 .env 補上金鑰。';
-            else if (status === 401 || status === 403 || has(/api[_ ]?key.*(invalid|not valid|expired)|incorrect api key|unauthorized|permission[_ ]denied|UNAUTHENTICATED/i)) msg = 'API Key 無效或沒有權限，請檢查 .env 內的金鑰。';
-            else if (status === 429 || has(/quota|rate.?limit|RESOURCE_EXHAUSTED|too many requests/i)) msg = 'API 額度已用完或請求過於頻繁，請稍候再試，或換一個模型 / 平台。';
-            else if (has(/timed? ?out|deadline|DEADLINE_EXCEEDED|504/i)) msg = 'AI 回應逾時，請稍後再試，或減少頁數與內容長度。';
-            else if (status === 503 || has(/overloaded|unavailable|UNAVAILABLE|high demand/i)) msg = 'AI 服務目前忙碌中，請稍後再試，或換一個模型。';
-            else if (has(/拒絕回應|safety|blocked|refus/i)) msg = '模型拒絕處理這段內容，請調整素材後再試。';
-            else if (has(/JSON|Unterminated|Expecting|validation|parse/i)) msg = 'AI 回傳的格式有誤，通常重試一次即可。';
-            else if (has(/not.?found|404|model/i) && has(/model/i)) msg = '找不到所選模型，請改選其他模型。';
-            else if (status >= 500 || !raw) msg = '伺服器發生錯誤，請稍後再試。';
-            else msg = raw.length > 80 ? raw.slice(0, 80) + '…' : raw;
-            if (raw) console.error('[R Slide]', raw);
-            return msg;
-        }
-        function fmtTime(ts) {
-            const d = new Date(ts), now = new Date();
-            const hm = pad(d.getHours()) + ':' + pad(d.getMinutes());
-            if (d.toDateString() === now.toDateString()) return '今天 ' + hm;
-            return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + hm;
-        }
-        function isGenerating() { return document.getElementById('btnGenerate').disabled; }
-
-        /* ===================== 歷史記錄（localStorage） ===================== */
-        const HKEY = 'rslide_history_v1';
-        const MAX_HISTORY = 30;
-        let historyItems = loadHistory();
-
-        function loadHistory() {
-            try {
-                const list = JSON.parse(localStorage.getItem(HKEY));
-                return Array.isArray(list) ? list : [];
-            } catch (e) { return []; }
-        }
-        function saveHistory() {
-            historyItems = historyItems.slice(0, MAX_HISTORY);
-            let trimmed = false;
-            while (true) {
-                try {
-                    localStorage.setItem(HKEY, JSON.stringify(historyItems));
-                    if (trimmed) showToast('儲存空間不足，已移除最舊的紀錄', 'info');
-                    return true;
-                } catch (e) {
-                    if (historyItems.length <= 1) { showToast('瀏覽器儲存空間不足，無法儲存紀錄', 'error'); return false; }
-                    historyItems.pop();
-                    trimmed = true;
-                }
-            }
-        }
-
-        function renderHistory(animate = false) {
-            const list = document.getElementById('historyList');
-            const q = document.getElementById('historySearch').value.trim().toLowerCase();
-            document.getElementById('historyCount').textContent = historyItems.length ? `(${historyItems.length})` : '';
-
-            const items = historyItems.filter(h =>
-                !q || (h.title || '').toLowerCase().includes(q) || (h.input?.content || '').toLowerCase().includes(q));
-
-            list.classList.toggle('stagger', animate);
-
-            if (!items.length) {
-                list.innerHTML = `
-          <div class="text-center text-zinc-400 text-xs py-12 px-4 reveal">
-            <i class="fa-regular fa-folder-open text-3xl mb-3 block"></i>
-            ${historyItems.length ? '找不到符合的紀錄' : '還沒有生成紀錄<br>生成的簡報會自動儲存在這裡'}
-          </div>`;
-                return;
-            }
-
-            list.innerHTML = items.map(h => {
-                const active = h.id === currentHistoryId;
-                const style = (h.input?.style_preference || '').split(' (')[0];
-                const pages = h.data?.slides?.length || 0;
-                return `
-          <div data-id="${esc(h.id)}" data-act="open" class="hist-item group spot rounded-xl border p-3 cursor-pointer transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md ${active
-                        ? 'border-black dark:border-white bg-zinc-50 dark:bg-zinc-800 shadow-sm'
-                        : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-600'}">
-            <div class="relative flex items-start gap-2.5">
-              <div class="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-xs ${active ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500'}">
-                <i class="fa-solid fa-display"></i>
-              </div>
-              <div class="min-w-0 flex-1">
-                <div class="text-sm font-semibold truncate" title="${esc(h.title)}">${esc(h.title)}</div>
-                <div class="text-[11px] text-zinc-400 mt-0.5 truncate">${fmtTime(h.createdAt)} · ${pages} 頁${style ? ' · ' + esc(style) : ''}</div>
-              </div>
-              <div class="flex flex-col gap-1 lg:opacity-0 lg:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                <button data-act="rename" class="icon-btn w-6 h-6 rounded-md text-[11px] text-zinc-400 hover:text-blue-500 hover:bg-zinc-100 dark:hover:bg-zinc-700" title="重新命名" aria-label="重新命名"><i class="fa-solid fa-pen"></i></button>
-                <button data-act="delete" class="icon-btn w-6 h-6 rounded-md text-[11px] text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-700" title="刪除" aria-label="刪除"><i class="fa-solid fa-trash"></i></button>
-              </div>
-            </div>
-          </div>`;
-            }).join('');
-        }
-
-        function addHistory(input, data) {
-            const entry = {
-                id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-                createdAt: Date.now(),
-                title: data.presentation_title || '未命名簡報',
-                input,
-                data
-            };
-            historyItems.unshift(entry);
-            currentHistoryId = entry.id;
-            saveHistory();
-            if (!historyItems.some(h => h.id === currentHistoryId)) currentHistoryId = null;
-            renderHistory(true);
-        }
-
-        function getCurrentGenerationInput() {
-            const active = historyItems.find(x => x.id === currentHistoryId);
-            if (active?.input?.content?.trim()) return { ...active.input };
-            return {
-                content: document.getElementById('inputContent').value.trim(),
-                target_audience: document.getElementById('targetAudience').value,
-                num_pages: parseInt(document.getElementById('numPages').value) || (currentPresentationData?.slides?.length || 3),
-                style_preference: document.getElementById('stylePreference').value
-            };
-        }
-
-        function syncCurrentPresentationToHistory() {
-            if (!currentHistoryId || !currentPresentationData) return;
-            const item = historyItems.find(x => x.id === currentHistoryId);
-            if (!item) return;
-            item.data = currentPresentationData;
-            item.title = currentPresentationData.presentation_title || item.title;
-            saveHistory();
-            renderHistory();
-        }
-
-        function openHistory(id) {
-            if (isGenerating()) { showToast('正在生成中，請稍候', 'info'); return; }
-            const h = historyItems.find(x => x.id === id);
-            if (!h || !h.data || !Array.isArray(h.data.slides)) { showToast('此紀錄資料已損毀', 'error'); return; }
-            stopAutoplay();
-            currentHistoryId = id;
-            currentPresentationData = sanitizePresentation(h.data);
-            currentSlideIdx = 0;
-            resetUndo();
-
-            document.getElementById('inputContent').value = h.input?.content || '';
-            document.getElementById('targetAudience').value = h.input?.target_audience || '';
-            if (h.input?.num_pages != null) document.getElementById('numPages').value = String(h.input.num_pages);
-            if (h.input?.style_preference) document.getElementById('stylePreference').value = h.input.style_preference;
-            updateCount();
-            syncStyleCards();
-
-            renderHistory();
-            confirmAndPlay();
-            if (window.innerWidth < 1024) setSidebar(false);
-            showToast('已切換至「' + h.title + '」', 'success', 1800);
-        }
-
-        function renameHistory(id) {
-            const h = historyItems.find(x => x.id === id);
-            if (!h) return;
-            const name = prompt('重新命名', h.title);
-            if (name === null) return;
-            const t = name.trim();
-            if (!t) return;
-            h.title = t;
-            saveHistory();
-            renderHistory();
-        }
-
-        function deleteHistory(id, el) {
-            const finish = () => {
-                historyItems = historyItems.filter(x => x.id !== id);
-                saveHistory();
-                if (id === currentHistoryId) { currentHistoryId = null; resetWorkspace(false); }
-                renderHistory();
-            };
-            if (el) { el.classList.add('hist-out'); setTimeout(finish, 330); } else finish();
-        }
-
-        function clearHistory() {
-            if (!historyItems.length) { showToast('目前沒有歷史記錄', 'info', 1800); return; }
-            if (!confirm('確定要清除所有歷史記錄嗎？此動作無法復原。')) return;
-            historyItems = [];
-            saveHistory();
-            if (currentHistoryId) { currentHistoryId = null; }
-            renderHistory();
-            showToast('已清除所有歷史記錄', 'success', 1800);
-        }
-
-        document.getElementById('historyList').addEventListener('click', e => {
-            const item = e.target.closest('.hist-item');
-            if (!item) return;
-            const id = item.dataset.id;
-            const actEl = e.target.closest('[data-act]');
-            const act = actEl ? actEl.dataset.act : 'open';
-            if (act === 'rename') { e.stopPropagation(); renameHistory(id); }
-            else if (act === 'delete') { e.stopPropagation(); deleteHistory(id, item); }
-            else openHistory(id);
-        });
-        document.getElementById('historySearch').addEventListener('input', () => renderHistory());
-
-        /* ----- 新增簡報 / 重置 ----- */
-        function resetWorkspace(clearFields = true) {
-            stopAutoplay();
-            if (document.fullscreenElement) document.exitFullscreen();
-            currentPresentationData = null;
-            currentSlideIdx = 0;
-            resetUndo();
-            document.getElementById('sectionReview').classList.add('hidden');
-            document.getElementById('sectionPlayer').classList.add('hidden');
-            if (clearFields) clearInput();
-            setStep(1);
-        }
-        function newPresentation() {
-            if (isGenerating()) { showToast('正在生成中，請稍候', 'info'); return; }
-            currentHistoryId = null;
-            resetWorkspace(true);
-            renderHistory();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            const sec = document.getElementById('sectionInput');
-            animateIn(sec);
-            document.getElementById('inputContent').focus({ preventScroll: true });
-            if (window.innerWidth < 1024) setSidebar(false);
-        }
-
-        /* ----- 側邊欄開關 ----- */
-        function setSidebar(open) {
-            document.body.classList.toggle('sb-open', open);
-            document.getElementById('sbIcon').className = open && window.innerWidth < 1024 ? 'fa-solid fa-xmark' : 'fa-solid fa-bars';
-            if (window.innerWidth >= 1024) {
-                try { localStorage.setItem('rslide_sb', open ? '1' : '0'); } catch (e) { }
-            }
-        }
-        function toggleSidebar() { setSidebar(!document.body.classList.contains('sb-open')); }
-        (function initSidebar() {
-            let saved = null;
-            try { saved = localStorage.getItem('rslide_sb'); } catch (e) { }
-            setSidebar(window.innerWidth >= 1024 ? saved !== '0' : false);
-        })();
-
-        /* ===================== 範例與輸入互動 ===================== */
-        const SAMPLES = [
-            { text: "我們推出全新智慧手錶 Nova X：續航 7 天、支援血氧與睡眠分析、內建 AI 健康助理。目標是讓日常健康管理更簡單，預計下季開賣，首批限量 5,000 支。", audience: "科技愛好者與一般消費者" },
-            { text: "第三季專案進度：核心功能完成 85%，使用者測試回饋正面，主要風險為第三方 API 延遲。下一步將優化效能並於 11 月底上線，需追加兩名後端人力。", audience: "公司主管與跨部門團隊" },
-            { text: "什麼是機器學習？機器學習讓電腦從資料中找出規律而非手寫規則。常見類型有監督式、非監督式與強化學習，應用包含推薦系統、影像辨識與語音助理。", audience: "入門學習者" }
-        ];
-        function fillSample(i) {
-            const ta = document.getElementById('inputContent');
-            ta.value = SAMPLES[i].text;
-            document.getElementById('targetAudience').value = SAMPLES[i].audience;
-            updateCount();
-            ta.focus();
-            showToast('已填入範例內容', 'success', 1800);
-        }
-        function clearInput() {
-            document.getElementById('inputContent').value = '';
-            document.getElementById('targetAudience').value = '';
-            updateCount();
-            try { localStorage.removeItem(DRAFT_KEY); } catch (e) { }
-        }
-        function updateCount() {
-            const ta = document.getElementById('inputContent');
-            const c = document.getElementById('charCount');
-            c.textContent = ta.value.length + ' 字';
-            c.classList.toggle('text-emerald-500', ta.value.length > 20);
-        }
-        document.getElementById('inputContent').addEventListener('input', updateCount);
-        document.getElementById('inputContent').addEventListener('keydown', e => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') startGeneration();
-        });
-
-        /* ===================== 檔案匯入（PDF / DOCX / Markdown / TXT） ===================== */
-        const IMPORT_EXTS = ['.pdf', '.docx', '.md', '.markdown', '.txt'];
-        const IMPORT_MAX_BYTES = 10 * 1024 * 1024;
-        let importing = false;
-
-        function setImporting(on, name = '') {
-            importing = on;
-            document.getElementById('inputDropZone').classList.toggle('importing', on);
-            document.getElementById('inputContent').readOnly = on;
-            document.getElementById('importBtn').disabled = on;
-            document.getElementById('importIcon').className = (on ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-file-arrow-up') + ' mr-1';
-            document.getElementById('importLabel').textContent = on ? '匯入中…' : '上傳檔案';
-            document.getElementById('dropOverlayIcon').className = (on ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-file-arrow-up') + ' text-2xl';
-            document.getElementById('dropOverlayLabel').textContent = on ? `正在讀取 ${name}…` : '放開以匯入檔案';
-        }
-
-        async function importFile(file) {
-            if (!file || importing) return;
-            if (isGenerating()) { showToast('生成中，請稍候再匯入檔案', 'info'); return; }
-            const ext = (file.name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
-            if (!IMPORT_EXTS.includes(ext)) { showToast('不支援的檔案格式，目前支援 PDF、DOCX、Markdown、TXT', 'error', 5000); return; }
-            if (file.size > IMPORT_MAX_BYTES) { showToast('檔案過大（上限 10 MB）', 'error', 5000); return; }
-
-            setImporting(true, file.name);
-            try {
-                const form = new FormData();
-                form.append('file', file);
-                const res = await fetch('/api/extract', { method: 'POST', body: form });
-                if (!res.ok) throw await readApiError(res);
-                applyImportedText(await res.json());
-            } catch (err) {
-                showToast(friendlyError(err), 'error', 6000);
-            } finally {
-                setImporting(false);
-            }
-        }
-
-        // 以匯入內容取代輸入框；原本有內容時提供「復原」
-        function applyImportedText(data) {
-            const ta = document.getElementById('inputContent');
-            const prev = ta.value;
-            ta.value = data.text;
-            updateCount();
-            saveDraft();
-            ta.scrollTop = 0;
-            const meta = [data.pages ? `${data.pages} 頁` : '', `${data.text.length.toLocaleString()} 字`].filter(Boolean).join('，');
-            const undoAction = prev.trim() ? {
-                label: '復原', onClick: () => { ta.value = prev; updateCount(); saveDraft(); }
-            } : null;
-            showToast(`已匯入 ${data.filename}（${meta}）`, 'success', undoAction ? 6000 : 2600, undoAction);
-            if (data.truncated) {
-                showToast(`原文共 ${data.chars.toLocaleString()} 字，超過上限，已截斷至前 ${data.text.length.toLocaleString()} 字`, 'info', 7000);
-            }
-        }
-
-        (function initFileImport() {
-            const zone = document.getElementById('inputDropZone');
-            const input = document.getElementById('fileInput');
-            const hasFiles = e => [...(e.dataTransfer?.types || [])].includes('Files');
-            let dragDepth = 0;
-
-            input.addEventListener('change', () => {
-                importFile(input.files[0]);
-                input.value = ''; // 允許重複選同一個檔案
-            });
-            zone.addEventListener('dragenter', e => {
-                if (!hasFiles(e)) return;
-                e.preventDefault();
-                dragDepth++;
-                zone.classList.add('dragging');
-            });
-            zone.addEventListener('dragover', e => {
-                if (!hasFiles(e)) return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = importing ? 'none' : 'copy';
-            });
-            zone.addEventListener('dragleave', e => {
-                if (!hasFiles(e)) return;
-                if (--dragDepth <= 0) { dragDepth = 0; zone.classList.remove('dragging'); }
-            });
-            zone.addEventListener('drop', e => {
-                if (!hasFiles(e)) return;
-                e.preventDefault();
-                dragDepth = 0;
-                zone.classList.remove('dragging');
-                const files = e.dataTransfer.files;
-                if (files.length > 1) showToast('一次只能匯入一個檔案，已匯入第一個', 'info', 3000);
-                importFile(files[0]);
-            });
-            // 從檔案總管複製後在輸入框貼上
-            document.getElementById('inputContent').addEventListener('paste', e => {
-                const file = e.clipboardData?.files?.[0];
-                if (!file) return;
-                e.preventDefault();
-                importFile(file);
-            });
-            // 檔案若誤放在輸入框以外，避免瀏覽器直接開啟檔案而離開頁面
-            window.addEventListener('dragover', e => { if (hasFiles(e)) e.preventDefault(); });
-            window.addEventListener('drop', e => { if (hasFiles(e)) e.preventDefault(); });
-        })();
-
-        /* ===================== 輸入區：受眾快選 / 風格卡片 / 草稿自動儲存 ===================== */
-        const AUDIENCE_PRESETS = ['公司主管', '客戶 / 投資人', '技術團隊', '學生 / 入門學習者', '一般大眾'];
-        (function initAudienceChips() {
-            const box = document.getElementById('audienceChips');
-            const input = document.getElementById('targetAudience');
-            AUDIENCE_PRESETS.forEach(name => {
-                const b = document.createElement('button');
-                b.type = 'button';
-                b.textContent = name;
-                b.className = 'chip text-[11px] px-2.5 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800';
-                b.onclick = () => { input.value = name; input.dispatchEvent(new Event('input')); };
-                box.appendChild(b);
-            });
-        })();
-
-        // 依選項順序對應的示意配色：[底色, 色塊1, 色塊2, 色塊3]
-        const STYLE_SWATCHES = [
-            ['#ffffff', '#18181b', '#d4d4d8', '#a1a1aa'],
-            ['#020617', '#ffffff', '#22d3ee', '#3b82f6'],
-            ['#f8fafc', '#1e3a8a', '#3b82f6', '#94a3b8'],
-            ['#fffbeb', '#facc15', '#f472b6', '#fb923c'],
-            ['#f5f5f4', '#3f6212', '#78350f', '#a8a29e'],
-            ['#fef3c7', '#000000', '#f472b6', '#38bdf8'],
-            ['#09090b', '#e879f9', '#67e8f9', '#a855f7'],
-            ['#0a0a0a', '#fcd34d', '#d97706', '#737373'],
-            ['#ecfdf5', '#022c22', '#059669', '#6ee7b7'],
-            ['#f4f4f5', '#000000', '#dc2626', '#a1a1aa']
-        ];
-        // 文字後方顯示示意色塊（底色 + 三個強調色）
-        function swatchHtml(i) {
-            const [bg, a, b, c] = STYLE_SWATCHES[i] || ['#fff', '#000', '#888', '#bbb'];
-            const dot = col => `<span class="inline-block w-3 h-3 rounded-full border border-black/15 dark:border-white/25" style="background:${col}"></span>`;
-            return `<span class="inline-flex items-center gap-1 shrink-0" aria-hidden="true">${dot(bg)}${dot(a)}${dot(b)}${dot(c)}</span>`;
-        }
-        function styleLabel(opt) { return opt.textContent.replace(/\s+/g, ' ').trim(); }
-        function initStyleCards() {
-            const sel = document.getElementById('stylePreference');
-            const list = document.getElementById('styleList');
-            const btn = document.getElementById('styleBtn');
-            const setOpen = open => {
-                list.classList.toggle('hidden', !open);
-                btn.setAttribute('aria-expanded', String(open));
-                if (open) list.querySelector('[aria-selected=true]')?.scrollIntoView({ block: 'nearest' });
-            };
-            [...sel.options].forEach((opt, i) => {
-                const li = document.createElement('li');
-                li.setAttribute('role', 'option');
-                li.dataset.value = opt.value;
-                li.className = 'flex items-center justify-between gap-3 px-4 py-2 text-sm cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 aria-selected:font-bold aria-selected:bg-zinc-100 dark:aria-selected:bg-zinc-800';
-                li.innerHTML = `<span class="truncate">${esc(styleLabel(opt))}</span>${swatchHtml(i)}`;
-                li.onclick = () => { sel.value = opt.value; syncStyleCards(); setOpen(false); saveDraft(); btn.focus(); };
-                list.appendChild(li);
-            });
-            btn.onclick = () => setOpen(list.classList.contains('hidden'));
-            document.addEventListener('click', e => { if (!e.target.closest('#styleDropdown')) setOpen(false); });
-            document.getElementById('styleDropdown').addEventListener('keydown', e => {
-                if (e.key === 'Escape') { setOpen(false); btn.focus(); return; }
-                if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-                e.preventDefault();
-                const n = sel.options.length;
-                sel.selectedIndex = (sel.selectedIndex + (e.key === 'ArrowDown' ? 1 : n - 1)) % n;
-                syncStyleCards(); saveDraft();
-                setOpen(true);
-            });
-            syncStyleCards();
-        }
-        function syncStyleCards() {
-            const sel = document.getElementById('stylePreference');
-            const i = sel.selectedIndex;
-            document.getElementById('styleBtn').innerHTML =
-                `<span class="truncate">${esc(styleLabel(sel.options[i]))}</span><span class="flex items-center gap-2 shrink-0">${swatchHtml(i)}<i class="fa-solid fa-chevron-down text-[10px] text-zinc-400"></i></span>`;
-            document.querySelectorAll('#styleList [role=option]').forEach(li => li.setAttribute('aria-selected', String(li.dataset.value === sel.value)));
-        }
-
-        const DRAFT_KEY = 'rslide_draft';
-        let draftTimer = null;
-        function saveDraft() {
-            clearTimeout(draftTimer);
-            draftTimer = setTimeout(() => {
-                try {
-                    const content = document.getElementById('inputContent').value;
-                    if (!content.trim()) { localStorage.removeItem(DRAFT_KEY); return; }
-                    localStorage.setItem(DRAFT_KEY, JSON.stringify({
-                        content,
-                        audience: document.getElementById('targetAudience').value,
-                        pages: document.getElementById('numPages').value,
-                        style: document.getElementById('stylePreference').value
-                    }));
-                } catch (e) { }
-            }, 400);
-        }
-        function restoreDraft() {
-            let d = null;
-            try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (e) { }
-            if (!d || !d.content) return;
-            document.getElementById('inputContent').value = d.content;
-            document.getElementById('targetAudience').value = d.audience || '';
-            if (d.pages != null) document.getElementById('numPages').value = d.pages;
-            if (d.style) document.getElementById('stylePreference').value = d.style;
-            updateCount();
-            syncStyleCards();
-            showToast('已還原上次未送出的草稿', 'info', 2400);
-        }
-        ['inputContent', 'targetAudience'].forEach(id => document.getElementById(id).addEventListener('input', saveDraft));
-        ['numPages', 'stylePreference'].forEach(id => document.getElementById(id).addEventListener('change', saveDraft));
-        initStyleCards();
-
-        /* ===================== 步驟條 ===================== */
-        function setStep(n) {
-            currentStep = n;
-            if (n !== 3) toggleEditMode(false);
-            for (let i = 1; i <= 3; i++) {
-                const el = document.getElementById('stepTag' + i);
-                const active = i === n;
-                const done = i < n;
-                el.className = 'transition-all duration-300 ' + (active
-                    ? 'text-black dark:text-white scale-110'
-                    : done ? 'text-zinc-600 dark:text-zinc-300 hover:text-black dark:hover:text-white' : 'text-zinc-400 dark:text-zinc-600');
-            }
-            document.getElementById('stepLine1').style.width = n >= 2 ? '100%' : '0%';
-            document.getElementById('stepLine2').style.width = n >= 3 ? '100%' : '0%';
-        }
-        function goStep(n) {
-            if (n === 1) {
-                stopAutoplay();
-                document.getElementById('sectionPlayer').classList.add('hidden');
-                document.getElementById('sectionReview').classList.toggle('hidden', !currentPresentationData);
-                setStep(1);
-                document.getElementById('sectionInput').scrollIntoView({ behavior: 'smooth' });
-                return;
-            }
-            if (!currentPresentationData) { showToast('請先生成簡報內容', 'info'); return; }
-            if (n === 2) backToReview(); else confirmAndPlay();
-        }
-
-        /* ===================== 生成 ===================== */
-        // 骨架屏：卡片結構與「版面審查」一致（縮圖 + 標題 + 版型 + 兩顆按鈕 + 操作列）
-        function buildSkeletonCards() {
-            const n = parseInt(document.getElementById('numPages').value) || 6; // 0 = 由 AI 決定
-            const card = `
-          <div class="p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 rounded-xl flex flex-col gap-3">
-            <div class="skeleton w-full rounded-xl" style="aspect-ratio:16/9"></div>
-            <div class="px-1">
-              <div class="flex items-center gap-2 mb-2"><div class="skeleton h-5 w-8"></div><div class="skeleton h-4 flex-1"></div></div>
-              <div class="skeleton h-3 w-3/4"></div>
-            </div>
-            <div class="flex items-center gap-2 px-1"><div class="skeleton h-8 flex-1 rounded-full"></div><div class="skeleton h-8 flex-1 rounded-full"></div></div>
-            <div class="flex items-center justify-between px-1 pb-1"><div class="skeleton h-6 w-6 rounded-full"></div><div class="skeleton h-6 w-6 rounded-full"></div><div class="skeleton h-6 w-14 rounded-full"></div><div class="skeleton h-6 w-14 rounded-full"></div></div>
-          </div>`;
-            document.getElementById('skeletonGrid').innerHTML = card.repeat(Math.min(Math.max(n, 1), 6));
-        }
-        const LOADING_MSGS = ['分析內容中…', '規劃版面結構…', 'AI 動態配色中…', '生成排版中…'];
-        function setLoading(on) {
-            const btn = document.getElementById('btnGenerate');
-            const spinner = document.getElementById('loadingSpinner');
-            const icon = document.getElementById('btnIcon');
-            const label = document.getElementById('btnLabel');
-            const skel = document.getElementById('sectionSkeleton');
-            btn.disabled = on;
-            spinner.classList.toggle('hidden', !on);
-            icon.classList.toggle('hidden', on);
-            clearInterval(loadingTimer);
-            if (on) {
-                let i = 0;
-                label.textContent = LOADING_MSGS[0];
-                loadingTimer = setInterval(() => { i = (i + 1) % LOADING_MSGS.length; label.textContent = LOADING_MSGS[i]; }, 1800);
-                document.getElementById('sectionReview').classList.add('hidden');
-                document.getElementById('sectionPlayer').classList.add('hidden');
-                buildSkeletonCards();
-                skel.classList.remove('hidden');
-                animateIn(skel);
-                skel.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            } else {
-                label.textContent = '生成排版';
-                skel.classList.add('hidden');
-            }
-        }
-
-        let modelCatalog = {
-            gemini: { models: ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.5-pro'] },
-            openai: { models: ['gpt-4.1-mini', 'gpt-4.1', 'gpt-4o-mini', 'gpt-4o'] }
-        };
-
-        function populateModels(preferred) {
-            const provider = document.getElementById('providerSelect').value;
-            const sel = document.getElementById('modelSelect');
-            const models = modelCatalog[provider]?.models || [];
-            sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
-            if (preferred && models.includes(preferred)) sel.value = preferred;
-        }
-
-        function saveModelPref() {
-            try {
-                localStorage.setItem('rslide_llm', JSON.stringify({
-                    provider: document.getElementById('providerSelect').value,
-                    model: document.getElementById('modelSelect').value
-                }));
-            } catch (e) { }
-        }
-
-        function getLlmChoice() {
-            return {
-                provider: document.getElementById('providerSelect').value,
-                model: document.getElementById('modelSelect').value
-            };
-        }
-
-        /* ---------- 模型選單（樣式與「簡報風格」一致，附廠商圖示） ---------- */
-        // 圖示路徑取自 simple-icons（CC0）
-        const PROVIDER_META = {
-            gemini: {
-                name: 'Google Gemini',
-                path: 'M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81',
-                gradient: ['#4796e3', '#9177c7', '#ca6673']
-            },
-            openai: {
-                name: 'OpenAI',
-                path: 'M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z'
-            }
-        };
-        let providerIconSeq = 0;
-        function providerIcon(provider, cls = 'w-4 h-4') {
-            const meta = PROVIDER_META[provider];
-            if (!meta) return '<i class="fa-solid fa-microchip"></i>';
-            // 漸層 id 每個圖示各自獨立：若引用到隱藏清單內的同名漸層，Chrome 會畫不出來
-            const id = 'pg' + (++providerIconSeq);
-            const fill = meta.gradient ? `url(#${id})` : 'currentColor';
-            const defs = meta.gradient ? `<defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1">${meta.gradient.map((c, i) => `<stop offset="${i / (meta.gradient.length - 1)}" stop-color="${c}"/>`).join('')}</linearGradient></defs>` : '';
-            return `<svg class="${cls} shrink-0" viewBox="0 0 24 24" aria-hidden="true">${defs}<path fill="${fill}" d="${meta.path}"/></svg>`;
-        }
-
-        function modelOptions() {
-            return [...document.getElementById('providerSelect').options].flatMap(opt =>
-                (modelCatalog[opt.value]?.models || []).map(model => ({ provider: opt.value, model, disabled: opt.disabled })));
-        }
-
-        function selectModel(provider, model) {
-            document.getElementById('providerSelect').value = provider;
-            populateModels(model);
-            saveModelPref();
-            renderModelPicker();
-        }
-
-        function renderModelPicker() {
-            const provider = document.getElementById('providerSelect').value;
-            const model = document.getElementById('modelSelect').value;
-            document.getElementById('modelBtn').innerHTML =
-                `${providerIcon(provider)}<span class="font-medium truncate max-w-[11rem]">${esc(model || '選擇模型')}</span><i class="fa-solid fa-chevron-down text-[10px] text-zinc-400"></i>`;
-            document.getElementById('modelBtn').title = `${PROVIDER_META[provider]?.name || provider} · ${model}`;
-            document.getElementById('modelList').innerHTML = [...document.getElementById('providerSelect').options].map(opt => {
-                const p = opt.value;
-                const header = `<li role="presentation" class="flex items-center gap-2 px-4 pt-2.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                    ${providerIcon(p, 'w-3.5 h-3.5')}<span>${esc(PROVIDER_META[p]?.name || p)}</span>
-                    ${opt.disabled ? '<span class="ml-auto normal-case tracking-normal font-medium text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800">未設定金鑰</span>' : ''}</li>`;
-                const items = (modelCatalog[p]?.models || []).map(m => {
-                    const selected = p === provider && m === model;
-                    return `<li role="option" data-provider="${esc(p)}" data-model="${esc(m)}" aria-selected="${selected}" aria-disabled="${opt.disabled}"
-                        class="flex items-center justify-between gap-3 pl-10 pr-4 py-2 text-sm cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 aria-selected:font-bold aria-selected:bg-zinc-100 dark:aria-selected:bg-zinc-800 aria-disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:hover:bg-transparent">
-                        <span class="truncate">${esc(m)}</span>${selected ? '<i class="fa-solid fa-check text-xs"></i>' : ''}</li>`;
-                }).join('');
-                return header + items;
-            }).join('');
-        }
-
-        (function initModelPicker() {
-            const wrap = document.getElementById('modelDropdown');
-            const btn = document.getElementById('modelBtn');
-            const list = document.getElementById('modelList');
-            const setOpen = open => {
-                list.classList.toggle('hidden', !open);
-                btn.setAttribute('aria-expanded', String(open));
-                if (!open) return;
-                // 窄螢幕時按鈕會換行到左側，選單改為靠左對齊以免超出畫面
-                const alignLeft = btn.getBoundingClientRect().right < list.offsetWidth + 16;
-                list.classList.toggle('left-0', alignLeft);
-                list.classList.toggle('right-0', !alignLeft);
-                list.querySelector('[aria-selected=true]')?.scrollIntoView({ block: 'nearest' });
-            };
-            btn.onclick = () => setOpen(list.classList.contains('hidden'));
-            list.addEventListener('click', e => {
-                const li = e.target.closest('[role=option]');
-                if (!li || li.getAttribute('aria-disabled') === 'true') return;
-                selectModel(li.dataset.provider, li.dataset.model);
-                setOpen(false);
-                btn.focus();
-            });
-            document.addEventListener('click', e => { if (!e.target.closest('#modelDropdown')) setOpen(false); });
-            wrap.addEventListener('keydown', e => {
-                if (e.key === 'Escape') { setOpen(false); btn.focus(); return; }
-                if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-                e.preventDefault();
-                const opts = modelOptions().filter(o => !o.disabled);
-                if (!opts.length) return;
-                const cur = getLlmChoice();
-                const i = opts.findIndex(o => o.provider === cur.provider && o.model === cur.model);
-                const step = e.key === 'ArrowDown' ? 1 : opts.length - 1;
-                const next = i < 0 ? opts[e.key === 'ArrowDown' ? 0 : opts.length - 1] : opts[(i + step) % opts.length];
-                selectModel(next.provider, next.model);
-                setOpen(true);
-            });
-        })();
-
-        async function initModelSelectors() {
-            try {
-                const res = await fetch('/api/models');
-                if (res.ok) {
-                    const data = await res.json();
-                    for (const k of Object.keys(data)) modelCatalog[k] = data[k];
-                    const providerSel = document.getElementById('providerSelect');
-                    for (const opt of providerSel.options) {
-                        if (data[opt.value] && !data[opt.value].available) opt.disabled = true;
-                    }
-                }
-            } catch (e) { }
-            let saved = {};
-            try { saved = JSON.parse(localStorage.getItem('rslide_llm') || '{}'); } catch (e) { }
-            const providerSel = document.getElementById('providerSelect');
-            const opt = [...providerSel.options].find(o => o.value === saved.provider && !o.disabled);
-            providerSel.value = opt ? opt.value : ([...providerSel.options].find(o => !o.disabled)?.value || 'gemini');
-            populateModels(saved.model);
-            renderModelPicker();
-        }
-        initModelSelectors();
-
-        async function startGeneration() {
-            const ta = document.getElementById('inputContent');
-            const content = ta.value.trim();
-            const targetAudience = document.getElementById('targetAudience').value;
-            const numPages = parseInt(document.getElementById('numPages').value);
-            const stylePreference = document.getElementById('stylePreference').value; // 讀取選擇的風格
-
-            if (importing) { showToast('檔案匯入中，請稍候', 'info'); return; }
-            if (!content) {
-                ta.classList.remove('shake'); void ta.offsetWidth; ta.classList.add('shake');
-                ta.focus();
-                showToast('請輸入內容！', 'error');
-                return;
-            }
-            if (isGenerating()) return;
-
-            burstFromButton(true);
-            setLoading(true);
-
-            try {
-                const res = await fetch('/api/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        content,
-                        target_audience: targetAudience,
-                        num_pages: numPages,
-                        style_preference: stylePreference,
-                        ...getLlmChoice()
-                    })
-                });
-
-                if (!res.ok) throw await readApiError(res);
-                const data = sanitizePresentation(await res.json());
-                await bakeSlideCharts(data.slides);
-                currentPresentationData = data;
-                currentSlideIdx = 0;
-                resetUndo();
-                setLoading(false);
-                addHistory({ content, target_audience: targetAudience, num_pages: numPages, style_preference: stylePreference }, data);
-                renderReviewSection();
-                burstFromButton(false);
-                showToast('版面生成完成，已存入歷史記錄', 'success', 2200);
-            } catch (err) {
-                setLoading(false);
-                showToast(friendlyError(err), 'error', 8000, { label: '重試', onClick: startGeneration });
-            }
-        }
-
-        function renderReviewSection(quiet = false) {
-            const review = document.getElementById('sectionReview');
-            review.classList.remove('hidden');
-            document.getElementById('sectionPlayer').classList.add('hidden');
-            if (!quiet) animateIn(review);
-            setStep(2);
-
-            const container = document.getElementById('reviewContainer');
-            container.innerHTML = '';
-
-            currentPresentationData.slides.forEach((slide, idx) => {
-                const card = document.createElement('div');
-                card.className = "rv-card spot p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 rounded-xl flex flex-col gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-600";
-                card.innerHTML = `
-          <div class="rv-thumb" role="button" tabindex="0" onclick="previewSingleSlide(${idx})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();previewSingleSlide(${idx})}" aria-label="預覽第 ${idx + 1} 頁：${esc(slide.slide_title)}" title="點擊放大預覽">
-            <div class="slide-scaler">${slide.html_content}</div>
-          </div>
-          <div class="relative min-w-0 px-1">
-            <div class="flex items-center gap-2 mb-1">
-              <span class="drag-handle text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 px-0.5" draggable="true" title="拖曳調整頁序" aria-hidden="true"
-                ondragstart="onSlideDragStart(event, ${idx})" ondragend="onSlideDragEnd()"><i class="fa-solid fa-grip-vertical text-[11px]"></i></span>
-              <span class="text-xs font-mono bg-zinc-200 dark:bg-zinc-800 px-2 py-0.5 rounded text-zinc-600 dark:text-zinc-300">${pad(idx + 1)}</span>
-              <span class="slide-title-edit font-bold text-sm truncate min-w-0 flex-1" contenteditable="plaintext-only" spellcheck="false" title="點擊可修改標題"
-                onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}else if(event.key==='Escape'){this.textContent=currentPresentationData.slides[${idx}].slide_title;this.blur()}"
-                onblur="commitSlideTitle(${idx}, this)">${esc(slide.slide_title)}</span>
-            </div>
-            <div class="text-xs text-zinc-500 dark:text-zinc-400 flex items-center gap-1 min-w-0">
-              <span class="inline-block w-2 h-2 shrink-0 rounded-full bg-green-500 pulse-dot"></span>
-              <span class="truncate" title="${esc(slide.layout_concept)}">${esc(slide.layout_concept)}</span>
-            </div>
-          </div>
-          <div class="flex items-center gap-2 px-1 pb-1">
-            <button onclick="previewSingleSlide(${idx})" class="icon-btn flex-1 justify-center text-xs px-3 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-semibold flex items-center gap-1.5 whitespace-nowrap">
-              <i class="fa-regular fa-eye text-[10px]"></i>
-              <span>預覽</span>
-            </button>
-            <button id="regenSlideBtn-${idx}" onclick="openRegenerateModal(${idx})" class="icon-btn flex-1 justify-center text-xs px-3 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-semibold flex items-center gap-1.5 whitespace-nowrap">
-              <i id="regenSlideIcon-${idx}" class="fa-solid fa-arrows-rotate text-[10px]"></i>
-              <span id="regenSlideLabel-${idx}">重產此頁</span>
-            </button>
-          </div>
-          <div class="flex items-center justify-between gap-1 px-1 pb-1 text-zinc-500 dark:text-zinc-400">
-            <button onclick="moveSlide(${idx}, ${idx - 1})" ${idx === 0 ? 'disabled' : ''} class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center" title="前移" aria-label="前移"><i class="fa-solid fa-arrow-left text-[11px]"></i></button>
-            <button onclick="moveSlide(${idx}, ${idx + 1})" ${idx === currentPresentationData.slides.length - 1 ? 'disabled' : ''} class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center" title="後移" aria-label="後移"><i class="fa-solid fa-arrow-right text-[11px]"></i></button>
-            <button onclick="duplicateSlide(${idx})" class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5" title="複製此頁" aria-label="複製此頁"><i class="fa-regular fa-clone text-[11px]"></i><span>複製</span></button>
-            <button onclick="deleteSlide(${idx})" ${currentPresentationData.slides.length <= 1 ? 'disabled' : ''} class="icon-btn h-8 px-3 rounded-full hover:bg-red-50 hover:text-red-500 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed text-xs font-semibold flex items-center gap-1.5" title="刪除此頁" aria-label="刪除此頁"><i class="fa-regular fa-trash-can text-[11px]"></i><span>刪除</span></button>
-          </div>
-        `;
-                card.dataset.idx = idx;
-                card.addEventListener('dragover', e => { if (dragSlideIdx !== null) { e.preventDefault(); card.classList.add('drag-over'); } });
-                card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
-                card.addEventListener('drop', e => {
-                    e.preventDefault();
-                    card.classList.remove('drag-over');
-                    if (dragSlideIdx !== null) moveSlide(dragSlideIdx, idx);
-                });
-                container.appendChild(card);
-            });
-            fitReviewThumbs();
-            if (regeneratingSlideIdx !== null) setReviewRegenerateState(regeneratingSlideIdx, true);
-
-            if (!quiet) review.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        // 縮圖寬度不固定（隨視窗變動），依容器寬度等比縮放 1024px 的投影片
-        // Tailwind CDN 會在元素插入「之後」才產生 class 樣式，建立當下量到的寬度可能不對，
-        // 因此用 ResizeObserver 監看每個縮圖，寬度一變就重算縮放。
-        const thumbFitRO = new ResizeObserver(entries => {
-            entries.forEach(({ target: box }) => {
-                const scaler = box.querySelector('.slide-scaler');
-                if (scaler && box.clientWidth) scaler.style.transform = `scale(${box.clientWidth / 1024})`;
-            });
-        });
-        function fitReviewThumbs() {
-            document.querySelectorAll('#reviewContainer .rv-thumb').forEach(box => thumbFitRO.observe(box));
-        }
-
-        function previewSingleSlide(idx) {
-            currentSlideIdx = idx;
-            confirmAndPlay();
-        }
-
-        function confirmAndPlay() {
-            const player = document.getElementById('sectionPlayer');
-            player.classList.remove('hidden');
-            document.getElementById('sectionReview').classList.add('hidden');
-            animateIn(player);
-            setStep(3);
-
-            document.getElementById('presentationTitleDisplay').innerText = currentPresentationData.presentation_title;
-            buildThumbnails();
-            renderSlide(currentSlideIdx, 'fade');
-            player.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        function backToReview() {
-            stopAutoplay();
-            toggleEditMode(false);
-            if (document.fullscreenElement) document.exitFullscreen();
-            renderReviewSection();
-        }
-
-        function setReviewRegenerateState(idx, on) {
-            const btn = document.getElementById(`regenSlideBtn-${idx}`);
-            const icon = document.getElementById(`regenSlideIcon-${idx}`);
-            const label = document.getElementById(`regenSlideLabel-${idx}`);
-            if (!btn || !icon || !label) return;
-            btn.disabled = on;
-            icon.className = on ? 'fa-solid fa-circle-notch fa-spin text-[10px]' : 'fa-solid fa-arrows-rotate text-[10px]';
-            label.textContent = on ? '重產中...' : '重產此頁';
-        }
-
-        function setCurrentRegenerateState(on) {
-            const btn = document.getElementById('regenCurrentBtn');
-            const icon = document.getElementById('regenCurrentIcon');
-            const label = document.getElementById('regenCurrentLabel');
-            if (!btn || !icon || !label) return;
-            btn.disabled = on;
-            icon.className = on ? 'fa-solid fa-circle-notch fa-spin text-[11px]' : 'fa-solid fa-arrows-rotate text-[11px]';
-            label.textContent = on ? '重產中...' : '重產此頁';
-        }
-
-        function regenerateCurrentSlide() {
-            openRegenerateModal(currentSlideIdx);
-        }
-
-        function openRegenerateModal(idx) {
-            if (regeneratingSlideIdx !== null) {
-                showToast('已有頁面正在重產中，請稍候', 'info', 2200);
-                return;
-            }
-            if (!currentPresentationData || !Array.isArray(currentPresentationData.slides) || idx < 0 || idx >= currentPresentationData.slides.length) return;
-            regenerateModalSlideIdx = idx;
-            const modal = document.getElementById('regenModal');
-            const ta = document.getElementById('regenPromptInput');
-            ta.value = '';
-            modal.classList.remove('hidden');
-            setTimeout(() => ta.focus(), 0);
-        }
-
-        function closeRegenerateModal(force = false) {
-            if (!force && regeneratingSlideIdx !== null) return;
-            regenerateModalSlideIdx = null;
-            document.getElementById('regenPromptInput').value = '';
-            document.getElementById('regenModal').classList.add('hidden');
-        }
-
-        async function confirmRegenerateFromModal() {
-            if (regenerateModalSlideIdx === null) return;
-            const prompt = document.getElementById('regenPromptInput').value.trim();
-            await regenerateSingleSlide(regenerateModalSlideIdx, prompt);
-        }
-
-        async function regenerateSingleSlide(idx, customPrompt = '') {
-            if (!currentPresentationData || !Array.isArray(currentPresentationData.slides)) {
-                showToast('目前沒有可重產的簡報內容', 'info', 2200);
-                return;
-            }
-            if (isGenerating()) {
-                showToast('正在生成整份簡報中，請稍候', 'info', 2200);
-                return;
-            }
-            if (regeneratingSlideIdx !== null) {
-                showToast('已有頁面正在重產中，請稍候', 'info', 2200);
-                return;
-            }
-            if (idx < 0 || idx >= currentPresentationData.slides.length) return;
-
-            const input = getCurrentGenerationInput();
-            if (!input.content?.trim()) {
-                showToast('缺少原始內容，無法重產此頁', 'error', 3200);
-                return;
-            }
-
-            regeneratingSlideIdx = idx;
-            updateUndoButtons();
-            setReviewRegenerateState(idx, true);
-            setCurrentRegenerateState(true);
-            const modalConfirmBtn = document.getElementById('regenModalConfirmBtn');
-            const modalConfirmIcon = document.getElementById('regenModalConfirmIcon');
-            const modalConfirmLabel = document.getElementById('regenModalConfirmLabel');
-            const modalCancelBtn = document.getElementById('regenModalCancelBtn');
-            const modalOpen = !document.getElementById('regenModal').classList.contains('hidden');
-            if (modalOpen) {
-                modalConfirmBtn.disabled = true;
-                modalCancelBtn.disabled = true;
-                modalConfirmIcon.className = 'fa-solid fa-circle-notch fa-spin text-[11px]';
-                modalConfirmLabel.textContent = '重產中...';
-            }
-
-            try {
-                // 上傳的圖片（data URL）與已畫好的圖表 SVG 不送給 LLM：省 token，回來後再換回原圖
-                const slim = slimSlidesForLlm(currentPresentationData.slides);
-                const res = await fetch('/api/regenerate-slide', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        content: input.content,
-                        target_audience: input.target_audience || '',
-                        num_pages: currentPresentationData.slides.length,
-                        style_preference: input.style_preference || '',
-                        presentation_title: currentPresentationData.presentation_title || '未命名簡報',
-                        slide_index: idx,
-                        slides: slim.slides,
-                        custom_prompt: customPrompt,
-                        ...getLlmChoice()
-                    })
-                });
-
-                if (!res.ok) throw await readApiError(res);
-
-                const newSlide = sanitizeSlide(await res.json());
-                newSlide.html_content = restoreSlideImages(newSlide.html_content, slim.images);
-                await bakeSlideCharts([newSlide]);
-                const oldSlide = currentPresentationData.slides[idx];
-                pushUndoSnapshot();
-                currentPresentationData.slides[idx] = {
-                    ...oldSlide,
-                    ...newSlide,
-                    page_number: oldSlide.page_number || idx + 1
-                };
-
-                syncCurrentPresentationToHistory();
-
-                const inPlayer = !document.getElementById('sectionPlayer').classList.contains('hidden');
-                const inReview = !document.getElementById('sectionReview').classList.contains('hidden');
-                if (inPlayer) {
-                    buildThumbnails();
-                    if (idx === currentSlideIdx) renderSlide(idx, 'fade');
-                    else updateThumbnails();
-                }
-                if (inReview) renderReviewSection(true);
-                if (modalOpen) closeRegenerateModal(true);
-                showToast(`第 ${idx + 1} 頁已重產完成`, 'success', 2200);
-            } catch (err) {
-                showToast(friendlyError(err), 'error', 8000, { label: '重試', onClick: () => regenerateSingleSlide(idx, customPrompt) });
-            } finally {
-                setReviewRegenerateState(idx, false);
-                setCurrentRegenerateState(false);
-                regeneratingSlideIdx = null;
-                updateUndoButtons();
-                modalConfirmBtn.disabled = false;
-                modalCancelBtn.disabled = false;
-                modalConfirmIcon.className = 'fa-solid fa-arrows-rotate text-[11px]';
-                modalConfirmLabel.textContent = '確認重產';
-            }
-        }
-
-        /* ===================== 撤銷／重做 ===================== */
-        const UNDO_LIMIT = 50;
-        let undoStack = [];
-        let redoStack = [];
-
-        function cloneSlides() {
-            return JSON.parse(JSON.stringify(currentPresentationData.slides));
-        }
-
-        function resetUndo() {
-            undoStack = [];
-            redoStack = [];
-            updateUndoButtons();
-        }
-
-        // 修改簡報前呼叫，記下修改前的版本
-        function pushUndoSnapshot() {
-            undoStack.push(cloneSlides());
-            if (undoStack.length > UNDO_LIMIT) undoStack.shift();
-            redoStack = [];
-            updateUndoButtons();
-        }
-
-        function canEditSlides() {
-            if (!currentPresentationData) return false;
-            if (regeneratingSlideIdx !== null || isGenerating()) {
-                showToast('請等待目前的生成完成後再撤銷／重做', 'info', 2200);
-                return false;
-            }
-            return true;
-        }
-
-        function applySlides(slides) {
-            currentPresentationData.slides = slides;
-            currentSlideIdx = Math.min(currentSlideIdx, slides.length - 1);
-            syncCurrentPresentationToHistory();
-
-            const inPlayer = !document.getElementById('sectionPlayer').classList.contains('hidden');
-            const inReview = !document.getElementById('sectionReview').classList.contains('hidden');
-            if (inPlayer) {
-                buildThumbnails();
-                renderSlide(currentSlideIdx, 'fade');
-            }
-            if (inReview) renderReviewSection(true);
-            updateUndoButtons();
-        }
-
-        function undo() {
-            if (!canEditSlides() || !undoStack.length) return;
-            redoStack.push(cloneSlides());
-            applySlides(undoStack.pop());
-            showToast('已撤銷上一步變更', 'info', 1800);
-        }
-
-        function redo() {
-            if (!canEditSlides() || !redoStack.length) return;
-            undoStack.push(cloneSlides());
-            applySlides(redoStack.pop());
-            showToast('已重做', 'info', 1800);
-        }
-
-        function updateUndoButtons() {
-            const busy = regeneratingSlideIdx !== null;
-            document.querySelectorAll('[data-undo]').forEach(b => b.disabled = busy || !undoStack.length);
-            document.querySelectorAll('[data-redo]').forEach(b => b.disabled = busy || !redoStack.length);
-        }
-
-        /* ===================== 行內文字編輯 ===================== */
-        let editMode = false;
-        const PLAINTEXT_EDIT = (() => { const d = document.createElement('div'); try { d.contentEditable = 'plaintext-only'; } catch (e) { } return d.contentEditable === 'plaintext-only'; })();
-
-        // 序列化投影片 DOM：移除編輯用的標記屬性（文字編輯中 / 拼字檢查 / 選取標記），得到可存回 html_content 的字串
-        const EDIT_ATTRS = ['contenteditable', 'spellcheck', 'data-rs-sel'];
-        function serializeScaler(scaler) {
-            const c = scaler.cloneNode(true);
-            c.querySelectorAll(EDIT_ATTRS.map(a => `[${a}]`).join(',')).forEach(el => EDIT_ATTRS.forEach(a => el.removeAttribute(a)));
-            return c.innerHTML;
-        }
-
-        function getScaler() { return document.querySelector('#slideCanvas .slide-scaler'); }
-
-        // 進入編輯模式／換頁後：記下目前內容作為比對基準
-        function prepareEditing() {
-            const scaler = getScaler();
-            if (scaler) scaler.dataset.base = serializeScaler(scaler);
-        }
-
-        function toggleEditMode(force) {
-            const want = typeof force === 'boolean' ? force : !editMode;
-            if (want === editMode) return;
-            if (want) {
-                if (!currentPresentationData || regeneratingSlideIdx !== null) return;
-                stopAutoplay();
-            } else {
-                stopTextEdit();
-                clearSelection();
-                commitSlideEdit();
-            }
-            editMode = want;
-            const canvas = document.getElementById('slideCanvas');
-            canvas.classList.toggle('editing', editMode);
-            const btn = document.getElementById('editBtn');
-            btn.setAttribute('aria-pressed', String(editMode));
-            document.getElementById('editLabel').textContent = editMode ? '完成編輯' : '編輯';
-            document.getElementById('editIcon').className = 'fa-solid text-[11px] ' + (editMode ? 'fa-check' : 'fa-pen-to-square');
-            document.querySelectorAll('[data-edit-only]').forEach(b => { b.classList.toggle('hidden', !editMode); b.classList.toggle('flex', editMode); });
-            if (editMode) { prepareEditing(); showToast('單擊選取元素、雙擊編輯文字；插入的文字、圖片與圖表可拖曳移動、拉角落縮放（Esc 取消選取，可撤銷）', 'info', 4000); }
-        }
-
-        // 把畫面上的修改寫回資料（一次編輯 = 一個撤銷步驟）
-        // withUndo=false：呼叫端已自行 pushUndoSnapshot（例如同時修改了 slide.charts）
-        function commitSlideEdit(withUndo = true) {
-            const scaler = getScaler();
-            const slide = currentPresentationData?.slides?.[currentSlideIdx];
-            if (!scaler || !slide || scaler.dataset.base === undefined) return;
-            const html = serializeScaler(scaler);
-            if (html === scaler.dataset.base) { if (!withUndo) syncCurrentPresentationToHistory(); return; }
-            if (withUndo) pushUndoSnapshot();
-            slide.html_content = html;
-            scaler.dataset.base = html;
-            const thumbScaler = document.querySelector(`#thumbnailContainer .thumb[data-idx="${currentSlideIdx}"] .slide-scaler`);
-            if (thumbScaler) thumbScaler.innerHTML = html;
-            syncCurrentPresentationToHistory();
-        }
-
-        /* ----- 選取（單擊）與文字編輯（雙擊） ----- */
-        let selectedEl = null;
-        let editingEl = null;
-
-        function hasOwnText(el) { return [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()); }
-        function isRootBlock(el) { return !!el && el.parentElement === getScaler(); }
-
-        function selectElement(el) {
-            if (selectedEl && selectedEl !== el) selectedEl.removeAttribute('data-rs-sel');
-            selectedEl = el;
-            el.setAttribute('data-rs-sel', '1');
-            fmtRO.disconnect();
-            fmtRO.observe(el);
-            refreshToolbar();
-        }
-
-        function clearSelection() {
-            if (selectedEl) selectedEl.removeAttribute('data-rs-sel');
-            selectedEl = null;
-            fmtRO.disconnect();
-            hidePalette();
-            document.getElementById('fmtToolbar')?.classList.remove('open');
-            document.getElementById('floatBox')?.classList.remove('open');
-        }
-
-        function startTextEdit(el, x, y) {
-            if (editingEl && editingEl !== el) stopTextEdit();
-            editingEl = el;
-            el.setAttribute('contenteditable', PLAINTEXT_EDIT ? 'plaintext-only' : 'true');
-            el.setAttribute('spellcheck', 'false');
-            selectElement(el);
-            el.focus({ preventScroll: true });
-            // 游標放在雙擊的位置
-            let range = null;
-            if (document.caretRangeFromPoint) range = document.caretRangeFromPoint(x, y);
-            else if (document.caretPositionFromPoint) {
-                const pos = document.caretPositionFromPoint(x, y);
-                if (pos) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); range.collapse(true); }
-            }
-            if (range && el.contains(range.startContainer)) {
-                const sel = window.getSelection();
-                sel.removeAllRanges();
-                sel.addRange(range);
-            }
-        }
-
-        function stopTextEdit() {
-            if (!editingEl) return;
-            const el = editingEl;
-            editingEl = null;
-            el.removeAttribute('contenteditable');
-            el.removeAttribute('spellcheck');
-            // 插入後沒有輸入任何文字的文字方塊直接移除（不留下撤銷步驟）
-            if (el.hasAttribute('data-rs-text') && !el.textContent.trim()) {
-                if (selectedEl === el) clearSelection();
-                el.remove();
-            }
-            commitSlideEdit();
-        }
-
-        const slideCanvasEl = document.getElementById('slideCanvas');
-        slideCanvasEl.addEventListener('click', e => {
-            if (!editMode) return;
-            const scaler = getScaler();
-            let t = e.target;
-            if (!scaler || !scaler.contains(t) || t === scaler) { clearSelection(); return; }
-            if (editingEl && editingEl.contains(t)) return;          // 編輯中：保留游標操作
-            e.preventDefault();                                       // 避免投影片內的連結跳轉
-            if (editingEl) stopTextEdit();
-            const svg = t.closest('svg');
-            if (svg && svg !== t && scaler.contains(svg)) t = svg;   // SVG 內部以整個圖形為單位
-            const obj = t.closest('[data-rs-chart],[data-rs-float]');
-            if (obj && scaler.contains(obj)) t = obj;                // 圖表 / 浮動圖片以整個容器為單位
-            selectElement(t);
-        });
-        slideCanvasEl.addEventListener('dblclick', e => {
-            if (!editMode) return;
-            const scaler = getScaler();
-            let el = e.target;
-            while (el && el !== scaler && !hasOwnText(el)) el = el.parentElement;
-            if (!el || el === scaler || el.closest('svg')) return;
-            e.preventDefault();
-            startTextEdit(el, e.clientX, e.clientY);
-        });
-        slideCanvasEl.addEventListener('focusout', e => {
-            if (!editMode) return;
-            if (e.target === editingEl) stopTextEdit(); else commitSlideEdit();
-        });
-        slideCanvasEl.addEventListener('keydown', e => {
-            // 編輯中避免 Enter 觸發外層按鈕行為；貼上一律純文字
-            if (editMode && e.key === 'Enter' && !PLAINTEXT_EDIT) { e.preventDefault(); document.execCommand('insertLineBreak'); }
-        });
-        slideCanvasEl.addEventListener('paste', e => {
-            if (!editMode || PLAINTEXT_EDIT) return;
-            e.preventDefault();
-            document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text/plain'));
-        });
-
-        /* ----- 以 Tailwind class 為單位的樣式替換 ----- */
-        const TW_HUES = ['slate', 'gray', 'zinc', 'neutral', 'stone', 'red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal', 'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose'];
-        const TW_SHADES = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
-        const COLOR_BODY = `(?:white|black|transparent|current|inherit|(?:${TW_HUES.join('|')})-(?:${TW_SHADES.join('|')}))(?:\\/\\d{1,3})?`;
-        const RE = {
-            size: /^text-(?:xs|sm|base|lg|xl|[2-9]xl)$|^text-\[\d*\.?\d+(?:px|rem|em|vw|vh|%)\]$/,
-            weight: /^font-(?:thin|extralight|light|normal|medium|semibold|bold|extrabold|black)$/,
-            align: /^text-(?:left|center|right|justify|start|end)$/,
-            justify: /^justify-(?:start|center|end)$/,
-            items: /^items-(?:start|center|end)$/,
-            textColor: new RegExp(`^text-${COLOR_BODY}$|^text-\\[(?:#|rgb|hsl)[^\\]]*\\]$`),
-            bgColor: new RegExp(`^bg-${COLOR_BODY}$|^bg-\\[(?:#|rgb|hsl)[^\\]]*\\]$|^bg-gradient-to-\\w+$|^(?:from|via|to)-${COLOR_BODY}$`),
-            radius: /^rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full))?$|^rounded-\[[^\]]*\]$/
-        };
-        const SIZE_STEPS = ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl', '7xl', '8xl', '9xl'];
-        const SIZE_PX = [12, 14, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96, 128];
-        const WEIGHTS = [['thin', '極細', 100], ['light', '細', 300], ['normal', '標準', 400], ['medium', '中等', 500], ['semibold', '半粗', 600], ['bold', '粗', 700], ['extrabold', '特粗', 800], ['black', '黑', 900]];
-        const RADII = [['none', '無'], ['sm', '極小'], ['', '小'], ['md', '中'], ['lg', '大'], ['xl', '特大'], ['2xl', '2XL'], ['3xl', '3XL'], ['full', '圓形']];
-
-        function removeClasses(el, ...res) {
-            [...el.classList].forEach(c => { if (res.some(re => re.test(c))) el.classList.remove(c); });
-        }
-        function setClass(el, groupRes, cls) {
-            removeClasses(el, ...groupRes);
-            if (cls) el.classList.add(cls);
-            if (!el.getAttribute('class')) el.removeAttribute('class');
-        }
-        function clearInlineStyle(el, ...props) {
-            props.forEach(p => el.style.removeProperty(p));
-            if (!el.getAttribute('style')) el.removeAttribute('style');
-        }
-
-        function currentSizeIndex(el) {
-            const cls = [...el.classList].find(c => /^text-(?:xs|sm|base|lg|xl|[2-9]xl)$/.test(c));
-            if (cls) return SIZE_STEPS.indexOf(cls.slice(5));
-            const px = parseFloat(getComputedStyle(el).fontSize) || 16;
-            return SIZE_PX.reduce((best, v, i) => Math.abs(v - px) < Math.abs(SIZE_PX[best] - px) ? i : best, 0);
-        }
-        function currentWeight(el) {
-            const cls = [...el.classList].find(c => RE.weight.test(c));
-            if (cls) { const n = cls.slice(5); return (WEIGHTS.find(w => w[0] === n) || WEIGHTS.find(w => w[0] === 'light'))[0]; }
-            const w = parseInt(getComputedStyle(el).fontWeight) || 400;
-            return WEIGHTS.reduce((best, x) => Math.abs(x[2] - w) < Math.abs(best[2] - w) ? x : best, WEIGHTS[2])[0];
-        }
-        function currentRadius(el) {
-            const cls = [...el.classList].find(c => /^rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full))?$/.test(c));
-            if (cls) return cls === 'rounded' ? '' : cls.slice(8);
-            return getComputedStyle(el).borderTopLeftRadius === '0px' ? 'none' : '__custom';
-        }
-        function currentAlign(el) {
-            const a = getComputedStyle(el).textAlign;
-            return a === 'center' ? 'center' : (a === 'right' || a === 'end') ? 'right' : 'left';
-        }
-
-        // 套用樣式 → 寫回資料（一個撤銷步驟）→ 稍後更新工具列（等 Tailwind 產生新 class 的樣式）
-        function fmtCommit() {
-            commitSlideEdit();
-            setTimeout(refreshToolbar, 90);
-        }
-
-        const FMT_ACTIONS = {
-            sizeDown() { stepSize(-1); },
-            sizeUp() { stepSize(1); },
-            align(v) {
-                const el = selectedEl;
-                setClass(el, [RE.align], 'text-' + v);
-                const cs = getComputedStyle(el);
-                const pos = { left: 'start', center: 'center', right: 'end' }[v];
-                if (/flex/.test(cs.display)) {      // flex 容器的子項不吃 text-align，一併調整主軸／交叉軸對齊
-                    if (cs.flexDirection.startsWith('column')) setClass(el, [RE.items], 'items-' + pos);
-                    else setClass(el, [RE.justify], 'justify-' + pos);
-                }
-            },
-            weight(v) { setClass(selectedEl, [RE.weight], 'font-' + v); },
-            radius(v) { if (v !== '__custom') setClass(selectedEl, [RE.radius], v === '' ? 'rounded' : 'rounded-' + v); },
-            color(kind, c) {                         // c === '' → 移除
-                const el = selectedEl;
-                if (kind === 'text') { setClass(el, [RE.textColor], c ? 'text-' + c : ''); clearInlineStyle(el, 'color'); }
-                else { setClass(el, [RE.bgColor], c ? 'bg-' + c : ''); clearInlineStyle(el, 'background', 'background-color', 'background-image'); }
-            },
-            parent() {
-                const p = selectedEl.parentElement;
-                if (p && p !== getScaler()) { stopTextEdit(); selectElement(p); }
-            },
-            remove() {
-                if (isRootBlock(selectedEl)) return;
-                const el = selectedEl;
-                stopTextEdit();
-                clearSelection();
-                el.remove();
-            },
-            duplicate() {
-                if (isRootBlock(selectedEl)) return;
-                stopTextEdit();
-                const el = selectedEl;
-                const c = el.cloneNode(true);
-                [c, ...c.querySelectorAll(EDIT_ATTRS.map(a => `[${a}]`).join(','))].forEach(n => EDIT_ATTRS.forEach(a => n.removeAttribute(a)));
-                // 複製出的圖表使用自己的一份資料，之後各自編輯互不影響
-                const slide = currentPresentationData.slides[currentSlideIdx];
-                [c, ...c.querySelectorAll('[data-rs-chart]')].filter(n => n.hasAttribute('data-rs-chart')).forEach(n => {
-                    const spec = slide.charts?.[Number(n.getAttribute('data-rs-chart'))];
-                    if (!spec) return;
-                    slide.charts.push(JSON.parse(JSON.stringify(spec)));
-                    n.setAttribute('data-rs-chart', String(slide.charts.length - 1));
-                });
-                if (c.hasAttribute('data-rs-float')) {      // 浮動物件錯開位置，避免完全疊在原物件上
-                    c.style.left = (parseFloat(c.style.left) || 0) + 24 + 'px';
-                    c.style.top = (parseFloat(c.style.top) || 0) + 24 + 'px';
-                }
-                el.after(c);
-                selectElement(c);
-            },
-            moveUp() { moveSibling(-1); },
-            moveDown() { moveSibling(1); }
-        };
-
-        function stepSize(dir) {
-            const i = currentSizeIndex(selectedEl) + dir;
-            if (i < 0 || i >= SIZE_STEPS.length) return;
-            setClass(selectedEl, [RE.size], 'text-' + SIZE_STEPS[i]);
-        }
-        function moveSibling(dir) {
-            const el = selectedEl;
-            if (isRootBlock(el)) return;
-            const other = dir < 0 ? el.previousElementSibling : el.nextElementSibling;
-            if (!other) return;
-            stopTextEdit();
-            if (dir < 0) other.before(el); else other.after(el);
-        }
-
-        function runFmt(name, ...args) {
-            if (!editMode || !selectedEl || !selectedEl.isConnected) return;
-            FMT_ACTIONS[name](...args);
-            fmtCommit();
-        }
-
-        /* ----- 浮動工具列 ----- */
-        const fmtRO = new ResizeObserver(() => positionToolbar());
-        (function buildToolbar() {
-            const tb = document.createElement('div');
-            tb.id = 'fmtToolbar';
-            tb.setAttribute('role', 'toolbar');
-            tb.setAttribute('aria-label', '文字與元素格式');
-            const btn = (id, icon, title, extra = '') => `<button type="button" class="fb ${extra}" data-fmt="${id}" title="${title}" aria-label="${title}">${icon}</button>`;
-            tb.innerHTML = `
-          ${btn('parent', '<i class="fa-solid fa-turn-up text-[11px]"></i>', '選取父層元素')}
-          <span class="sep"></span>
-          ${btn('sizeDown', '<i class="fa-solid fa-minus text-[9px]"></i><span>A</span>', '縮小字級')}
-          <span id="fmtSize" class="px-1 tabular-nums min-w-[2.2rem] text-center" title="目前字級"></span>
-          ${btn('sizeUp', '<span>A</span><i class="fa-solid fa-plus text-[9px]"></i>', '放大字級')}
-          <span class="sep"></span>
-          <select id="fmtWeight" title="字體粗細" aria-label="字體粗細">${WEIGHTS.map(w => `<option value="${w[0]}">${w[1]}</option>`).join('')}</select>
-          <span class="sep"></span>
-          ${btn('align-left', '<i class="fa-solid fa-align-left text-[11px]"></i>', '靠左')}
-          ${btn('align-center', '<i class="fa-solid fa-align-center text-[11px]"></i>', '置中')}
-          ${btn('align-right', '<i class="fa-solid fa-align-right text-[11px]"></i>', '靠右')}
-          <span class="sep"></span>
-          ${btn('pal-text', '<span class="font-bold">A</span><span id="fmtTextChip" class="chipbox"></span>', '文字顏色')}
-          ${btn('pal-bg', '<i class="fa-solid fa-fill-drip text-[11px]"></i><span id="fmtBgChip" class="chipbox"></span>', '背景顏色')}
-          <span class="sep"></span>
-          <select id="fmtRadius" title="圓角" aria-label="圓角"><option value="__custom" disabled hidden>圓角</option>${RADII.map(r => `<option value="${r[0]}">圓角：${r[1]}</option>`).join('')}</select>
-          <span class="sep"></span>
-          ${btn('chart', '<i class="fa-solid fa-chart-column text-[11px]"></i><span>圖表資料</span>', '編輯圖表資料', 'chart-only')}
-          <span class="sep chart-only"></span>
-          ${btn('duplicate', '<i class="fa-regular fa-clone text-[11px]"></i>', '複製元素')}
-          ${btn('moveUp', '<i class="fa-solid fa-arrow-up text-[11px]"></i>', '同層上移（往前）')}
-          ${btn('moveDown', '<i class="fa-solid fa-arrow-down text-[11px]"></i>', '同層下移（往後）')}
-          ${btn('remove', '<i class="fa-regular fa-trash-can text-[11px]"></i>', '刪除元素（Delete）', 'danger')}`;
-            document.body.appendChild(tb);
-
-            const pal = document.createElement('div');
-            pal.id = 'fmtPalette';
-            const chip = (c, label) => `<button type="button" class="pal-chip ${c ? 'bg-' + c : ''}" data-color="${c}" title="${label}" aria-label="${label}"></button>`;
-            pal.innerHTML = `
-          <div class="flex items-center gap-1 mb-1">
-            <button type="button" class="fb text-[11px] px-2 h-6 rounded-md border border-zinc-300 dark:border-zinc-600" data-color="" >預設（移除）</button>
-            ${chip('white', 'white')}${chip('black', 'black')}<button type="button" class="pal-chip" data-color="transparent" title="transparent" aria-label="transparent" style="background:linear-gradient(135deg,#fff 45%,#ef4444 45%,#ef4444 55%,#fff 55%)"></button>
-          </div>
-          ${TW_HUES.map(h => `<div class="pal-row">${TW_SHADES.map(sh => chip(`${h}-${sh}`, `${h}-${sh}`)).join('')}</div>`).join('')}`;
-            document.body.appendChild(pal);
-
-            // 按鈕不搶走焦點（維持文字編輯中的游標）；select 例外
-            tb.addEventListener('mousedown', e => { if (!e.target.closest('select')) e.preventDefault(); });
-            pal.addEventListener('mousedown', e => e.preventDefault());
-            tb.addEventListener('click', e => {
-                const b = e.target.closest('[data-fmt]');
-                if (!b || b.disabled) return;
-                const id = b.dataset.fmt;
-                if (id === 'chart') openChartEditor(selectedEl);
-                else if (id.startsWith('align-')) runFmt('align', id.slice(6));
-                else if (id === 'pal-text' || id === 'pal-bg') togglePalette(id === 'pal-text' ? 'text' : 'bg', b);
-                else runFmt(id);
-            });
-            tb.querySelector('#fmtWeight').addEventListener('change', e => runFmt('weight', e.target.value));
-            tb.querySelector('#fmtRadius').addEventListener('change', e => runFmt('radius', e.target.value));
-            pal.addEventListener('click', e => {
-                const c = e.target.closest('[data-color]');
-                if (!c) return;
-                runFmt('color', palMode, c.dataset.color);
-                hidePalette();
-            });
-        })();
-
-        let palMode = 'text';
-        function togglePalette(mode, anchor) {
-            const pal = document.getElementById('fmtPalette');
-            if (pal.classList.contains('open') && palMode === mode) { hidePalette(); return; }
-            palMode = mode;
-            pal.classList.add('open');
-            const r = anchor.getBoundingClientRect();
-            const h = pal.offsetHeight, w = pal.offsetWidth;
-            let top = r.bottom + 6;
-            if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
-            pal.style.top = top + 'px';
-            pal.style.left = Math.min(Math.max(8, r.left), window.innerWidth - w - 8) + 'px';
-        }
-        function hidePalette() { document.getElementById('fmtPalette')?.classList.remove('open'); }
-
-        function refreshToolbar() {
-            const tb = document.getElementById('fmtToolbar');
-            const el = selectedEl;
-            if (!editMode || !el || !el.isConnected) { clearSelection(); return; }
-            tb.classList.add('open');
-            const cs = getComputedStyle(el);
-            document.getElementById('fmtSize').textContent = SIZE_STEPS[currentSizeIndex(el)];
-            document.getElementById('fmtWeight').value = currentWeight(el);
-            const rad = currentRadius(el);
-            const radSel = document.getElementById('fmtRadius');
-            radSel.value = rad;
-            if (radSel.value !== rad) radSel.value = '__custom';
-            const al = currentAlign(el);
-            tb.querySelectorAll('[data-fmt^="align-"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.fmt === 'align-' + al)));
-            document.getElementById('fmtTextChip').style.background = cs.color;
-            const bg = cs.backgroundColor;
-            document.getElementById('fmtBgChip').style.background = bg === 'rgba(0, 0, 0, 0)' ? 'transparent' : bg;
-            const root = isRootBlock(el);
-            const sizeIdx = currentSizeIndex(el);
-            tb.querySelector('[data-fmt="parent"]').disabled = root;
-            tb.querySelector('[data-fmt="sizeDown"]').disabled = sizeIdx <= 0;
-            tb.querySelector('[data-fmt="sizeUp"]').disabled = sizeIdx >= SIZE_STEPS.length - 1;
-            tb.querySelector('[data-fmt="duplicate"]').disabled = root;
-            tb.querySelector('[data-fmt="remove"]').disabled = root;
-            tb.querySelector('[data-fmt="moveUp"]').disabled = root || !el.previousElementSibling;
-            tb.querySelector('[data-fmt="moveDown"]').disabled = root || !el.nextElementSibling;
-            const isChart = el.hasAttribute('data-rs-chart');
-            tb.querySelectorAll('.chart-only').forEach(n => n.style.display = isChart ? '' : 'none');
-            positionToolbar();
-        }
-
-        // 工具列固定在視窗座標：優先放在元素上方，放不下就改放下方
-        function positionToolbar() {
-            positionFloatBox();
-            const tb = document.getElementById('fmtToolbar');
-            if (!tb || !selectedEl || !tb.classList.contains('open')) return;
-            const r = selectedEl.getBoundingClientRect();
-            if (r.bottom < 0 || r.top > window.innerHeight) { tb.style.visibility = 'hidden'; return; }
-            tb.style.visibility = 'visible';
-            const w = tb.offsetWidth, h = tb.offsetHeight;
-            let top = r.top - h - 8;
-            if (top < 8) top = r.bottom + 8;
-            if (top + h > window.innerHeight - 8) top = Math.max(8, Math.min(r.top + 8, window.innerHeight - h - 8));
-            tb.style.top = top + 'px';
-            tb.style.left = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - w - 8)) + 'px';
-        }
-        window.addEventListener('scroll', () => { positionToolbar(); hidePalette(); }, { passive: true });
-        window.addEventListener('resize', () => { positionToolbar(); hidePalette(); });
-        new ResizeObserver(() => positionToolbar()).observe(document.getElementById('slideCanvas'));
-        document.addEventListener('mousedown', e => {
-            if (!e.target.closest('#fmtPalette') && !e.target.closest('[data-fmt^="pal-"]')) hidePalette();
-        });
-
-        /* ===================== 圖片與圖表 ===================== */
-        // 圖片以 data URL 內嵌在 html_content（不經伺服器、不需外部資源，sanitizeSlideHtml 本來就允許 data:image/png|jpeg）；
-        // 圖表為 static/charts.js 畫出的靜態 SVG，資料存在 slide.charts，容器以 data-rs-chart 指向索引。
-        // 使用者插入的圖片 / 圖表為絕對定位的「浮動物件」（data-rs-float），可拖曳移動、拉角落縮放。
-        const IMG_MAX_INPUT = 15 * 1024 * 1024;
-        const IMG_MAX_SIDE = 1600;
-        const IMG_MAX_DATA_URL = 3 * 1024 * 1024;
-        const SLIDE_W = 1024, SLIDE_H = 576;
-
-        // 重產單頁時送給 LLM 的版本：圖片換成 rs-img:N 代號、圖表容器清空
-        function slimSlidesForLlm(slides) {
-            const images = [];
-            const out = slides.map(s => {
-                const doc = new DOMParser().parseFromString(`<!DOCTYPE html><html><body>${s.html_content || ''}</body></html>`, 'text/html');
-                doc.querySelectorAll('[data-rs-chart]').forEach(el => { el.innerHTML = ''; });
-                doc.querySelectorAll('img[src^="data:"]').forEach(img => {
-                    images.push(img.getAttribute('src'));
-                    img.setAttribute('src', 'rs-img:' + (images.length - 1));
-                    img.setAttribute('data-rs-img', '');
-                });
-                return { ...s, html_content: doc.body.innerHTML, charts: s.charts || [] };
-            });
-            return { slides: out, images };
-        }
-        function restoreSlideImages(html, images) {
-            if (!/rs-img:/.test(html || '')) return html;
-            const doc = new DOMParser().parseFromString(`<!DOCTYPE html><html><body>${html}</body></html>`, 'text/html');
-            doc.querySelectorAll('img[src^="rs-img:"]').forEach(img => {
-                img.setAttribute('src', images[Number(img.getAttribute('src').slice(7))] || EXPORT_PLACEHOLDER_IMG);
-            });
-            return doc.body.innerHTML;
-        }
-
-        // 浮動物件放在投影片最外層容器（LLM 依規範產生 w-full h-full 的單一根元素）內；
-        // 定位基準是 .slide-scaler（position: relative，與根元素同為 1024×576），匯出時也相同
-        function slideRoot() {
-            const scaler = getScaler();
-            if (!scaler) return null;
-            const root = scaler.firstElementChild;
-            return root && scaler.children.length === 1 ? root : scaler;
-        }
-        function slideScale() { return document.getElementById('slideCanvas').clientWidth / SLIDE_W; }
-
-        /* ----- 插入圖片 ----- */
-        function pickSlideImage() {
-            if (!editMode) return;
-            const input = document.getElementById('slideImageInput');
-            input.value = '';
-            input.click();
-        }
-        document.getElementById('slideImageInput').addEventListener('change', e => {
-            const f = e.target.files?.[0];
-            if (f) insertSlideImage(f);
-        });
-
-        function loadImageElement(url) {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => resolve(img);
-                img.onerror = () => reject(new Error('無法讀取這張圖片'));
-                img.src = url;
-            });
-        }
-
-        // 縮到最長邊 1600px 並重新編碼：PNG / GIF / WebP / SVG 保留透明（PNG），太大或照片類改 JPEG
-        async function compressImage(file) {
-            const url = URL.createObjectURL(file);
-            try {
-                const img = await loadImageElement(url);
-                let w = img.naturalWidth || 800, h = img.naturalHeight || 600;
-                const k = Math.min(1, IMG_MAX_SIDE / Math.max(w, h));
-                w = Math.max(1, Math.round(w * k)); h = Math.max(1, Math.round(h * k));
-                const c = document.createElement('canvas');
-                c.width = w; c.height = h;
-                const ctx = c.getContext('2d');
-                const keepAlpha = file.type !== 'image/jpeg';
-                if (!keepAlpha) { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); }
-                ctx.drawImage(img, 0, 0, w, h);
-                let data = keepAlpha ? c.toDataURL('image/png') : '';
-                if (!data || data.length > IMG_MAX_DATA_URL / 2) {
-                    // 照片存成 PNG 會很大：鋪白底後改存 JPEG
-                    const j = document.createElement('canvas');
-                    j.width = w; j.height = h;
-                    const jctx = j.getContext('2d');
-                    jctx.fillStyle = '#fff'; jctx.fillRect(0, 0, w, h);
-                    jctx.drawImage(c, 0, 0);
-                    data = j.toDataURL('image/jpeg', 0.85);
-                }
-                if (data.length > IMG_MAX_DATA_URL) throw new Error('圖片壓縮後仍過大，請換一張較小的圖片');
-                return { data, w, h };
-            } finally {
-                URL.revokeObjectURL(url);
-            }
-        }
-
-        async function insertSlideImage(file, at) {
-            if (!editMode || !currentPresentationData) return;
-            if (!/^image\/(png|jpeg|webp|gif|svg\+xml)$/.test(file.type)) { showToast('只支援 PNG、JPG、WebP、GIF、SVG 圖片', 'error'); return; }
-            if (file.size > IMG_MAX_INPUT) { showToast('圖片過大（上限 15 MB）', 'error'); return; }
-            const slideIdx = currentSlideIdx;
-            let result;
-            try { result = await compressImage(file); }
-            catch (err) { showToast(err.message || '無法讀取這張圖片', 'error'); return; }
-            if (!editMode || slideIdx !== currentSlideIdx) return;   // 處理期間已換頁或離開編輯
-            const root = slideRoot();
-            if (!root) return;
-            stopTextEdit();
-            // 預設寬度約 40% 版面，太高時以高度為準
-            let w = Math.min(result.w, SLIDE_W * 0.4), h = w * result.h / result.w;
-            if (h > SLIDE_H * 0.6) { h = SLIDE_H * 0.6; w = h * result.w / result.h; }
-            let x = (SLIDE_W - w) / 2, y = (SLIDE_H - h) / 2;
-            if (at) { x = at.x - w / 2; y = at.y - h / 2; }
-            const img = document.createElement('img');
-            img.src = result.data;
-            img.alt = file.name.replace(/\.[^.]+$/, '').slice(0, 80);
-            img.setAttribute('data-rs-img', '');
-            img.setAttribute('data-rs-float', '');
-            img.setAttribute('draggable', 'false');
-            setFloatRect(img, x, y, w, null);
-            img.style.zIndex = '10';
-            img.style.objectFit = 'contain';
-            root.appendChild(img);
-            commitSlideEdit();
-            selectElement(img);
-            showToast('已插入圖片，可拖曳移動、拉角落調整大小', 'success', 2200);
-        }
-
-        // 拖放 / 貼上圖片到投影片（僅編輯模式）
-        slideCanvasEl.addEventListener('dragover', e => {
-            if (!editMode || ![...(e.dataTransfer?.types || [])].includes('Files')) return;
-            e.preventDefault();
-            slideCanvasEl.classList.add('drop-target');
-        });
-        slideCanvasEl.addEventListener('dragleave', () => slideCanvasEl.classList.remove('drop-target'));
-        slideCanvasEl.addEventListener('drop', e => {
-            slideCanvasEl.classList.remove('drop-target');
-            if (!editMode) return;
-            const f = [...(e.dataTransfer?.files || [])].find(f => f.type.startsWith('image/'));
-            if (!f) return;
-            e.preventDefault();
-            const r = slideCanvasEl.getBoundingClientRect(), s = slideScale();
-            insertSlideImage(f, { x: (e.clientX - r.left) / s, y: (e.clientY - r.top) / s });
-        });
-        slideCanvasEl.addEventListener('dragstart', e => { if (editMode) e.preventDefault(); });
-        document.addEventListener('paste', e => {
-            if (!editMode || editingEl || /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
-            if (document.getElementById('sectionPlayer').classList.contains('hidden')) return;
-            const f = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/'));
-            if (f) { e.preventDefault(); insertSlideImage(f); }
-        });
-
-        /* ----- 插入文字方塊 ----- */
-        // 與圖片相同的浮動物件，可拖曳移動、拉角落調整寬度；格式（字級、粗細、對齊、顏色）沿用浮動工具列
-        function insertTextBox() {
-            if (!editMode || !currentPresentationData) return;
-            const root = slideRoot();
-            if (!root) return;
-            stopTextEdit();
-            const w = 360;
-            const el = document.createElement('div');
-            el.setAttribute('data-rs-text', '');
-            el.setAttribute('data-rs-float', '');
-            el.className = 'text-2xl font-semibold leading-snug';
-            el.textContent = '輸入文字';
-            setFloatRect(el, (SLIDE_W - w) / 2, SLIDE_H / 2 - 24, w, null);
-            el.style.zIndex = '10';
-            el.style.whiteSpace = 'pre-wrap';
-            root.appendChild(el);
-            startTextEdit(el, 0, 0);
-            // 預設文字全選，直接輸入即可取代
-            const range = document.createRange();
-            range.selectNodeContents(el);
-            const sel = window.getSelection();
-            sel.removeAllRanges();
-            sel.addRange(range);
-        }
-
-        /* ----- 浮動物件：移動與縮放 ----- */
-        function setFloatRect(el, x, y, w, h) {
-            Object.assign(el.style, { position: 'absolute', left: Math.round(x) + 'px', top: Math.round(y) + 'px', width: Math.round(w) + 'px' });
-            el.style.height = h == null ? 'auto' : Math.round(h) + 'px';
-        }
-        function floatRect(el) {
-            return { x: parseFloat(el.style.left) || 0, y: parseFloat(el.style.top) || 0, w: el.offsetWidth, h: el.offsetHeight };
-        }
-        function isFloat(el) { return !!el && el.hasAttribute('data-rs-float') && el.style.position === 'absolute'; }
-
-        (function buildFloatBox() {
-            const box = document.createElement('div');
-            box.id = 'floatBox';
-            box.innerHTML = ['nw', 'ne', 'sw', 'se'].map(h => `<span class="fh" data-h="${h}"></span>`).join('') + '<span class="fsize"></span>';
-            document.body.appendChild(box);
-            box.addEventListener('pointerdown', e => {
-                const h = e.target.closest('.fh');
-                if (h) startFloatDrag(e, h.dataset.h);
-            });
-        })();
-
-        function positionFloatBox() {
-            const box = document.getElementById('floatBox');
-            if (!box) return;
-            if (!editMode || !isFloat(selectedEl) || !selectedEl.isConnected) { box.classList.remove('open'); return; }
-            const r = selectedEl.getBoundingClientRect();
-            Object.assign(box.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
-            box.querySelector('.fsize').textContent = `${selectedEl.offsetWidth} × ${selectedEl.offsetHeight}`;
-            box.classList.add('open');
-        }
-
-        let floatDrag = null;
-        function startFloatDrag(e, handle) {
-            const el = selectedEl;
-            if (!editMode || !isFloat(el) || e.button !== 0) return;
-            e.preventDefault();
-            e.stopPropagation();
-            stopTextEdit();
-            floatDrag = { el, handle, sx: e.clientX, sy: e.clientY, r: floatRect(el), s: slideScale(), moved: false, keepRatio: el.hasAttribute('data-rs-img') };
-            e.target.setPointerCapture?.(e.pointerId);
-            e.target.addEventListener('pointermove', onFloatDragMove);
-            e.target.addEventListener('pointerup', endFloatDrag, { once: true });
-            e.target.addEventListener('pointercancel', endFloatDrag, { once: true });
-        }
-        function onFloatDragMove(e) {
-            const d = floatDrag;
-            if (!d) return;
-            const dx = (e.clientX - d.sx) / d.s, dy = (e.clientY - d.sy) / d.s;
-            if (!d.moved && Math.abs(dx) + Math.abs(dy) < 2) return;
-            d.moved = true;
-            const { x, y, w, h } = d.r;
-            const MIN = 24;
-            if (!d.handle) {
-                // 移動：至少保留 24px 在投影片內，避免拖出畫面找不回來
-                const nx = Math.min(Math.max(x + dx, MIN - w), SLIDE_W - MIN);
-                const ny = Math.min(Math.max(y + dy, MIN - h), SLIDE_H - MIN);
-                d.el.style.left = Math.round(nx) + 'px';
-                d.el.style.top = Math.round(ny) + 'px';
-            } else {
-                const west = d.handle.includes('w'), north = d.handle.includes('n');
-                let nw = Math.max(MIN, w + (west ? -dx : dx));
-                let nh = Math.max(MIN, h + (north ? -dy : dy));
-                if (d.keepRatio) nh = nw * h / w;
-                const autoH = d.keepRatio || d.el.hasAttribute('data-rs-text');   // 文字方塊只調寬度，高度隨文字
-                if (autoH && !d.keepRatio) nh = h;
-                // 從左 / 上方的控制點縮放時，對側固定不動
-                setFloatRect(d.el, west ? x + w - nw : x, north ? y + h - nh : y, nw, autoH ? null : nh);
-            }
-            positionToolbar();
-        }
-        function endFloatDrag(e) {
-            e.target.removeEventListener('pointermove', onFloatDragMove);
-            const d = floatDrag;
-            floatDrag = null;
-            if (!d || !d.moved) return;
-            suppressNextClick = true;                 // 只吞掉緊接在放開滑鼠後的那次 click
-            setTimeout(() => { suppressNextClick = false; }, 0);
-            if (d.handle && d.el.hasAttribute('data-rs-chart')) rerenderChart(d.el);  // 依新尺寸重畫，文字不變形
-            commitSlideEdit();
-            refreshToolbar();
-        }
-        let suppressNextClick = false;
-        slideCanvasEl.addEventListener('pointerdown', e => {
-            if (!editMode || editingEl) return;
-            const obj = e.target.closest('[data-rs-float]');
-            if (!obj || !getScaler()?.contains(obj) || !isFloat(obj)) return;
-            if (selectedEl !== obj) selectElement(obj);
-            startFloatDrag(e, null);
-        });
-        // 拖曳結束後的 click 不要重新觸發選取（避免工具列閃動）
-        slideCanvasEl.addEventListener('click', e => {
-            if (suppressNextClick) { suppressNextClick = false; e.stopImmediatePropagation(); e.preventDefault(); }
-        }, true);
-
-        /* ----- 圖表資料編輯 ----- */
-        let chartEditTarget = null;      // null = 插入新圖表；否則為 [data-rs-chart] 容器
-
-        function chartToText(spec) {
-            const rows = [['類別', ...spec.datasets.map((d, i) => d.label || `系列${i + 1}`)]];
-            spec.labels.forEach((l, i) => rows.push([l, ...spec.datasets.map(d => d.values[i] ?? 0)]));
-            return rows.map(r => r.join(', ')).join('\n');
-        }
-
-        // 解析數據：有 Tab 就以 Tab 分隔（從 Excel 貼上，數字可含千分位），否則以逗號分隔
-        function parseChartText(text) {
-            const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-            if (lines.length < 2) throw new Error('請至少輸入標題列與一列數據');
-            const tab = lines.some(l => l.includes('\t'));
-            const split = l => (tab ? l.split('\t') : l.split(/[,，]/)).map(c => c.trim());
-            const head = split(lines[0]);
-            const width = Math.max(2, head.length);
-            const datasets = Array.from({ length: width - 1 }, (_, k) => ({ label: head[k + 1] || '', values: [] }));
-            const labels = [];
-            lines.slice(1).forEach((line, r) => {
-                const cells = split(line);
-                labels.push(cells[0] || `項目 ${r + 1}`);
-                datasets.forEach((d, k) => {
-                    const raw = (cells[k + 1] || '').replace(/[,\s%]/g, '');
-                    const v = raw === '' ? 0 : Number(raw);
-                    if (!Number.isFinite(v)) throw new Error(`第 ${r + 2} 列的「${cells[k + 1]}」不是數字`);
-                    d.values.push(v);
-                });
-            });
-            if (labels.length > 12) throw new Error('類別最多 12 個');
-            if (datasets.length > 4) throw new Error('資料系列最多 4 個');
-            return { labels, datasets };
-        }
-
-        function readChartForm() {
-            const { labels, datasets } = parseChartText(document.getElementById('chartData').value);
-            const type = document.getElementById('chartType').value;
-            const colors = document.getElementById('chartColors').value.split(/[,，\s]+/).map(c => c.trim()).filter(Boolean);
-            const bad = colors.find(c => !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(c));
-            if (bad) throw new Error(`「${bad}」不是有效的 HEX 色碼`);
-            return {
-                type,
-                title: document.getElementById('chartTitle').value.trim().slice(0, 40),
-                unit: document.getElementById('chartUnit').value.trim().slice(0, 12),
-                labels,
-                datasets: type === 'pie' || type === 'doughnut' ? datasets.slice(0, 1) : datasets,
-                colors
-            };
-        }
-
-        function updateChartPreview() {
-            const box = document.getElementById('chartPreview');
-            const err = document.getElementById('chartError');
-            try {
-                const spec = readChartForm();
-                const target = chartEditTarget;
-                const w = target ? target.offsetWidth : 480, h = target ? target.offsetHeight : 280;
-                box.innerHTML = renderChartSvg(spec, w, h);
-                err.classList.add('hidden');
-                document.getElementById('chartApplyBtn').disabled = false;
-            } catch (e) {
-                err.textContent = e.message;
-                err.classList.remove('hidden');
-                document.getElementById('chartApplyBtn').disabled = true;
-            }
-        }
-        ['chartType', 'chartTitle', 'chartUnit', 'chartData', 'chartColors'].forEach(id =>
-            document.getElementById(id).addEventListener('input', updateChartPreview));
-
-        function openChartEditor(target) {
-            if (!editMode || !currentPresentationData) return;
-            stopTextEdit();
-            const slide = currentPresentationData.slides[currentSlideIdx];
-            const spec = target ? slide.charts?.[Number(target.getAttribute('data-rs-chart'))] : null;
-            if (target && !spec) { showToast('找不到這張圖表的資料', 'error'); return; }
-            chartEditTarget = target;
-            const s = spec || {
-                type: 'bar', title: '', unit: '', colors: [],
-                labels: ['第一季', '第二季', '第三季', '第四季'],
-                datasets: [{ label: '2024', values: [120, 150, 170, 210] }, { label: '2025', values: [140, 180, 205, 260] }]
-            };
-            document.getElementById('chartModalTitle').textContent = target ? '編輯圖表資料' : '插入圖表';
-            document.getElementById('chartApplyLabel').textContent = target ? '套用' : '插入圖表';
-            document.getElementById('chartType').value = s.type;
-            document.getElementById('chartTitle').value = s.title || '';
-            document.getElementById('chartUnit').value = s.unit || '';
-            document.getElementById('chartColors').value = (s.colors || []).join(', ');
-            document.getElementById('chartData').value = chartToText(s);
-            document.getElementById('chartModal').classList.remove('hidden');
-            updateChartPreview();
-            setTimeout(() => document.getElementById('chartData').focus(), 0);
-        }
-
-        function closeChartEditor() {
-            chartEditTarget = null;
-            document.getElementById('chartModal').classList.add('hidden');
-        }
-
-        function rerenderChart(el) {
-            const slide = currentPresentationData.slides[currentSlideIdx];
-            const spec = slide.charts?.[Number(el.getAttribute('data-rs-chart'))];
-            if (spec) el.innerHTML = renderChartSvg(spec, el.offsetWidth, el.offsetHeight);
-        }
-
-        function applyChartEditor() {
-            let spec;
-            try { spec = readChartForm(); } catch (e) { updateChartPreview(); return; }
-            const slide = currentPresentationData?.slides?.[currentSlideIdx];
-            if (!editMode || !slide) { closeChartEditor(); return; }
-            const target = chartEditTarget;
-            if (target && !target.isConnected) { closeChartEditor(); return; }
-            // 同時修改 slide.charts 與 HTML：先記錄撤銷點，再以 commitSlideEdit(false) 寫回
-            pushUndoSnapshot();
-            slide.charts = Array.isArray(slide.charts) ? slide.charts : [];
-            let el = target;
-            if (el) {
-                slide.charts[Number(el.getAttribute('data-rs-chart'))] = spec;
-            } else {
-                const root = slideRoot();
-                if (!root) { closeChartEditor(); return; }
-                slide.charts.push(spec);
-                el = document.createElement('div');
-                el.setAttribute('data-rs-chart', String(slide.charts.length - 1));
-                el.setAttribute('data-rs-float', '');
-                const w = 480, h = 280;
-                setFloatRect(el, (SLIDE_W - w) / 2, (SLIDE_H - h) / 2, w, h);
-                el.style.zIndex = '10';
-                root.appendChild(el);
-            }
-            rerenderChart(el);
-            commitSlideEdit(false);
-            closeChartEditor();
-            selectElement(el);
-            showToast(target ? '已更新圖表' : '已插入圖表，可拖曳移動、拉角落調整大小', 'success', 2200);
-        }
-
-        /* ===================== 頁面管理：標題、排序、複製、刪除 ===================== */
-        let dragSlideIdx = null;
-
-        function slideOpsAllowed() {
-            if (!currentPresentationData) return false;
-            if (regeneratingSlideIdx !== null || isGenerating()) {
-                showToast('請等待目前的生成完成後再調整頁面', 'info', 2200);
-                return false;
-            }
-            return true;
-        }
-
-        // 修改頁面順序／數量後：重新編號、同步歷史記錄、重畫審查頁
-        function finishSlideOps(keepSlide) {
-            const slides = currentPresentationData.slides;
-            slides.forEach((s, i) => { s.page_number = i + 1; });
-            const at = keepSlide ? slides.indexOf(keepSlide) : -1;
-            currentSlideIdx = at >= 0 ? at : Math.min(currentSlideIdx, slides.length - 1);
-            syncCurrentPresentationToHistory();
-            renderReviewSection(true);
-            updateUndoButtons();
-        }
-
-        function moveSlide(from, to) {
-            if (!slideOpsAllowed()) return;
-            const slides = currentPresentationData.slides;
-            if (from === to || from < 0 || to < 0 || from >= slides.length || to >= slides.length) return;
-            pushUndoSnapshot();
-            const keep = slides[currentSlideIdx];
-            const [moved] = slides.splice(from, 1);
-            slides.splice(to, 0, moved);
-            finishSlideOps(keep);
-        }
-
-        function duplicateSlide(idx) {
-            if (!slideOpsAllowed()) return;
-            const slides = currentPresentationData.slides;
-            if (idx < 0 || idx >= slides.length) return;
-            pushUndoSnapshot();
-            const keep = slides[currentSlideIdx];
-            slides.splice(idx + 1, 0, JSON.parse(JSON.stringify(slides[idx])));
-            finishSlideOps(keep);
-            showToast(`已複製第 ${idx + 1} 頁`, 'success', 1800);
-        }
-
-        function deleteSlide(idx) {
-            if (!slideOpsAllowed()) return;
-            const slides = currentPresentationData.slides;
-            if (slides.length <= 1) { showToast('至少要保留一頁', 'info', 2000); return; }
-            if (idx < 0 || idx >= slides.length) return;
-            pushUndoSnapshot();
-            const keep = slides[currentSlideIdx] === slides[idx] ? null : slides[currentSlideIdx];
-            slides.splice(idx, 1);
-            if (!keep) currentSlideIdx = Math.min(idx, slides.length - 1);
-            finishSlideOps(keep);
-            showToast(`已刪除第 ${idx + 1} 頁`, 'info', 5000, { label: '復原', onClick: undo });
-        }
-
-        function commitSlideTitle(idx, el) {
-            const slide = currentPresentationData?.slides?.[idx];
-            if (!slide) return;
-            const title = el.textContent.replace(/\s+/g, ' ').trim();
-            if (!title) { el.textContent = slide.slide_title; return; }
-            el.textContent = title;
-            if (title === slide.slide_title) return;
-            pushUndoSnapshot();
-            slide.slide_title = title;
-            el.title = title;
-            syncCurrentPresentationToHistory();
-        }
-
-        function onSlideDragStart(e, idx) {
-            if (!slideOpsAllowed()) { e.preventDefault(); return; }
-            dragSlideIdx = idx;
-            const card = e.target.closest('.rv-card');
-            if (card) { e.dataTransfer.setDragImage(card, 24, 24); card.classList.add('dragging'); }
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', String(idx));
-        }
-        function onSlideDragEnd() {
-            dragSlideIdx = null;
-            document.querySelectorAll('.rv-card').forEach(c => c.classList.remove('dragging', 'drag-over'));
-        }
-
-        /* ===================== 播放器 ===================== */
-        function fitSlide() {
-            const canvas = document.getElementById('slideCanvas');
-            const scaler = canvas.querySelector('.slide-scaler');
-            if (!scaler) return;
-            scaler.style.transform = `scale(${canvas.clientWidth / 1024})`;
-        }
-        new ResizeObserver(fitSlide).observe(document.getElementById('slideCanvas'));
-
-        function renderSlide(index, mode) {
-            const total = currentPresentationData.slides.length;
-            if (index < 0 || index >= total) return;
-            const dir = mode || (index > currentSlideIdx ? 'right' : index < currentSlideIdx ? 'left' : 'fade');
-            currentSlideIdx = index;
-            const slide = currentPresentationData.slides[index];
-            const canvas = document.getElementById('slideCanvas');
-
-            const cls = dir === 'right' ? 'slide-in-right' : dir === 'left' ? 'slide-in-left' : 'slide-in-fade';
-            canvas.innerHTML = `<div class="slide-anim ${cls}"><div class="slide-scaler">${slide.html_content}</div></div>`;
-            fitSlide();
-            document.getElementById('currentLayoutBadge').innerText = slide.layout_concept;
-            if (editMode) { editingEl = null; clearSelection(); prepareEditing(); }
-
-            document.getElementById('slideCounter').textContent = `${pad(index + 1)} / ${pad(total)}`;
-            document.getElementById('slideProgress').style.width = ((index + 1) / total * 100) + '%';
-            ['prevBtn', 'prevOverlay'].forEach(id => document.getElementById(id).disabled = index === 0);
-            ['nextBtn', 'nextOverlay'].forEach(id => document.getElementById(id).disabled = index === total - 1 && !autoplayTimer);
-
-            updateThumbnails();
-        }
-
-        function prevSlide() { if (currentSlideIdx > 0) renderSlide(currentSlideIdx - 1); }
-        function nextSlide() {
-            if (currentSlideIdx < currentPresentationData.slides.length - 1) renderSlide(currentSlideIdx + 1);
-        }
-
-        function buildThumbnails() {
-            const container = document.getElementById('thumbnailContainer');
-            container.innerHTML = '';
-            currentPresentationData.slides.forEach((slide, idx) => {
-                const thumb = document.createElement('div');
-                thumb.className = THUMB_BASE;
-                thumb.dataset.idx = idx;
-                thumb.title = slide.slide_title;
-                thumb.setAttribute('role', 'button');
-                thumb.tabIndex = 0;
-                thumb.setAttribute('aria-label', `第 ${idx + 1} 頁：${slide.slide_title}`);
-                thumb.onclick = () => renderSlide(idx);
-                thumb.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); renderSlide(idx); } };
-                thumb.innerHTML = `
-          <span class="absolute left-1.5 top-1.5 z-10 text-[10px] font-mono px-1.5 py-px rounded bg-black/65 text-white">${pad(idx + 1)}</span>
-          <div class="rv-thumb !border-0 !rounded-none !cursor-pointer"><div class="slide-scaler">${slide.html_content}</div></div>
-        `;
-                container.appendChild(thumb);
-            });
-            fitPlayerThumbs();
-            animateIn(container, 'reveal');
-        }
-        const THUMB_BASE = 'thumb relative flex-shrink-0 w-44 rounded-lg border overflow-hidden cursor-pointer transition-all duration-300 select-none ';
-        function fitPlayerThumbs() {
-            document.querySelectorAll('#thumbnailContainer .rv-thumb').forEach(box => thumbFitRO.observe(box));
-        }
-
-        function updateThumbnails() {
-            const container = document.getElementById('thumbnailContainer');
-            container.querySelectorAll('.thumb').forEach(thumb => {
-                const idx = Number(thumb.dataset.idx);
-                const isCurrent = idx === currentSlideIdx;
-                thumb.className = THUMB_BASE + (isCurrent
-                    ? 'border-black dark:border-white ring-2 ring-black dark:ring-white shadow-md scale-105'
-                    : 'border-zinc-200 dark:border-zinc-800 opacity-60 hover:opacity-100');
-                if (isCurrent) thumb.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-            });
-        }
-
-        /* ----- 自動播放 ----- */
-        function toggleAutoplay() { autoplayTimer ? stopAutoplay() : startAutoplay(); }
-        function startAutoplay() {
-            toggleEditMode(false);
-            if (!currentPresentationData) return;
-            autoplayTimer = setInterval(() => {
-                const last = currentPresentationData.slides.length - 1;
-                renderSlide(currentSlideIdx >= last ? 0 : currentSlideIdx + 1);
-            }, 4500);
-            document.getElementById('autoIcon').className = 'fa-solid fa-pause text-[10px] text-green-500';
-            document.getElementById('autoLabel').textContent = '播放中';
-            document.getElementById('nextBtn').disabled = false;
-            document.getElementById('nextOverlay').disabled = false;
-            showToast('自動播放已開啟', 'info', 1500);
-        }
-        function stopAutoplay() {
-            if (!autoplayTimer) return;
-            clearInterval(autoplayTimer);
-            autoplayTimer = null;
-            document.getElementById('autoIcon').className = 'fa-solid fa-play text-[10px]';
-            document.getElementById('autoLabel').textContent = '自動播放';
-        }
-
-        /* ----- 全螢幕 ----- */
-        function toggleFullscreen() {
-            const stage = document.getElementById('slideStage');
-            if (document.fullscreenElement) document.exitFullscreen();
-            else if (stage.requestFullscreen) stage.requestFullscreen().catch(() => showToast('瀏覽器不支援全螢幕', 'error'));
-            else showToast('瀏覽器不支援全螢幕', 'error');
-        }
-        let idleTimer;
-        function wakeStage() {
-            const stage = document.getElementById('slideStage');
-            stage.classList.remove('idle');
-            clearTimeout(idleTimer);
-            if (document.fullscreenElement) idleTimer = setTimeout(() => stage.classList.add('idle'), 2000);
-        }
-        document.getElementById('slideStage').addEventListener('mousemove', wakeStage);
-        document.addEventListener('fullscreenchange', () => {
-            const fs = !!document.fullscreenElement;
-            document.getElementById('fsIcon').className = 'fa-solid text-[11px] ' + (fs ? 'fa-compress' : 'fa-expand');
-            document.getElementById('fsLabel').textContent = fs ? '離開全螢幕' : '全螢幕';
-            if (fs) toggleEditMode(false);
-            wakeStage();
-            setTimeout(fitSlide, 50);
-        });
-
-        /* ===================== 匯出選單 ===================== */
-        (function initExportMenu() {
-            const wrap = document.getElementById('exportMenu');
-            const btn = document.getElementById('exportBtn');
-            const list = document.getElementById('exportList');
-            const items = [...list.querySelectorAll('[role=menuitem]')];
-            const actions = { pdf: exportPresentationPdf, pptx: exportPresentationPptx, html: exportPresentationHtml };
-            const setOpen = (open, focusFirst = false) => {
-                list.classList.toggle('hidden', !open);
-                btn.setAttribute('aria-expanded', String(open));
-                if (open && focusFirst) items[0].focus();
-            };
-            btn.onclick = () => setOpen(list.classList.contains('hidden'));
-            items.forEach(item => item.onclick = () => { setOpen(false); btn.focus(); actions[item.dataset.export](); });
-            document.addEventListener('click', e => { if (!e.target.closest('#exportMenu')) setOpen(false); });
-            wrap.addEventListener('keydown', e => {
-                const open = !list.classList.contains('hidden');
-                if (e.key === 'Escape' && open) { e.stopPropagation(); setOpen(false); btn.focus(); return; }
-                if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-                e.preventDefault();
-                e.stopPropagation(); // 避免觸發全域的換頁快捷鍵
-                if (!open) { setOpen(true, true); return; }
-                const i = items.indexOf(document.activeElement);
-                items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
-            });
-        })();
-
-        /* ===================== 全域事件 ===================== */
-        document.addEventListener('keydown', (e) => {
-            if (!document.getElementById('chartModal').classList.contains('hidden')) {
-                if (e.key === 'Escape') { e.preventDefault(); closeChartEditor(); }
-                return;                                   // 圖表視窗開啟時不觸發換頁 / 刪除等快捷鍵
-            }
-            if (e.key === 'Escape' && !document.getElementById('regenModal').classList.contains('hidden')) {
-                e.preventDefault();
-                closeRegenerateModal();
-                return;
-            }
-            const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || !!e.target.isContentEditable;
-            if (e.key === 'Escape' && e.target.isContentEditable && e.target.closest('#slideCanvas')) { e.target.blur(); return; }
-            if (e.key === 'Escape' && editMode && selectedEl && !typing) { clearSelection(); return; }
-            if ((e.key === 'Delete' || e.key === 'Backspace') && editMode && selectedEl && !typing) { e.preventDefault(); runFmt('remove'); return; }
-            if ((e.ctrlKey || e.metaKey) && !e.altKey && !typing && currentPresentationData) {
-                const k = e.key.toLowerCase();
-                if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
-                if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo(); return; }
-            }
-            if (document.getElementById('sectionPlayer').classList.contains('hidden')) return;
-            if (typing) return;
-            if (e.key === 'ArrowLeft') prevSlide();
-            else if (e.key === 'ArrowRight') nextSlide();
-            else if (e.key === 'Home') renderSlide(0);
-            else if (e.key === 'End') renderSlide(currentPresentationData.slides.length - 1);
-            else if (e.key.toLowerCase() === 'f') toggleFullscreen();
-            else if (e.key === ' ') { e.preventDefault(); toggleAutoplay(); }
-        });
-
-        // 觸控滑動
-        (function () {
-            const canvas = document.getElementById('slideCanvas');
-            let sx = 0, sy = 0;
-            canvas.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }, { passive: true });
-            canvas.addEventListener('touchend', e => {
-                const dx = e.changedTouches[0].clientX - sx;
-                const dy = e.changedTouches[0].clientY - sy;
-                if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) dx < 0 ? nextSlide() : prevSlide();
-            }, { passive: true });
-        })();
-
-        // 捲動：進度條 + header 陰影
-        window.addEventListener('scroll', () => {
-            const h = document.documentElement;
-            const max = h.scrollHeight - h.clientHeight;
-            document.getElementById('scrollProgress').style.width = (max > 0 ? h.scrollTop / max * 100 : 0) + '%';
-            document.getElementById('topHeader').classList.toggle('shadow-md', h.scrollTop > 8);
-        }, { passive: true });
-
-        // 視窗大小變化時同步側邊欄圖示
-        window.addEventListener('resize', () => {
-            const open = document.body.classList.contains('sb-open');
-            document.getElementById('sbIcon').className = open && window.innerWidth < 1024 ? 'fa-solid fa-xmark' : 'fa-solid fa-bars';
-        });
-
-        // 光斑跟隨滑鼠
-        document.addEventListener('pointermove', e => {
-            const el = e.target.closest && e.target.closest('.spot');
-            if (!el) return;
-            const r = el.getBoundingClientRect();
-            el.style.setProperty('--mx', (e.clientX - r.left) + 'px');
-            el.style.setProperty('--my', (e.clientY - r.top) + 'px');
-        });
-
-        // 按鈕漣漪
-        document.addEventListener('click', e => {
-            const btn = e.target.closest('.ripple-btn');
-            if (!btn || btn.disabled) return;
-            const r = btn.getBoundingClientRect();
-            const size = Math.max(r.width, r.height);
-            const s = document.createElement('span');
-            s.className = 'ripple';
-            s.style.width = s.style.height = size + 'px';
-            s.style.left = (e.clientX - r.left - size / 2) + 'px';
-            s.style.top = (e.clientY - r.top - size / 2) + 'px';
-            btn.appendChild(s);
-            setTimeout(() => s.remove(), 600);
-        });
-
-        // 生成按鈕粒子爆發
-        document.body.insertAdjacentHTML('beforeend', '<canvas id="fxCanvas" aria-hidden="true"></canvas>');
-        const fxCv = document.getElementById('fxCanvas');
-        const fxCtx = fxCv.getContext('2d');
-        const FX_COLORS = ['#7c5cff', '#22d3ee', '#ff5ca8', '#ffb23e', '#ffffff'];
-        let fxParts = [], fxRaf = 0, lastGenClick = null;
-        const fxReduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        function fxResize() {
-            const dpr = Math.min(window.devicePixelRatio || 1, 2);
-            fxCv.width = innerWidth * dpr; fxCv.height = innerHeight * dpr;
-            fxCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        }
-        fxResize(); addEventListener('resize', fxResize);
-        function fxStar(x, y, r, rot) {
-            fxCtx.beginPath();
-            for (let i = 0; i < 8; i++) {
-                const a = rot + i * Math.PI / 4, d = i % 2 ? r * .38 : r;
-                fxCtx[i ? 'lineTo' : 'moveTo'](x + Math.cos(a) * d, y + Math.sin(a) * d);
-            }
-            fxCtx.closePath(); fxCtx.fill();
-        }
-        function fxBurst(x, y) {
-            if (fxReduce) return;
-            for (let i = 0; i < 30; i++) {
-                const a = Math.random() * Math.PI * 2, sp = 2 + Math.random() * 6;
-                fxParts.push({
-                    x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 2.5, r: 3 + Math.random() * 6,
-                    rot: Math.random() * 6, vr: (Math.random() - .5) * .3, life: 1, decay: .014 + Math.random() * .014,
-                    c: FX_COLORS[(Math.random() * FX_COLORS.length) | 0], star: Math.random() < .55
-                });
-            }
-            if (!fxRaf) fxRaf = requestAnimationFrame(fxTick);
-        }
-        function fxTick() {
-            fxCtx.clearRect(0, 0, innerWidth, innerHeight);
-            fxParts = fxParts.filter(p => p.life > 0);
-            for (const p of fxParts) {
-                p.vy += .16; p.vx *= .985; p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.life -= p.decay;
-                fxCtx.globalAlpha = Math.max(p.life, 0); fxCtx.fillStyle = p.c;
-                if (p.star) fxStar(p.x, p.y, p.r, p.rot);
-                else { fxCtx.beginPath(); fxCtx.arc(p.x, p.y, p.r * .45, 0, 6.3); fxCtx.fill(); }
-            }
-            fxCtx.globalAlpha = 1;
-            fxRaf = fxParts.length ? requestAnimationFrame(fxTick) : 0;
-            if (!fxRaf) fxCtx.clearRect(0, 0, innerWidth, innerHeight);
-        }
-        function burstFromButton(useClick) {
-            const r = document.getElementById('btnGenerate').getBoundingClientRect();
-            if (useClick && lastGenClick) fxBurst(lastGenClick.x, lastGenClick.y);
-            else fxBurst(r.left + r.width / 2, r.top + r.height / 2);
-            lastGenClick = null;
-        }
-        document.getElementById('btnGenerate').addEventListener('pointerdown', e => {
-            lastGenClick = { x: e.clientX, y: e.clientY };
-        });
-
-        setStep(1);
-        renderHistory(true);
-        restoreDraft();
-    </script>
+    <script src="/static/charts.js?v=3"></script>
+    <script src="/static/chart-grid.js?v=1"></script>
+    <script src="/static/export.js?v=7"></script>
+    <script src="/static/presenter.js?v=2"></script>
+    <script src="/static/icons.js?v=1"></script>
+    <script src="/static/app/core.js?v=3"></script>
+    <script src="/static/app/input.js?v=2"></script>
+    <script src="/static/app/generate.js?v=4"></script>
+    <script src="/static/app/editor.js?v=2"></script>
+    <script src="/static/app/media.js?v=2"></script>
+    <script src="/static/app/player.js?v=2"></script>
+    <script src="/static/app/auth.js?v=2"></script>
+    <script src="/static/app/main.js?v=3"></script>
 </body>
 
 </html>

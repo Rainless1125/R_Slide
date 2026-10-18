@@ -136,3 +136,27 @@ def test_oversized_upload_is_rejected():
 def test_missing_file_field_is_rejected():
     res = client.post("/api/extract", data={"other": "x"})
     assert res.status_code == 400
+
+
+@pytest.mark.parametrize("pages", [
+    [["Revenue 2023", "2023"], ["Revenue 2024", "2024"], ["Users", "350"]],   # 遞增的年份不是頁碼
+    [["A", "100"], ["B", "200"], ["C", "100"]],                               # 少數頁面剛好相同不是頁尾
+    [["Total revenue", "350"]],
+])
+def test_pdf_keeps_trailing_numbers_that_are_not_page_numbers(pages):
+    res = upload("data.pdf", make_pdf(pages))
+    assert res.status_code == 200
+    assert res.json()["text"] == "\n\n".join("\n".join(lines) for lines in pages)
+
+
+def test_pdf_strips_running_header_and_footer_numbers():
+    pages = [["2024", "Intro", "1"], ["2024", "Plan", "2"], ["2024", "Risks", "3"], ["2024", "End", "4"]]
+    res = upload("annual.pdf", make_pdf(pages))
+    assert res.status_code == 200
+    assert res.json()["text"] == "Intro\n\nPlan\n\nRisks\n\nEnd"
+
+
+def test_pdf_strips_offset_page_numbers_and_labels():
+    res = upload("deck.pdf", make_pdf([["Cover"], ["Intro", "2"], ["Plan", "3"], ["Page 4 of 4", "End"]]))
+    assert res.status_code == 200
+    assert res.json()["text"] == "Cover\n\nIntro\n\nPlan\n\nEnd"
