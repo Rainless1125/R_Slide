@@ -8,6 +8,9 @@
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <script>
         tailwind.config = {
@@ -15,17 +18,18 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['"PingFang TC"', '"Microsoft JhengHei"', '"Noto Sans TC"', 'sans-serif'],
+                        // 英數用 Inter，中文用 Noto Sans TC；避免 Windows 以微軟正黑體的英文字形顯示
+                        sans: ['Inter', '"Noto Sans TC"', '"PingFang TC"', '"Microsoft JhengHei"', 'sans-serif'],
                     }
                 }
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/app/app.css?v=2">
+    <link rel="stylesheet" href="/static/app/app.css?v=5">
 </head>
 
 <body
-    class="bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors duration-300 min-h-screen flex flex-col">
+    class="antialiased bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors duration-300 min-h-screen flex flex-col">
 
     <div id="scrollProgress"></div>
     <div class="blob blob-1"></div>
@@ -45,7 +49,7 @@
                 </button>
                 <div class="flex items-center gap-3 group cursor-default">
                     <div
-                        class="w-8 h-8 bg-black dark:bg-white text-white dark:text-black rounded-md flex items-center justify-center font-black text-lg transition-transform duration-500 group-hover:rotate-[360deg] group-hover:scale-110">
+                        class="w-8 h-8 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 text-white shadow-md shadow-purple-500/30 rounded-md flex items-center justify-center font-black text-lg transition-transform duration-500 group-hover:rotate-[360deg] group-hover:scale-110">
                         R</div>
                     <div class="flex flex-col leading-tight">
                         <span class="font-bold text-lg tracking-tight">R Slide</span>
@@ -92,7 +96,7 @@
                 <i
                     class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400"></i>
                 <input id="historySearch" type="text" placeholder="搜尋歷史記錄"
-                    class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow">
+                    class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow">
             </div>
         </div>
         <div
@@ -102,7 +106,7 @@
             <button onclick="clearHistory()" class="icon-btn hover:text-red-500 transition-colors" title="清除全部"
                 aria-label="清除全部歷史記錄"><i class="fa-regular fa-trash-can"></i></button>
         </div>
-        <div id="historyList" class="flex-1 overflow-y-auto no-scrollbar px-3 pb-4 space-y-2"></div>
+        <div id="historyList" class="flex-1 overflow-y-auto no-scrollbar px-3 pt-1 pb-4 space-y-2"></div>
         <button id="legacyImportBtn" type="button" onclick="importLegacyHistory(true)"
             class="hidden mx-3 mb-2 px-3 py-2 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-center gap-1.5 transition-colors">
             <i class="fa-solid fa-file-import"></i><span id="legacyImportLabel">匯入此瀏覽器的舊紀錄</span>
@@ -119,16 +123,16 @@
             <!-- 步驟條 -->
             <div class="flex items-center justify-center mb-10 text-xs font-semibold tracking-wide reveal">
                 <button id="stepTag1" onclick="goStep(1)"
-                    class="transition-all duration-300 text-black dark:text-white"><i
+                    class="transition-all duration-300 text-violet-600 dark:text-violet-300"><i
                         class="fa-solid fa-pen-to-square mr-1"></i>01 / 輸入</button>
                 <div class="w-8 sm:w-12 h-[2px] bg-zinc-300 dark:bg-zinc-700 mx-3 sm:mx-4 rounded overflow-hidden">
-                    <div id="stepLine1" class="step-fill h-full w-0 bg-black dark:bg-white"></div>
+                    <div id="stepLine1" class="step-fill h-full w-0 bg-gradient-to-r from-blue-500 to-purple-500"></div>
                 </div>
                 <button id="stepTag2" onclick="goStep(2)"
                     class="transition-all duration-300 text-zinc-400 dark:text-zinc-600"><i
                         class="fa-solid fa-list-check mr-1"></i>02 / 審查</button>
                 <div class="w-8 sm:w-12 h-[2px] bg-zinc-300 dark:bg-zinc-700 mx-3 sm:mx-4 rounded overflow-hidden">
-                    <div id="stepLine2" class="step-fill h-full w-0 bg-black dark:bg-white"></div>
+                    <div id="stepLine2" class="step-fill h-full w-0 bg-gradient-to-r from-blue-500 to-purple-500"></div>
                 </div>
                 <button id="stepTag3" onclick="goStep(3)"
                     class="transition-all duration-300 text-zinc-400 dark:text-zinc-600"><i
@@ -137,13 +141,13 @@
 
             <!-- 步驟 1: 輸入區 -->
             <section id="sectionInput"
-                class="reveal bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 shadow-sm hover:shadow-lg transition-all duration-300">
+                class="reveal relative z-20 card-elevated bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-[1.25rem] p-8 transition-all duration-300">
                 <div class="flex flex-wrap items-center justify-between gap-3 mb-1">
-                    <h2 class="text-xl font-bold">構思您的簡報</h2>
+                    <h2 class="text-2xl font-bold tracking-tight">構思您的簡報</h2>
                     <div id="modelDropdown" class="relative">
                         <button type="button" id="modelBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="modelList"
                             aria-label="選擇 AI 模型"
-                            class="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl pl-3 pr-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow"></button>
+                            class="flex items-center gap-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-full pl-3 pr-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow"></button>
                         <ul id="modelList" role="listbox" aria-label="AI 模型"
                             class="hidden absolute z-30 right-0 mt-1 w-72 max-w-[calc(100vw-2rem)] max-h-80 overflow-y-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1"></ul>
                         <!-- 實際值仍存在這兩個隱藏的 select，供 getLlmChoice() 等既有邏輯讀取 -->
@@ -161,7 +165,7 @@
                     <div>
                         <div id="inputDropZone" class="relative">
                             <textarea id="inputContent" rows="10" maxlength="50000"
-                                class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 pb-8 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow resize-none"
+                                class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 pb-8 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow resize-none"
                                 placeholder="輸入素材內容，或拖放 PDF / Word / Markdown / TXT 檔案至此...（Ctrl / ⌘ + Enter 快速生成）"></textarea>
                             <span id="charCount"
                                 class="absolute bottom-2 right-3 text-[11px] text-zinc-400 dark:text-zinc-500 tabular-nums transition-colors">0
@@ -202,7 +206,7 @@
                                 class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider"><i
                                     class="fa-solid fa-users mr-1"></i>目標受眾</label>
                             <input type="text" id="targetAudience" value="" placeholder="目標受眾（可點下方快速選擇）"
-                                class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow">
+                                class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow">
                             <div id="audienceChips" class="flex flex-wrap gap-1.5 mt-2"></div>
                         </div>
                         <div>
@@ -210,7 +214,7 @@
                                 class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider"><i
                                     class="fa-regular fa-file-lines mr-1"></i>頁數設定</label>
                             <select id="numPages"
-                                class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow appearance-none cursor-pointer">
+                                class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow appearance-none cursor-pointer">
                                 <option value="0">由 AI 決定</option>
                                 <option value="2" selected>2 頁 (2 Pages)</option>
                                 <option value="3">3 頁 (3 Pages)</option>
@@ -225,7 +229,7 @@
                                     class="fa-solid fa-palette mr-1"></i>簡報風格 (AI 動態配色)</label>
                             <div id="styleDropdown" class="relative">
                                 <button type="button" id="styleBtn" aria-haspopup="listbox" aria-expanded="false"
-                                    class="w-full flex items-center justify-between gap-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-left focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow"></button>
+                                    class="w-full flex items-center justify-between gap-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm text-left focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow"></button>
                                 <ul id="styleList" role="listbox" aria-label="簡報風格"
                                     class="hidden absolute z-30 left-0 right-0 mt-1 max-h-72 overflow-y-auto bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl py-1"></ul>
                             </div>
@@ -258,13 +262,18 @@
                                 <option
                                     value="瑞士雜誌排版 (淺冷灰底 bg-zinc-100、巨大粗黑字 text-black、國際鮮紅標籤 bg-red-600 text-white、強烈網格對齊)">
                                     瑞士雜誌 (Swiss Editorial)</option>
+
+                                <!-- 自訂四色：實際送出的描述由 getStylePreference() 組成 -->
+                                <option value="__custom__">自訂風格 (Custom)</option>
                             </select>
+                            <div id="customStylePanel"
+                                class="hidden mt-2 p-3 grid grid-cols-4 gap-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950"></div>
                         </div>
                     </div>
 
                     <div class="flex justify-end pt-4">
                         <button id="btnGenerate" onclick="startGeneration()"
-                            class="ripple-btn bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black font-semibold px-6 py-2.5 rounded-lg flex items-center gap-2 transition-all hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0 active:scale-95 disabled:opacity-70 disabled:cursor-wait disabled:hover:translate-y-0">
+                            class="ripple-btn btn-flow text-white font-semibold px-6 py-2.5 rounded-xl flex items-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 disabled:opacity-70 disabled:cursor-wait disabled:hover:translate-y-0">
                             <span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
                             <i id="btnIcon" class="fa-solid fa-wand-magic-sparkles"></i>
                             <span id="btnLabel">生成排版</span>
@@ -276,7 +285,7 @@
 
             <!-- 載入骨架屏 -->
             <section id="sectionSkeleton" aria-hidden="true"
-                class="hidden mt-6 bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 sm:p-8 shadow-sm">
+                class="hidden mt-6 card-elevated bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-[1.25rem] p-4 sm:p-8">
                 <div class="flex items-center justify-between mb-6 gap-4">
                     <div>
                         <div class="skeleton h-6 w-28 mb-2"></div>
@@ -293,10 +302,10 @@
 
             <!-- 步驟 2: AI 版面構思審查 -->
             <section id="sectionReview"
-                class="hidden bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 sm:p-8 shadow-sm transition-colors mt-6">
+                class="hidden card-elevated bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-[1.25rem] p-4 sm:p-8 transition-colors mt-6">
                 <div class="flex flex-wrap items-center justify-between mb-6 gap-4">
                     <div class="min-w-0 basis-56 flex-1">
-                        <h2 class="text-xl font-bold mb-1">版面審查</h2>
+                        <h2 class="text-2xl font-bold tracking-tight mb-1">版面審查</h2>
                         <p class="text-sm text-zinc-500 dark:text-zinc-400">確認 R Slide 分配的結構與版型，隨後進入播放模式。</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-2">
@@ -492,10 +501,10 @@
             </div>
             <label for="authUsername" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">帳號</label>
             <input id="authUsername" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="32"
-                class="mt-1.5 mb-4 w-full h-10 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow">
+                class="mt-1.5 mb-4 w-full h-10 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow">
             <label for="authPassword" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">密碼</label>
             <input id="authPassword" type="password" autocomplete="current-password" maxlength="128"
-                class="mt-1.5 w-full h-10 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow">
+                class="mt-1.5 w-full h-10 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow">
             <p id="authHint" class="hidden mt-2 text-[11px] text-zinc-500 dark:text-zinc-400">帳號 2~32 字（文字、數字與 . _ - @），密碼至少 6 個字元</p>
             <p id="authError" role="alert" class="min-h-[1.25rem] mt-2 text-xs text-red-500"></p>
             <button id="authSubmit" type="submit"
@@ -527,7 +536,7 @@
             <div class="mt-4">
                 <label for="regenPromptInput" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">重產提示詞（選填）</label>
                 <textarea id="regenPromptInput" rows="4"
-                    class="mt-1.5 w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow resize-y"
+                    class="mt-1.5 w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow resize-y"
                     placeholder="例如：請改成更商務、重點三點式、減少文字並加上 KPI 資訊卡"></textarea>
             </div>
             <div class="mt-5 flex items-center justify-end gap-2">
@@ -642,9 +651,9 @@
     <script src="/static/export.js?v=7"></script>
     <script src="/static/presenter.js?v=2"></script>
     <script src="/static/icons.js?v=1"></script>
-    <script src="/static/app/core.js?v=2"></script>
-    <script src="/static/app/input.js?v=1"></script>
-    <script src="/static/app/generate.js?v=2"></script>
+    <script src="/static/app/core.js?v=3"></script>
+    <script src="/static/app/input.js?v=2"></script>
+    <script src="/static/app/generate.js?v=4"></script>
     <script src="/static/app/editor.js?v=2"></script>
     <script src="/static/app/media.js?v=2"></script>
     <script src="/static/app/player.js?v=2"></script>

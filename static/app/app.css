@@ -91,6 +91,15 @@ header {
     transition: width .1s linear;
 }
 
+/* ---------- 主要卡片：帶品牌紫的柔和陰影 ---------- */
+.card-elevated {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 12px 40px -12px rgba(88, 28, 135, .18);
+}
+
+.dark .card-elevated {
+    box-shadow: 0 0 0 1px rgba(168, 85, 247, .12), 0 20px 50px -20px rgba(168, 85, 247, .35);
+}
+
 /* ---------- 側邊欄 ---------- */
 #sidebar {
     position: fixed;
@@ -153,6 +162,47 @@ body.sb-open #sidebar {
         margin: 0;
         border-width: 0;
     }
+}
+
+/* ---------- 自訂風格色票 ---------- */
+.custom-color {
+    width: 100%;
+    height: 32px;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, .12);
+    border-radius: 8px;
+    background: none;
+    cursor: pointer;
+}
+
+.dark .custom-color {
+    border-color: rgba(255, 255, 255, .18);
+}
+
+.custom-color::-webkit-color-swatch-wrapper {
+    padding: 3px;
+}
+
+.custom-color::-webkit-color-swatch {
+    border: none;
+    border-radius: 5px;
+}
+
+.custom-color::-moz-color-swatch {
+    border: none;
+    border-radius: 5px;
+}
+
+/* 目前開啟的紀錄：左側品牌漸層條（::before 已被 .spot 使用） */
+.hist-active::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 10px;
+    bottom: 10px;
+    width: 3px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, #3b82f6, #a855f7, #ec4899);
 }
 
 .hist-out {
@@ -333,9 +383,49 @@ body.sb-open #sidebar {
     }
 }
 
+/* ---------- 流光漸層按鈕：平時緩慢流動，hover／生成中加速 ----------
+ * 直接改 animation-duration 會讓漸層位置瞬間跳動，所以疊兩層：
+ * ::before 慢速常駐，::after 快速、平時透明，hover／disabled 時淡入。 */
+.btn-flow {
+    isolation: isolate;
+    box-shadow: 0 8px 24px -8px rgba(168, 85, 247, .6);
+}
+
+.btn-flow::before,
+.btn-flow::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background-image: linear-gradient(110deg, #3b82f6, #a855f7, #ec4899, #a855f7, #3b82f6);
+    background-size: 300% 100%;
+    animation: btnFlow 6s linear infinite;
+}
+
+.btn-flow::after {
+    animation-duration: 1.6s;
+    opacity: 0;
+    transition: opacity .4s;
+}
+
+.btn-flow:hover::after,
+.btn-flow:disabled::after {
+    opacity: 1;
+}
+
+@keyframes btnFlow {
+    to { background-position: 300% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .btn-flow::before,
+    .btn-flow::after { animation: none; }
+}
+
 /* ---------- 粒子爆發按鈕 ---------- */
 #btnGenerate:not(:disabled):hover {
-    box-shadow: 0 8px 22px rgba(124, 92, 255, .35);
+    box-shadow: 0 14px 32px -10px rgba(168, 85, 247, .75);
 }
 
 #btnGenerate .dots {

@@ -160,13 +160,80 @@ const STYLE_SWATCHES = [
     ['#ecfdf5', '#022c22', '#059669', '#6ee7b7'],
     ['#f4f4f5', '#000000', '#dc2626', '#a1a1aa']
 ];
+const DEFAULT_SWATCH = ['#ffffff', '#000000', '#888888', '#bbbbbb'];
+
+/* ----- 自訂風格：使用者自選四色，送出時組成含色碼的風格描述 ----- */
+const CUSTOM_STYLE = '__custom__';               // stylePreference 中「自訂風格」選項的 value
+const CUSTOM_STYLE_KEY = 'rslide_custom_style';
+const CUSTOM_COLOR_ROLES = ['背景', '主色', '強調', '輔助'];
+const CUSTOM_STYLE_RE = /^自訂配色 \(背景色 (#[0-9a-f]{6})、主色 (#[0-9a-f]{6})、強調色 (#[0-9a-f]{6})、輔助色 (#[0-9a-f]{6})/i;
+let customColors = ['#ffffff', '#1e1b4b', '#7c3aed', '#f472b6'];
+try {
+    const saved = JSON.parse(localStorage.getItem(CUSTOM_STYLE_KEY) || 'null');
+    if (Array.isArray(saved) && saved.length === 4 && saved.every(c => /^#[0-9a-f]{6}$/i.test(c))) customColors = saved;
+} catch (e) { }
+
+function buildCustomStyle([bg, main, accent, sub]) {
+    return `自訂配色 (背景色 ${bg}、主色 ${main}、強調色 ${accent}、輔助色 ${sub}；` +
+        `請以 Tailwind 任意值語法精確套用這四個色碼：投影片背景 bg-[${bg}]、標題與主要文字 text-[${main}]、` +
+        `重點色塊／圖示／數字 bg-[${accent}] text-[${accent}]、邊框與次要元素 border-[${sub}] text-[${sub}]，` +
+        `可搭配透明度（例如 bg-[${accent}]/10），不要改用其他色系，並確保文字與背景對比清楚)`;
+}
+function parseCustomStyle(value) {
+    const m = CUSTOM_STYLE_RE.exec(value || '');
+    return m ? m.slice(1, 5).map(c => c.toLowerCase()) : null;
+}
+// 任一風格描述對應的四色（預設風格查表、自訂風格從描述中解析）
+function styleColors(value) {
+    const custom = parseCustomStyle(value);
+    if (custom) return custom;
+    const i = [...document.getElementById('stylePreference').options].findIndex(o => o.value === value);
+    return STYLE_SWATCHES[i] || DEFAULT_SWATCH;
+}
+function getStylePreference() {
+    const v = document.getElementById('stylePreference').value;
+    return v === CUSTOM_STYLE ? buildCustomStyle(customColors) : v;
+}
+function setStylePreference(value) {
+    const sel = document.getElementById('stylePreference');
+    const custom = parseCustomStyle(value);
+    if (custom) { customColors = custom; sel.value = CUSTOM_STYLE; }
+    else if ([...sel.options].some(o => o.value === value)) sel.value = value;
+    syncStyleCards();
+}
+
 // 文字後方顯示示意色塊（底色 + 三個強調色）
-function swatchHtml(i) {
-    const [bg, a, b, c] = STYLE_SWATCHES[i] || ['#fff', '#000', '#888', '#bbb'];
+function swatchHtml(colors) {
+    const [bg, a, b, c] = colors;
     const dot = col => `<span class="inline-block w-3 h-3 rounded-full border border-black/15 dark:border-white/25" style="background:${col}"></span>`;
     return `<span class="inline-flex items-center gap-1 shrink-0" aria-hidden="true">${dot(bg)}${dot(a)}${dot(b)}${dot(c)}</span>`;
 }
+function optionColors(i) {
+    return document.getElementById('stylePreference').options[i]?.value === CUSTOM_STYLE ? customColors : (STYLE_SWATCHES[i] || DEFAULT_SWATCH);
+}
+// 歷史紀錄用的迷你投影片縮圖，以風格四色繪製
+function styleThumbHtml([bg, a, b, c]) {
+    const bar = (css, col) => `<div class="absolute rounded-sm" style="${css};background:${col}"></div>`;
+    return `<div class="w-14 shrink-0 rounded-md overflow-hidden ring-1 ring-black/10 dark:ring-white/10 relative" style="aspect-ratio:16/9;background:${bg}" aria-hidden="true">
+        ${bar('left:12%;top:20%;height:14%;width:52%', a)}${bar('left:12%;top:48%;height:9%;width:34%', b)}
+        ${bar('left:12%;top:64%;height:9%;width:26%', c)}${bar('right:10%;top:44%;height:34%;width:22%;opacity:.9', b)}
+      </div>`;
+}
 function styleLabel(opt) { return opt.textContent.replace(/\s+/g, ' ').trim(); }
+function initCustomStylePanel() {
+    const panel = document.getElementById('customStylePanel');
+    panel.innerHTML = CUSTOM_COLOR_ROLES.map((role, i) => `
+        <label class="flex flex-col gap-1 text-[11px] text-zinc-500 dark:text-zinc-400 cursor-pointer min-w-0">
+          <input type="color" data-ci="${i}" class="custom-color" aria-label="自訂${role}色">
+          <span class="text-center leading-tight"><span class="block font-semibold">${role}</span><span data-hex="${i}" class="block font-mono uppercase text-[10px] text-zinc-400"></span></span>
+        </label>`).join('');
+    panel.querySelectorAll('input[type=color]').forEach(inp => inp.addEventListener('input', () => {
+        customColors[+inp.dataset.ci] = inp.value.toLowerCase();
+        try { localStorage.setItem(CUSTOM_STYLE_KEY, JSON.stringify(customColors)); } catch (e) { }
+        syncStyleCards();
+        saveDraft();
+    }));
+}
 function initStyleCards() {
     const sel = document.getElementById('stylePreference');
     const list = document.getElementById('styleList');
@@ -181,10 +248,11 @@ function initStyleCards() {
         li.setAttribute('role', 'option');
         li.dataset.value = opt.value;
         li.className = 'flex items-center justify-between gap-3 px-4 py-2 text-sm cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 aria-selected:font-bold aria-selected:bg-zinc-100 dark:aria-selected:bg-zinc-800';
-        li.innerHTML = `<span class="truncate">${esc(styleLabel(opt))}</span>${swatchHtml(i)}`;
+        li.innerHTML = `<span class="truncate">${esc(styleLabel(opt))}</span><span data-swatch>${swatchHtml(optionColors(i))}</span>`;
         li.onclick = () => { sel.value = opt.value; syncStyleCards(); setOpen(false); saveDraft(); btn.focus(); };
         list.appendChild(li);
     });
+    initCustomStylePanel();
     btn.onclick = () => setOpen(list.classList.contains('hidden'));
     document.addEventListener('click', e => { if (!e.target.closest('#styleDropdown')) setOpen(false); });
     document.getElementById('styleDropdown').addEventListener('keydown', e => {
@@ -200,10 +268,18 @@ function initStyleCards() {
 }
 function syncStyleCards() {
     const sel = document.getElementById('stylePreference');
+    if (sel.selectedIndex < 0) sel.selectedIndex = 0;
     const i = sel.selectedIndex;
+    const isCustom = sel.value === CUSTOM_STYLE;
     document.getElementById('styleBtn').innerHTML =
-        `<span class="truncate">${esc(styleLabel(sel.options[i]))}</span><span class="flex items-center gap-2 shrink-0">${swatchHtml(i)}<i class="fa-solid fa-chevron-down text-[10px] text-zinc-400"></i></span>`;
+        `<span class="truncate">${esc(styleLabel(sel.options[i]))}</span><span class="flex items-center gap-2 shrink-0">${swatchHtml(optionColors(i))}<i class="fa-solid fa-chevron-down text-[10px] text-zinc-400"></i></span>`;
     document.querySelectorAll('#styleList [role=option]').forEach(li => li.setAttribute('aria-selected', String(li.dataset.value === sel.value)));
+    const customLi = document.querySelector(`#styleList [data-value="${CUSTOM_STYLE}"] [data-swatch]`);
+    if (customLi) customLi.innerHTML = swatchHtml(customColors);
+    const panel = document.getElementById('customStylePanel');
+    panel.classList.toggle('hidden', !isCustom);
+    panel.querySelectorAll('input[type=color]').forEach(inp => { inp.value = customColors[+inp.dataset.ci]; });
+    panel.querySelectorAll('[data-hex]').forEach(s => { s.textContent = customColors[+s.dataset.hex]; });
 }
 
 const DRAFT_KEY = 'rslide_draft';
@@ -218,7 +294,7 @@ function saveDraft() {
                 content,
                 audience: document.getElementById('targetAudience').value,
                 pages: document.getElementById('numPages').value,
-                style: document.getElementById('stylePreference').value
+                style: getStylePreference()
             }));
         } catch (e) { }
     }, 400);
@@ -230,9 +306,8 @@ function restoreDraft() {
     document.getElementById('inputContent').value = d.content;
     document.getElementById('targetAudience').value = d.audience || '';
     if (d.pages != null) document.getElementById('numPages').value = d.pages;
-    if (d.style) document.getElementById('stylePreference').value = d.style;
+    if (d.style) setStylePreference(d.style);
     updateCount();
-    syncStyleCards();
     showToast('已還原上次未送出的草稿', 'info', 2400);
 }
 ['inputContent', 'targetAudience'].forEach(id => document.getElementById(id).addEventListener('input', saveDraft));
