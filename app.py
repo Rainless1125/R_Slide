@@ -1,5 +1,6 @@
 import os
 import json
+from typing import Literal
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
@@ -204,16 +205,12 @@ SLIDE_LAYOUT_RULES = """
        - 頁首（小標籤 + 主標題 + 副標題）合計不超過約 140px。
        - 主要內容區約 300px。
        - 頁尾註記 / 結論列最多一列、約 40px；非必要就不要放。
-    4. 內容量上限：
-       - 主標題 1 個；副標題最多 1 句、不超過 30 字。
-       - 卡片 / 欄位 / 步驟最多 4 個並排、最多 2 列；每張卡片內文不超過 40 字、最多 3 行。
-       - 條列清單最多 5 點，每點不超過 25 字。
-       - 素材太多時請精簡、合併重點（頁數由你決定時可拆成更多頁），絕對不要把所有文字硬塞進同一頁。
-    5. 字級與間距上限：
-       - 主標題最大 text-4xl；只有封面或單一大數字頁可用 text-5xl ~ text-6xl。
-       - 卡片標題 text-lg ~ text-xl；內文 text-sm ~ text-base；註記 text-xs。
+    4. 內容量與字級依【簡報模式】的規定；以下為兩種模式共通的上限：
+       - 主標題 1 個，最大 text-4xl；只有封面或單一大數字頁可用 text-5xl ~ text-6xl。
+       - 卡片 / 欄位 / 步驟最多 4 個並排、最多 2 列。
        - 卡片內距 p-5 ~ p-6；區塊間距 gap-4 ~ gap-6；不要使用 p-10 以上的卡片內距或 mb-12 以上的間距。
-    6. 輸出前請自行估算：各區塊高度相加（含 padding、gap、margin、圖示）必須小於 576px。
+       - 素材太多時請精簡、合併重點（頁數由你決定時可拆成更多頁），絕對不要把所有文字硬塞進同一頁。
+    5. 輸出前請自行估算：各區塊高度相加（含 padding、gap、margin、圖示）必須小於 576px。
        若可能超出，先刪減文字，其次縮小字級與間距，最後才刪除次要區塊（例如頁尾列）。
 """
 
@@ -222,11 +219,42 @@ SLIDE_LAYOUT_RULES = """
 SPEAKER_NOTES_RULES = """
     【講者備註（speaker_notes）】：
     1. 每頁都要提供講者備註：講者上台時可以直接照著念的口語講稿，使用與原始素材相同的語言。
-    2. 長度約 80 ~ 200 字，2 ~ 5 句；封面與結尾頁可較短。
+    2. 長度依【簡報模式】的規定；封面與結尾頁可較短。
     3. 內容要補充畫面上沒有寫出的脈絡、數據來源、舉例或轉場，不要逐字重複投影片上的文字。
     4. 最後一句可以自然帶出下一頁的主題（最後一頁則做總結或呼籲行動）。
     5. 只輸出純文字，不要 HTML、Markdown 符號或 emoji；換段可使用換行。
 """
+
+
+# 簡報模式：演講型（講者在台上說、畫面只放重點）與閱讀型（會後寄送、不靠講者也能看懂）是兩種不同的溝通場景，
+# 差別在於「訊息放在畫面上還是講者嘴裡」，因此畫面文字量、字級與講者備註長度都依模式切換
+DECK_MODE_RULES = {
+    "speaker": """
+    【簡報模式：簡易模式（演講型 / Speaker Deck）】：
+    這份簡報由講者上台口頭說明，畫面只是視覺輔助，觀眾一眼就要看懂，細節由講者說出來。
+    1. 一頁只傳達一個核心訊息；寧可拆成更多頁，也不要在同一頁塞多個重點。
+    2. 畫面文字極度精簡：副標題最多 1 句、不超過 20 字；條列最多 3 點、每點不超過 15 字；
+       卡片內文不超過 20 字、最多 2 行。能用關鍵字就不用句子。
+    3. 優先使用大數字、大型圖示、圖表或單一強調句來呈現，保留大量留白。
+    4. 字級偏大：卡片標題 text-xl ~ text-2xl；內文 text-base ~ text-lg；不要用 text-xs 寫正文。
+    5. 被省略的論述、數據細節與舉例全部移到講者備註。
+    6. 講者備註是完整口語講稿：約 150 ~ 300 字、3 ~ 6 句，講者照著念就能把這頁講完。
+""",
+    "document": """
+    【簡報模式：詳細模式（閱讀型 / Document Deck）】：
+    這份簡報會在會後寄送或自行閱讀，沒有講者在旁說明，讀者必須只看畫面就能完整理解。
+    1. 主標題寫成完整的結論句（例如「第三季營收成長 18%，主因為新客戶擴張」），而不是單一名詞。
+    2. 標題下方放一句導言 / 摘要（不超過 40 字），交代這頁的重點與脈絡。
+    3. 內文要有完整的論述與支撐證據：條列最多 6 點、每點不超過 40 字；卡片內文不超過 80 字、最多 4 行；
+       用完整句子說明原因、影響與數據，不要只放關鍵字。
+    4. 數據要寫出單位、比較基準與期間；有出處時以頁尾註記（text-xs）標示資料來源。
+    5. 字級偏小以容納資訊：卡片標題 text-base ~ text-lg；內文 text-sm；註記與來源 text-xs。
+       仍須遵守版面尺寸限制，資訊太多時拆成更多頁，不可超出畫面。
+    6. 講者備註只做補充：約 50 ~ 120 字、1 ~ 3 句，補充延伸資訊或閱讀重點，不重複畫面內容。
+""",
+}
+DECK_MODE_LABELS = {"speaker": "簡易模式（演講型 / Speaker Deck）", "document": "詳細模式（閱讀型 / Document Deck）"}
+DeckMode = Literal["speaker", "document"]
 
 
 class GenerateRequest(BaseModel):
@@ -234,6 +262,7 @@ class GenerateRequest(BaseModel):
     target_audience: str = "商務主管 / 技術決策者"
     num_pages: int = Field(3, ge=0, le=MAX_PAGES)  # 0 = 由 AI 決定
     style_preference: str = "蘋果極簡白 (Apple Minimalist)"  # 新增：接收前端傳來的風格
+    deck_mode: DeckMode = "speaker"
     provider: str = "gemini"
     model: str = ""
 
@@ -243,6 +272,7 @@ class RegenerateSlideRequest(BaseModel):
     num_pages: int = Field(3, ge=0, le=MAX_PAGES)
     style_preference: str = "蘋果極簡白 (Apple Minimalist)"
     presentation_title: str = "未命名簡報"
+    deck_mode: DeckMode = "speaker"
     slide_index: int
     slides: list[SlideInput]
     custom_prompt: str = ""
@@ -278,17 +308,18 @@ def generate_slides(req: GenerateRequest):
        - 僅輸出 Tailwind CSS class。
        - 禁止使用emoji，請一律使用font-awesome圖示。
        - 【重要】你必須絕對服從使用者指定的「視覺風格」。如果要求明亮風，請多用 bg-white/bg-slate-50；如果要求科技風，才使用深色底 bg-slate-900 搭配螢光點綴色。
-    """ + SLIDE_LAYOUT_RULES + CHART_RULES + SPEAKER_NOTES_RULES
+    """ + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + SPEAKER_NOTES_RULES
 
     pages_hint = f"{req.num_pages} 頁" if req.num_pages > 0 else "由你依內容多寡與重點自行決定（建議 3~8 頁）"
     prompt = f"""
     【簡報目標客群】：{req.target_audience}
     【預計生成頁數】：{pages_hint}
+    【簡報模式】：{DECK_MODE_LABELS[req.deck_mode]}
     【指定視覺風格】：{req.style_preference} (請利用 Tailwind CSS 確實實踐此氛圍)
     【原始素材內容】：
     {req.content}
     
-    請深入理解內容，為每一頁構思最能凸顯該主題的獨特版面，並確保整體色彩與背景符合指定的【視覺風格】。
+    請深入理解內容，依【簡報模式】決定每頁的文字量，為每一頁構思最能凸顯該主題的獨特版面，並確保整體色彩與背景符合指定的【視覺風格】。
     """
     
     try:
@@ -385,12 +416,13 @@ def regenerate_slide(req: RegenerateSlideRequest):
     6. 原 HTML 中 <img data-rs-img src="rs-img:數字"> 是使用者上傳的圖片：除非使用者要求移除，否則請保留該 <img> 標籤與 src 原樣，
        可調整它的位置與大小。原 HTML 中的 data-rs-chart 容器內容已省略，圖表資料請參考【原圖表資料】。
     7. 講者備註需配合新版面重新撰寫；使用者的額外需求若只針對版面，仍可沿用【原講者備註】的重點。
-    """ + SLIDE_LAYOUT_RULES + CHART_RULES + SPEAKER_NOTES_RULES
+    """ + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + SPEAKER_NOTES_RULES
 
     prompt = f"""
     【簡報標題】：{req.presentation_title}
     【簡報目標客群】：{req.target_audience}
     【總頁數】：{req.num_pages}
+    【簡報模式】：{DECK_MODE_LABELS[req.deck_mode]}
     【指定視覺風格】：{req.style_preference}
     【原始素材內容】：
     {req.content}

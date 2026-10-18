@@ -275,7 +275,8 @@ function getCurrentGenerationInput() {
         content: document.getElementById('inputContent').value.trim(),
         target_audience: document.getElementById('targetAudience').value,
         num_pages: parseInt(document.getElementById('numPages').value) || (currentPresentationData?.slides?.length || 3),
-        style_preference: getStylePreference()
+        style_preference: getStylePreference(),
+        deck_mode: getDeckMode()
     };
 }
 
@@ -317,6 +318,7 @@ async function openHistory(id) {
     document.getElementById('targetAudience').value = h.input?.target_audience || '';
     if (h.input?.num_pages != null) document.getElementById('numPages').value = String(h.input.num_pages);
     if (h.input?.style_preference) setStylePreference(h.input.style_preference);
+    setDeckMode(h.input?.deck_mode);
     updateCount();
 
     renderHistory();

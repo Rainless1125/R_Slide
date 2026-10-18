@@ -228,6 +228,7 @@ async function startGeneration() {
     const targetAudience = document.getElementById('targetAudience').value;
     const numPages = parseInt(document.getElementById('numPages').value);
     const stylePreference = getStylePreference(); // 讀取選擇的風格（自訂風格會組成含四色的描述）
+    const deckMode = getDeckMode();
 
     if (importing) { showToast('檔案匯入中，請稍候', 'info'); return; }
     if (!content) {
@@ -250,6 +251,7 @@ async function startGeneration() {
                 target_audience: targetAudience,
                 num_pages: numPages,
                 style_preference: stylePreference,
+                deck_mode: deckMode,
                 ...getLlmChoice()
             })
         });
@@ -261,7 +263,7 @@ async function startGeneration() {
         currentSlideIdx = 0;
         resetUndo();
         setLoading(false);
-        addHistory({ content, target_audience: targetAudience, num_pages: numPages, style_preference: stylePreference }, data);
+        addHistory({ content, target_audience: targetAudience, num_pages: numPages, style_preference: stylePreference, deck_mode: deckMode }, data);
         renderReviewSection();
         burstFromButton(false);
         showToast('版面生成完成，已存入歷史記錄', 'success', 2200);
@@ -476,6 +478,7 @@ async function regenerateSingleSlide(idx, customPrompt = '') {
                 target_audience: input.target_audience || '',
                 num_pages: currentPresentationData.slides.length,
                 style_preference: input.style_preference || '',
+                deck_mode: input.deck_mode || 'speaker',
                 presentation_title: currentPresentationData.presentation_title || '未命名簡報',
                 slide_index: idx,
                 slides: slim.slides,

@@ -647,6 +647,142 @@ body.sb-open #sidebar {
     transform: translateY(-2px);
 }
 
+/* 簡報模式選擇卡（演講型 / 閱讀型）：radio 隱藏，以 :has(:checked) 呈現選取狀態 */
+.mode-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: .875rem;
+    padding: .75rem 2.25rem .75rem .875rem;
+    border: 1px solid rgb(228 228 231);
+    border-radius: .75rem;
+    background: rgb(250 250 250);
+    cursor: pointer;
+    transition: transform .2s, border-color .2s, background-color .2s, box-shadow .2s;
+}
+
+.dark .mode-card {
+    border-color: rgb(39 39 42);
+    background: rgb(9 9 11);
+}
+
+.mode-card:hover {
+    transform: translateY(-1px);
+    border-color: rgb(212 212 216);
+}
+
+.dark .mode-card:hover {
+    border-color: rgb(63 63 70);
+}
+
+.mode-card:has(input:checked) {
+    border-color: rgb(139 92 246);
+    background: rgb(245 243 255);
+    box-shadow: 0 0 0 3px rgb(139 92 246 / .15);
+}
+
+.dark .mode-card:has(input:checked) {
+    border-color: rgb(167 139 250);
+    background: rgb(139 92 246 / .1);
+    box-shadow: 0 0 0 3px rgb(167 139 250 / .15);
+}
+
+.mode-card:has(input:focus-visible) {
+    outline: 2px solid rgb(139 92 246);
+    outline-offset: 2px;
+}
+
+.mode-tag {
+    font-size: .6875rem;
+    font-weight: 500;
+    padding: .0625rem .5rem;
+    border-radius: 9999px;
+    color: rgb(113 113 122);
+    background: rgb(244 244 245);
+    white-space: nowrap;
+}
+
+.dark .mode-tag {
+    color: rgb(161 161 170);
+    background: rgb(39 39 42);
+}
+
+.mode-card:has(input:checked) .mode-tag {
+    color: rgb(109 40 217);
+    background: rgb(237 233 254);
+}
+
+.dark .mode-card:has(input:checked) .mode-tag {
+    color: rgb(221 214 254);
+    background: rgb(139 92 246 / .25);
+}
+
+.mode-check {
+    position: absolute;
+    top: .625rem;
+    right: .75rem;
+    font-size: .875rem;
+    color: rgb(139 92 246);
+    opacity: 0;
+    transform: scale(.6);
+    transition: opacity .2s, transform .2s;
+}
+
+.mode-card:has(input:checked) .mode-check {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* 迷你投影片示意：演講型為大字少量文字，閱讀型為密集文字欄 */
+.mode-thumb {
+    flex-shrink: 0;
+    width: 4.5rem;
+    height: 2.625rem;
+    padding: .3125rem .375rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    border-radius: .375rem;
+    border: 1px solid rgb(228 228 231);
+    background: #fff;
+}
+
+.dark .mode-thumb {
+    border-color: rgb(63 63 70);
+    background: rgb(24 24 27);
+}
+
+.mode-thumb i {
+    display: block;
+    height: 2px;
+    border-radius: 2px;
+    background: rgb(212 212 216);
+}
+
+.dark .mode-thumb i {
+    background: rgb(82 82 91);
+}
+
+.mode-thumb .mode-big {
+    display: block;
+    width: 1.75rem;
+    height: .75rem;
+    margin: 0 auto;
+    border-radius: 3px;
+}
+
+.mode-thumb .mode-big,
+.mode-thumb i.mode-accent {
+    background: rgb(161 161 170);
+    transition: background .2s;
+}
+
+.mode-card:has(input:checked) .mode-big,
+.mode-card:has(input:checked) i.mode-accent {
+    background: linear-gradient(90deg, rgb(59 130 246), rgb(168 85 247));
+}
+
 /* 匯出選單 */
 .export-item {
     width: 100%;
