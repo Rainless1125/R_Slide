@@ -115,9 +115,20 @@ def test_history_import_and_trim(monkeypatch):
     c = new_client()
     items = [item(f"i{n}", f"舊紀錄{n}", createdAt=n) for n in range(1, 4)]
     res = c.post("/api/history/import", json={"items": items})
-    assert res.json() == {"imported": 3}
+    assert res.json() == {"imported": 3, "skipped": 0}
     c.post("/api/history", json=item("new", "新的", createdAt=99))
     assert [h["id"] for h in c.get("/api/history").json()] == ["new", "i3", "i2"]   # 超過上限時刪最舊的
+
+
+def test_history_import_skips_bad_items_and_keeps_existing():
+    c = new_client()
+    c.post("/api/history", json=item("dup", "伺服器上已修改", createdAt=5))
+    bad = [{"id": "../x", "title": "t", "input": {}, "data": {}}, {"id": "nodata", "title": "t", "input": {}}, "not-an-object"]
+    res = c.post("/api/history/import", json={"items": [item("ok1", "可匯入", createdAt=1), item("dup", "舊版內容", createdAt=1), *bad]})
+    assert res.status_code == 200
+    assert res.json() == {"imported": 2, "skipped": 3}
+    assert c.get("/api/history/dup").json()["title"] == "伺服器上已修改"   # 匯入不覆蓋已存在的紀錄
+    assert c.get("/api/history/ok1").status_code == 200
 
 
 def test_history_rejects_bad_payload():

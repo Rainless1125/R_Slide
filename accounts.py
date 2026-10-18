@@ -1,6 +1,7 @@
 """帳號登入與各使用者的歷史記錄 API（資料存於 SQLite，見 store.py）。"""
 import os
 import re
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
@@ -89,7 +90,7 @@ class HistoryItem(BaseModel):
 
 
 class HistoryImport(BaseModel):
-    items: list[HistoryItem] = Field(max_length=store.MAX_HISTORY_PER_USER)
+    items: list[Any] = Field(max_length=store.MAX_HISTORY_PER_USER)    # 逐筆驗證，見 history_import
 
 
 class HistoryPatch(BaseModel):
@@ -132,10 +133,17 @@ async def history_add(request: Request, user: dict = Depends(current_user)):
 
 @router.post("/api/history/import")
 async def history_import(request: Request, user: dict = Depends(current_user)):
-    """匯入舊版存在瀏覽器 localStorage 的紀錄。"""
+    """匯入舊版存在瀏覽器 localStorage 的紀錄：格式不符的單筆略過，不讓整批失敗。"""
     body = await read_body(request, HistoryImport)
-    await run_in_threadpool(store.add_history, user["id"], [it.model_dump() for it in body.items])
-    return {"imported": len(body.items)}
+    valid = []
+    for raw in body.items:
+        try:
+            valid.append(HistoryItem.model_validate(raw).model_dump())
+        except ValidationError:
+            pass
+    # 已在伺服器上的同 id 紀錄不覆蓋（例如在另一台電腦已匯入並修改過）
+    await run_in_threadpool(store.add_history, user["id"], valid, False)
+    return {"imported": len(valid), "skipped": len(body.items) - len(valid)}
 
 
 @router.patch("/api/history/{item_id}")

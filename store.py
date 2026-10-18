@@ -204,12 +204,12 @@ def _trim(conn, user_id: int):
                  (user_id, user_id, MAX_HISTORY_PER_USER))
 
 
-def add_history(user_id: int, items: list[dict]):
-    """新增（或以相同 id 覆蓋）紀錄；items 需含 id、title、input、data，createdAt 可省略。"""
+def add_history(user_id: int, items: list[dict], replace: bool = True):
+    """新增紀錄；相同 id 已存在時 replace=True 覆蓋、False 保留原紀錄。items 需含 id、title、input、data，createdAt 可省略。"""
     now = now_ms()
     with connect() as conn:
         conn.executemany(
-            "INSERT OR REPLACE INTO history (user_id, id, title, input_json, data_json, pages, created_at, updated_at) "
+            f"INSERT OR {'REPLACE' if replace else 'IGNORE'} INTO history (user_id, id, title, input_json, data_json, pages, created_at, updated_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             [(user_id, it["id"], it["title"], json.dumps(it["input"], ensure_ascii=False),
               json.dumps(it["data"], ensure_ascii=False), _pages(it["data"]), it.get("createdAt") or now, now)

@@ -89,34 +89,81 @@ async function logout() {
     resetWorkspace(true);
     renderHistory();
     setCurrentUser(null);
+    updateLegacyImportBtn();
     document.getElementById('authUsername').value = '';
     setAuthMode('login');
     showAuth();
 }
 
-// 舊版的歷史記錄存在瀏覽器 localStorage：第一次登入時詢問是否匯入到目前的帳號
-async function importLegacyHistory() {
-    let list;
-    try { list = JSON.parse(localStorage.getItem(LEGACY_HISTORY_KEY)); } catch (_) { return; }
-    if (!Array.isArray(list)) return;
-    const items = list
-        .filter(h => h && typeof h.id === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(h.id) && Array.isArray(h.data?.slides))
-        .slice(0, MAX_HISTORY)
-        .map(h => ({
-            id: h.id,
-            title: String(h.title || '未命名簡報').slice(0, 200),
-            createdAt: Number.isFinite(h.createdAt) ? h.createdAt : null,
-            input: h.input && typeof h.input === 'object' ? h.input : {},
-            data: h.data
-        }));
-    if (!items.length) { try { localStorage.removeItem(LEGACY_HISTORY_KEY); } catch (_) { } return; }
-    if (!confirm(`這個瀏覽器裡有 ${items.length} 筆舊的歷史記錄，要匯入到「${currentUser}」帳號嗎？\n匯入後會從瀏覽器移除；選「取消」則保留，下次登入時再詢問。`)) return;
+// 舊版的歷史記錄存在瀏覽器 localStorage：只在這個瀏覽器第一次登入時自動詢問一次；
+// 之後（選了取消或匯入失敗）改由側邊欄的「匯入舊紀錄」按鈕手動匯入，不再每次載入都跳出
+const LEGACY_PROMPTED_KEY = 'rslide_history_v1_prompted';
+const IMPORT_BATCH_BYTES = 4 * 1024 * 1024;   // 分批送出，單次請求不超過伺服器與反向代理的上限
+let importingLegacy = false;
+
+function readLegacyHistory() {
     try {
-        await historyFetch('POST', '/import', { items });
-        try { localStorage.removeItem(LEGACY_HISTORY_KEY); } catch (_) { }
-        showToast(`已匯入 ${items.length} 筆歷史記錄`, 'success', 2400);
+        const list = JSON.parse(localStorage.getItem(LEGACY_HISTORY_KEY));
+        return Array.isArray(list) ? list.filter(h => h && typeof h === 'object') : [];
+    } catch (_) { return []; }
+}
+function clearLegacyHistory() {
+    try { localStorage.removeItem(LEGACY_HISTORY_KEY); localStorage.removeItem(LEGACY_PROMPTED_KEY); } catch (_) { }
+}
+function updateLegacyImportBtn() {
+    const n = currentUser ? readLegacyHistory().length : 0;
+    document.getElementById('legacyImportBtn').classList.toggle('hidden', !n);
+    document.getElementById('legacyImportLabel').textContent = `匯入此瀏覽器的舊紀錄（${n} 筆）`;
+}
+
+async function importLegacyHistory(manual = false) {
+    if (importingLegacy || !currentUser) return;
+    const list = readLegacyHistory();
+    if (!list.length) { clearLegacyHistory(); updateLegacyImportBtn(); return; }
+    let prompted = false;
+    try { prompted = localStorage.getItem(LEGACY_PROMPTED_KEY) === '1'; } catch (_) { }
+    if (!manual && prompted) { updateLegacyImportBtn(); return; }
+    try { localStorage.setItem(LEGACY_PROMPTED_KEY, '1'); } catch (_) { }
+
+    const ok = confirm(`這個瀏覽器裡有 ${list.length} 筆舊的歷史記錄，要匯入到「${currentUser}」帳號嗎？\n` +
+        '匯入後會從瀏覽器移除；選「取消」則保留，之後可從側邊欄的「匯入舊紀錄」按鈕再匯入。');
+    if (!ok) { updateLegacyImportBtn(); return; }
+
+    const items = list.slice(0, MAX_HISTORY).map(h => ({
+        id: String(h.id ?? ''),
+        title: String(h.title || '未命名簡報').slice(0, 200),
+        createdAt: Number.isFinite(h.createdAt) ? h.createdAt : null,
+        input: h.input && typeof h.input === 'object' && !Array.isArray(h.input) ? h.input : {},
+        data: h.data
+    }));
+    const batches = [];
+    let batch = [], size = 0;
+    for (const it of items) {
+        const n = JSON.stringify(it).length;
+        if (batch.length && size + n > IMPORT_BATCH_BYTES) { batches.push(batch); batch = []; size = 0; }
+        batch.push(it);
+        size += n;
+    }
+    if (batch.length) batches.push(batch);
+
+    importingLegacy = true;
+    let imported = 0, skipped = 0;
+    try {
+        for (const b of batches) {
+            const r = await historyFetch('POST', '/import', { items: b });
+            imported += r.imported;
+            skipped += r.skipped || 0;
+        }
+        clearLegacyHistory();
+        showToast(`已匯入 ${imported} 筆歷史記錄` + (skipped ? `，${skipped} 筆資料不完整已略過` : ''), 'success', 3200);
+        await loadHistory();
     } catch (err) {
-        if (!err.handled) showToast('匯入舊紀錄失敗：' + friendlyError(err), 'error', 6000);
+        // 已送出的批次重送時不會重複（伺服器以 id 去重），所以失敗時保留瀏覽器中的資料，可用按鈕重試
+        if (!err.handled) showToast('匯入舊紀錄失敗：' + friendlyError(err) + '，可稍後從側邊欄按鈕重試', 'error', 8000);
+        if (imported) await loadHistory();
+    } finally {
+        importingLegacy = false;
+        updateLegacyImportBtn();
     }
 }
 
