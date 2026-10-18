@@ -12,6 +12,7 @@ from google.genai import types
 from openai import BadRequestError, OpenAI
 from starlette.datastructures import UploadFile
 
+from accounts import router as accounts_router
 from charts import CHART_RULES, MAX_CHARTS_PER_SLIDE, ChartSpec, normalize_charts
 from exporter import ExportError, build_pptx
 from extract import MAX_UPLOAD_BYTES, ExtractError, extract_text
@@ -426,6 +427,7 @@ def regenerate_slide(req: RegenerateSlideRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+app.include_router(accounts_router)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/favicon.ico", include_in_schema=False)

@@ -55,6 +55,17 @@
                 </div>
             </div>
 
+            <div class="flex items-center gap-1 sm:gap-2 min-w-0">
+            <div id="userChip" class="hidden flex items-center gap-1 min-w-0">
+                <span class="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-zinc-600 dark:text-zinc-300 min-w-0">
+                    <i class="fa-solid fa-circle-user text-zinc-400"></i><span id="userName" class="truncate max-w-[10rem]"></span>
+                </span>
+                <button onclick="logout()"
+                    class="icon-btn w-9 h-9 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-red-500 focus:outline-none"
+                    aria-label="登出" title="登出">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
+            </div>
             <button id="themeBtn" onclick="toggleTheme()"
                 class="icon-btn h-9 px-3 shrink-0 whitespace-nowrap rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-2 text-sm font-semibold text-zinc-600 dark:text-zinc-300 focus:outline-none"
                 aria-label="切換深色／淺色模式" title="切換深色／淺色模式">
@@ -63,6 +74,7 @@
                 <span class="hidden dark:inline">深色模式</span>
                 <span class="inline dark:hidden">淺色模式</span>
             </button>
+            </div>
         </div>
     </header>
 
@@ -91,9 +103,13 @@
                 aria-label="清除全部歷史記錄"><i class="fa-regular fa-trash-can"></i></button>
         </div>
         <div id="historyList" class="flex-1 overflow-y-auto no-scrollbar px-3 pb-4 space-y-2"></div>
+        <button id="legacyImportBtn" type="button" onclick="importLegacyHistory(true)"
+            class="hidden mx-3 mb-2 px-3 py-2 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 text-xs font-semibold text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-center gap-1.5 transition-colors">
+            <i class="fa-solid fa-file-import"></i><span id="legacyImportLabel">匯入此瀏覽器的舊紀錄</span>
+        </button>
         <div
             class="p-3 border-t border-zinc-100 dark:border-zinc-800 text-[11px] text-zinc-400 flex items-center gap-1.5">
-            <i class="fa-solid fa-database"></i> 資料僅儲存於此瀏覽器
+            <i class="fa-solid fa-database"></i> 紀錄儲存於伺服器，僅你的帳號可見
         </div>
     </aside>
     <div id="sbOverlay" onclick="toggleSidebar()"></div>
@@ -462,6 +478,37 @@
         </footer>
     </div>
 
+    <!-- 登入 / 註冊（static/app/auth.js） -->
+    <div id="authModal" role="dialog" aria-modal="true" aria-labelledby="authTitle"
+        class="hidden fixed inset-0 z-[100] bg-zinc-100/80 dark:bg-zinc-950/85 backdrop-blur-md p-4 flex items-center justify-center">
+        <form onsubmit="submitAuth(event)" novalidate
+            class="w-full max-w-sm rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-6 sm:p-7">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-9 h-9 bg-black dark:bg-white text-white dark:text-black rounded-md flex items-center justify-center font-black text-lg">R</div>
+                <div>
+                    <h3 id="authTitle" class="text-lg font-bold leading-tight">登入 R Slide</h3>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400">歷史記錄會依帳號分開保存</p>
+                </div>
+            </div>
+            <label for="authUsername" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">帳號</label>
+            <input id="authUsername" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="32"
+                class="mt-1.5 mb-4 w-full h-10 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow">
+            <label for="authPassword" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">密碼</label>
+            <input id="authPassword" type="password" autocomplete="current-password" maxlength="128"
+                class="mt-1.5 w-full h-10 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white transition-shadow">
+            <p id="authHint" class="hidden mt-2 text-[11px] text-zinc-500 dark:text-zinc-400">帳號 2~32 字（文字、數字與 . _ - @），密碼至少 6 個字元</p>
+            <p id="authError" role="alert" class="min-h-[1.25rem] mt-2 text-xs text-red-500"></p>
+            <button id="authSubmit" type="submit"
+                class="mt-2 w-full h-10 rounded-lg bg-black text-white dark:bg-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 text-sm font-semibold disabled:opacity-50 transition-colors">
+                <span id="authSubmitLabel">登入</span>
+            </button>
+            <p id="authSwitch" class="mt-4 text-center text-xs text-zinc-500 dark:text-zinc-400">
+                <span id="authSwitchText">還沒有帳號？</span>
+                <button id="authSwitchBtn" type="button" onclick="toggleAuthMode()" class="font-semibold text-black dark:text-white hover:underline">註冊新帳號</button>
+            </p>
+        </form>
+    </div>
+
     <!-- 重產此頁 Modal -->
     <div id="regenModal"
         class="hidden fixed inset-0 z-[90] bg-black/45 backdrop-blur-sm p-4 flex items-center justify-center">
@@ -601,7 +648,8 @@
     <script src="/static/app/editor.js?v=2"></script>
     <script src="/static/app/media.js?v=2"></script>
     <script src="/static/app/player.js?v=2"></script>
-    <script src="/static/app/main.js?v=2"></script>
+    <script src="/static/app/auth.js?v=2"></script>
+    <script src="/static/app/main.js?v=3"></script>
 </body>
 
 </html>

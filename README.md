@@ -17,7 +17,8 @@
 - **講者備註與講者檢視**:LLM 會為每頁產生口語化的講稿(補充畫面上沒寫的脈絡,不重複投影片文字),可在播放器下方的備註區直接修改(快捷鍵 N)。「講者檢視」(快捷鍵 P)另開視窗顯示目前頁、下一頁、備註與計時器,適合主畫面投影、筆電看講稿;在講者檢視中可用方向鍵、PageUp / PageDown(簡報筆)換頁。備註會寫入 PPTX 的備忘稿,HTML 匯出也可按 N 顯示。
 - **單頁重新生成**:不滿意某一頁時,可附加需求單獨重產,並維持整份簡報一致。
 - **匯出 PDF / PPTX / HTML**:PDF 與 PPTX 的每一頁為 2 倍解析度的圖片,外觀與畫面一致,但文字無法再編輯;HTML 為可直接播放的單一檔案,匯出時會清理 AI 產生的內容(移除 script、事件屬性、外部資源白名單)。
-- **輕量部署**:後端為單一 FastAPI 服務,前端為靜態檔案,無需資料庫。
+- **帳號與歷史記錄**:以帳號密碼登入,每位使用者的簡報歷史記錄分開存放於伺服器的 SQLite 檔案,換電腦或瀏覽器也能接續使用。
+- **輕量部署**:後端為單一 FastAPI 服務,前端為靜態檔案;資料庫為內建的 SQLite,不需另外架設資料庫伺服器。
 
 > **編輯模式的限制**:LLM 生成的版面目前**只能修改文字與樣式**(字級、粗細、對齊、顏色、圓角),以及調整同層順序、複製或刪除元素,**無法自由拖曳移動或縮放**;LLM 產生的圖表也只能修改數據,位置與大小固定。若需要自由擺放,請使用編輯模式的「插入文字」「插入圖片」「插入圖表」「插入圖示」,自行插入的內容可以拖曳移動、拉角落調整大小。
 >
@@ -78,6 +79,27 @@ DATABRICKS_MODELS=databricks-claude-sonnet-4-5,databricks-gpt-oss-120b
 - 單檔上限 10 MB(`extract.py` 的 `MAX_UPLOAD_BYTES`);抽出的文字超過 50,000 字時會截斷並提示。
 - 掃描影像型 PDF 沒有文字層,目前不支援(未做 OCR);舊版 `.doc` 請先另存為 `.docx`。
 
+### 帳號與歷史記錄
+
+- 第一次開啟時需註冊 / 登入;歷史記錄依帳號分開存放,其他使用者看不到。每個帳號最多保留 200 筆,超過時自動刪除最舊的紀錄。
+- 資料庫為單一 SQLite 檔案,預設 `data/rslide.db`(第一次使用時自動建立),**備份時複製整個 `data/` 資料夾即可**。請放在本機磁碟,不要放在 NFS / SMB 等網路磁碟上。
+- 舊版存在瀏覽器 localStorage 的歷史記錄,會在該瀏覽器第一次登入時詢問是否匯入到目前的帳號。
+- 密碼以 scrypt 雜湊儲存;登入狀態為 HttpOnly cookie,有效 30 天。
+
+| 變數 | 說明 | 預設 |
+|------|------|------|
+| `RSLIDE_DB_PATH` | SQLite 檔案路徑 | `data/rslide.db` |
+| `ALLOW_REGISTRATION` | 是否開放在登入頁自行註冊;設為 `false` 時只能由管理員建立帳號 | `true` |
+| `COOKIE_SECURE` | 以 HTTPS 提供服務時設為 `true`,登入 cookie 只會經由 HTTPS 傳送 | `false` |
+
+管理員可在伺服器上以指令管理帳號:
+
+```bash
+python manage_users.py list                    # 列出帳號與紀錄筆數
+python manage_users.py add <帳號>               # 建立帳號(關閉註冊時使用)
+python manage_users.py reset-password <帳號>    # 重設密碼,該帳號所有裝置需重新登入
+```
+
 ## 部署到自己的伺服器
 
 `python app.py` 預設只監聽 `127.0.0.1`(`reload=True`,僅適合開發)。正式部署建議:
@@ -89,14 +111,14 @@ uvicorn app:app --host 0.0.0.0 --port 8000
 並置於 Nginx / Caddy 等反向代理之後啟用 HTTPS。若使用 Nginx,其預設上傳上限為 1 MB,需調高才能匯入較大的檔案或匯出 PPTX:
 
 ```nginx
-client_max_body_size 40m;   # 檔案匯入上限 10 MB;匯出 PPTX 時整份簡報的圖片上限 40 MB
+client_max_body_size 40m;   # 檔案匯入上限 10 MB;匯出 PPTX 與儲存單筆歷史記錄的上限 40 MB
 ```
 
-> **注意**:本服務目前沒有登入驗證。對外開放前請自行在反向代理層加上驗證(Basic Auth、SSO 等),避免 API Key 額度被他人使用。
+> **注意**:登入目前只用來區分歷史記錄,生成、匯出等 API 並未要求登入。若服務會對外開放,請在反向代理層加上驗證(Basic Auth、SSO 等)或將 `ALLOW_REGISTRATION` 設為 `false`,避免 API Key 額度被他人使用。
 
 ### 網路與資料流向(地端部署前請務必了解)
 
-資料**不會**存放在伺服器上(無資料庫),但目前並非完全離線:
+伺服器只保存帳號與歷史記錄(SQLite,見上方「帳號與歷史記錄」),上傳的檔案與匯出的簡報都不保存;目前並非完全離線:
 
 | 項目 | 說明 |
 |------|------|
@@ -105,7 +127,7 @@ client_max_body_size 40m;   # 檔案匯入上限 10 MB;匯出 PPTX 時整份簡�
 | 前端資源 | 介面載入 Tailwind CDN 與 Font Awesome CDN,使用者瀏覽器需可連外。 |
 | 匯出 PDF | 在瀏覽器端完成,不經過伺服器;第一次匯出時會從 cdnjs 載入 html-to-image 與 jsPDF。 |
 | 匯出 PPTX | 每頁圖片由瀏覽器渲染後送到伺服器組成 PPTX,伺服器不保存;同樣需從 cdnjs 載入 html-to-image。 |
-| 插入圖片 | 在瀏覽器端縮至最長邊 1600px 後以 data URL 存在簡報與歷史記錄(localStorage)中,不會上傳;重產單頁時圖片也不會送給 LLM。圖片多時歷史記錄可能因儲存空間不足而自動移除較舊的紀錄。 |
+| 插入圖片 | 在瀏覽器端縮至最長邊 1600px 後以 data URL 內嵌於簡報,隨歷史記錄存入伺服器的 SQLite;重產單頁時圖片不會送給 LLM。單筆紀錄上限 40 MB。 |
 | 匯出 HTML | 目前為 CDN 版;離線版(內嵌 Tailwind / Font Awesome / 字型)尚在規劃中。 |
 
 若需要完全內網 / 離線運作,需自行改接內部 LLM 端點並自架前端靜態資源。
@@ -115,6 +137,9 @@ client_max_body_size 40m;   # 檔案匯入上限 10 MB;匯出 PPTX 時整份簡�
 ```
 charts.py         圖表資料的 schema、LLM 提示規則與正規化
 app.py            FastAPI 後端(/api/generate、/api/regenerate-slide、/api/extract、/api/export/pptx、/api/models)
+accounts.py       登入 / 註冊與歷史記錄 API(/api/auth/*、/api/history)
+store.py          SQLite 資料存取(帳號、登入 session、歷史記錄)
+manage_users.py   帳號管理指令(列出、建立帳號、重設密碼)
 extract.py        上傳檔案的文字抽取(PDF / DOCX / Markdown / TXT)
 exporter.py       將投影片圖片組成 PPTX(/api/export/pptx)
 static/index.html 前端介面(HTML 結構;樣式與程式在 static/app/)
@@ -126,6 +151,7 @@ static/app/       主畫面的樣式與程式,依功能分檔,以一般 <script>
   editor.js       撤銷 / 重做、選取與行內文字編輯、格式工具列
   media.js        圖片、文字方塊、圖示、浮動物件拖曳縮放、圖表資料編輯
   player.js       頁面管理、播放器、自動播放、全螢幕、匯出選單
+  auth.js         登入 / 註冊、登出、匯入舊版 localStorage 歷史記錄
   main.js         全域快捷鍵、捲動 / 縮放事件與啟動(最後載入)
 static/charts.js  圖表 → 靜態 SVG 繪製
 static/chart-grid.js 圖表數據的試算表式輸入表格
