@@ -1,6 +1,6 @@
 """SQLite 儲存：使用者帳號、登入 session 與各使用者的簡報歷史記錄。
 
-資料庫是單一檔案（預設 data/rslide.db，可用 RSLIDE_DB_PATH 指定），備份時複製該檔即可。
+資料庫是單一檔案（預設為專案目錄下的 data/rslide.db，可用 RSLIDE_DB_PATH 指定），備份時複製該檔即可。
 每次操作開一個新連線：SQLite 開連線很便宜，也不必處理跨執行緒共用連線的問題。
 """
 import hashlib
@@ -12,7 +12,8 @@ import sqlite3
 import time
 from contextlib import closing, contextmanager
 
-DEFAULT_DB_PATH = os.path.join("data", "rslide.db")
+# 以本檔所在位置為基準（與 app.py 的 STATIC_DIR 相同），從其他目錄啟動 uvicorn 也會用同一個資料庫
+DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "rslide.db")
 
 SESSION_TTL_SECONDS = 30 * 24 * 3600
 MAX_HISTORY_PER_USER = 200          # 超過時自動刪除最舊的紀錄

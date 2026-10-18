@@ -31,6 +31,7 @@ let currentHistoryId = null;
 let autoplayTimer = null;
 let loadingTimer = null;
 let regeneratingSlideIdx = null;
+let regeneratingDeck = null;     // 正在重產的頁面所屬的簡報（重產期間可切換到其他簡報）
 let regenerateModalSlideIdx = null;
 let currentStep = 1;
 
@@ -106,6 +107,8 @@ function friendlyError(err) {
     else if (has(/timed? ?out|deadline|DEADLINE_EXCEEDED|504/i)) msg = 'AI 回應逾時，請稍後再試，或減少頁數與內容長度。';
     else if (status === 503 || has(/overloaded|unavailable|UNAVAILABLE|high demand/i)) msg = 'AI 服務目前忙碌中，請稍後再試，或換一個模型。';
     else if (has(/拒絕回應|safety|blocked|refus/i)) msg = '模型拒絕處理這段內容，請調整素材後再試。';
+    else if (has(/MAX_TOKENS|長度上限/)) msg = 'AI 輸出太長被截斷，請減少頁數或精簡內容後再試。';
+    else if (has(/沒有回傳內容/)) msg = 'AI 沒有回傳任何內容，請稍後再試，或換一個模型。';
     else if (has(/JSON|Unterminated|Expecting|validation|parse/i)) msg = 'AI 回傳的格式有誤，通常重試一次即可。';
     else if (has(/not.?found|404|model/i) && has(/model/i)) msg = '找不到所選模型，請改選其他模型。';
     else if (status >= 500 || !raw) msg = '伺服器發生錯誤，請稍後再試。';

@@ -12,7 +12,7 @@
 - **插入文字與圖片**:編輯模式中可插入文字方塊(字級、粗細、顏色沿用格式工具列),也可上傳、拖放或貼上圖片;兩者都能拖曳移動、拉角落調整大小。圖片在瀏覽器端壓縮後內嵌於簡報,不經過伺服器。
 - **快速插入圖示**:編輯模式中點「圖示」開啟清單,內建 150 個辦公室簡報常用的 Font Awesome Free 圖示,依商務、財務、數據、人員、溝通、文件、時間、科技、流程、箭頭、地點、常用符號分組,每列 10 個;可用中英文關鍵字搜尋(例如 `cash`、`會議`、`成長`),Enter 直接插入第一個結果。插入後可拖曳移動、拉角落等比縮放,顏色、背景與圓角沿用格式工具列(背景 + 圓形圓角即可做成圖示徽章)。
 - **匯入檔案作為素材**:支援 PDF、Word(.docx)、Markdown、TXT,可點選上傳、拖放或貼上檔案;文字抽出後會先填入輸入框,可檢查、修改再生成。
-- **多模型支援**:Gemini 與 OpenAI 可切換,只需設定其中一個 API Key。
+- **多模型支援**:Gemini、OpenAI 與 Databricks AI Gateway 可切換,只需設定其中一組;Databricks 適合公司統一透過 AI Gateway 管理模型與費用的情境。
 - **視覺風格可指定**:例如「蘋果極簡白」、科技深色風等,以 Tailwind CSS 實踐。
 - **講者備註與講者檢視**:LLM 會為每頁產生口語化的講稿(補充畫面上沒寫的脈絡,不重複投影片文字),可在播放器下方的備註區直接修改(快捷鍵 N)。「講者檢視」(快捷鍵 P)另開視窗顯示目前頁、下一頁、備註與計時器,適合主畫面投影、筆電看講稿;在講者檢視中可用方向鍵、PageUp / PageDown(簡報筆)換頁。備註會寫入 PPTX 的備忘稿,HTML 匯出也可按 N 顯示。
 - **單頁重新生成**:不滿意某一頁時,可附加需求單獨重產,並維持整份簡報一致。
@@ -26,7 +26,7 @@
 
 ## 快速開始
 
-需求:Python 3.10+(開發環境為 3.13)、至少一組 Gemini 或 OpenAI API Key。
+需求:Python 3.10+(開發環境為 3.13)、至少一組 Gemini / OpenAI API Key 或 Databricks AI Gateway 設定。
 
 ```bash
 git clone https://github.com/Rainless1125/R_Slide.git
@@ -44,14 +44,34 @@ python app.py
 
 ## 設定
 
-於專案根目錄的 `.env` 設定(至少填一個):
+於專案根目錄的 `.env` 設定(以下三組平台至少設定一組):
 
 | 變數 | 說明 | 必填 |
 |------|------|------|
-| `GEMINI_API_KEY` | Google Gemini API Key | 與 OpenAI 擇一 |
-| `OPENAI_API_KEY` | OpenAI API Key | 與 Gemini 擇一 |
+| `GEMINI_API_KEY` | Google Gemini API Key | 三組擇一 |
+| `OPENAI_API_KEY` | OpenAI API Key | 三組擇一 |
+| `DATABRICKS_HOST` | Databricks workspace 網址,例如 `https://adb-123.azuredatabricks.net` | 使用 Databricks 時 |
+| `DATABRICKS_TOKEN` | Databricks 存取權杖(PAT 或 service principal 的 token) | 使用 Databricks 時 |
+| `DATABRICKS_MODELS` | 開放給使用者選的模型(serving endpoint 名稱),以逗號分隔,第一個為預設 | 使用 Databricks 時 |
+| `DATABRICKS_BASE_URL` | 選填,覆寫 OpenAI 相容端點;預設為 `<DATABRICKS_HOST>/serving-endpoints` | 否 |
 
-可選模型清單定義於 `app.py` 的 `MODEL_CATALOG`,可依需求修改。
+Gemini 與 OpenAI 的可選模型清單定義於 `app.py` 的 `MODEL_CATALOG`,可依需求修改;Databricks 的模型清單則完全由 `DATABRICKS_MODELS` 決定,前端只能選清單內的模型。
+
+### 使用 Databricks AI Gateway
+
+Databricks 的 Model Serving / AI Gateway 提供 OpenAI 相容 API,本服務以 OpenAI SDK 呼叫:
+
+```env
+DATABRICKS_HOST=https://<workspace>.cloud.databricks.com
+DATABRICKS_TOKEN=<token>
+DATABRICKS_MODELS=databricks-claude-sonnet-4-5,databricks-gpt-oss-120b
+```
+
+- **模型名稱**:填 Databricks「Serving」頁面上的 endpoint 名稱(公司自建的外部模型 endpoint 也可以)。
+- **端點路徑**:預設呼叫 `<DATABRICKS_HOST>/serving-endpoints`;若公司改用 Unity AI Gateway 的新路徑,可設定 `DATABRICKS_BASE_URL=https://<workspace>/ai-gateway/mlflow/v1`,模型名稱改用 `system.ai.<模型>` 這類完整名稱。
+- **結構化輸出**:先以 JSON Schema 結構化輸出呼叫;若該模型不支援(回 400),會自動改為在提示詞附上 schema、由後端驗證回傳的 JSON。
+- **權杖**:測試可用個人 PAT;正式上線建議使用 service principal 的權杖,避免綁定個人帳號。
+- **用量與限流**:所有請求都以同一個權杖送出,Databricks 端只會看到「這個服務」的用量;流量限制、用量追蹤與內容記錄請在 Databricks 的 AI Gateway 設定。
 
 ### 檔案匯入限制
 
@@ -103,7 +123,7 @@ client_max_body_size 40m;   # 檔案匯入上限 10 MB;匯出 PPTX 與儲存單�
 | 項目 | 說明 |
 |------|------|
 | 檔案匯入 | 伺服器只抽取文字回傳給瀏覽器,不保存檔案;超過 1 MB 的檔案在解析期間會暫存於系統暫存目錄,處理完即刪除。抽取過程不會連外。 |
-| LLM 呼叫 | 輸入內容會送往 Gemini / OpenAI API,伺服器需可連外至這些服務。 |
+| LLM 呼叫 | 輸入內容會送往 Gemini / OpenAI API 或公司的 Databricks workspace,伺服器需可連到這些服務。 |
 | 前端資源 | 介面載入 Tailwind CDN 與 Font Awesome CDN,使用者瀏覽器需可連外。 |
 | 匯出 PDF | 在瀏覽器端完成,不經過伺服器;第一次匯出時會從 cdnjs 載入 html-to-image 與 jsPDF。 |
 | 匯出 PPTX | 每頁圖片由瀏覽器渲染後送到伺服器組成 PPTX,伺服器不保存;同樣需從 cdnjs 載入 html-to-image。 |

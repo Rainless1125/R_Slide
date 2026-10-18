@@ -78,3 +78,24 @@ def test_rejects_malformed_payload():
                        headers={"content-type": "application/json"}).status_code == 400
     assert client.post("/api/export/pptx", json=["x"]).status_code == 400
     assert client.post("/api/export/pptx", json={"slides": ["x"]}).status_code == 400
+
+
+def test_non_string_title_falls_back_to_page_label():
+    res = export([{"title": 123, "image": image_data_url()}])
+    assert res.status_code == 200
+    (pic,) = Presentation(io.BytesIO(res.content)).slides[0].shapes
+    assert pic._element.nvPicPr.cNvPr.get("descr") == "第 1 頁"
+
+
+def test_non_string_image_is_rejected():
+    res = export([{"title": "封面", "image": 123}])
+    assert res.status_code == 400
+    assert "圖片格式不正確" in res.json()["detail"]
+
+
+def test_decompression_bomb_is_rejected():
+    buf = io.BytesIO()
+    Image.new("1", (20000, 20000)).save(buf, "PNG")   # 壓縮後很小，但像素數超過 PIL 的安全上限
+    res = export([{"title": "封面", "image": "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()}])
+    assert res.status_code == 400
+    assert "尺寸過大" in res.json()["detail"]

@@ -180,10 +180,11 @@ function initPresenter(win) {
     $('pFontUp').onclick = () => setFont(fontSize + 2);
     setFont(fontSize);
 
-    $('pPrev').onclick = () => prevSlide();
-    $('pNext').onclick = () => nextSlide();
+    // 主視窗按「新增簡報」或刪除目前紀錄後，講者檢視可能仍開著，此時沒有可切換的投影片
+    $('pPrev').onclick = () => { if (currentPresentationData) prevSlide(); };
+    $('pNext').onclick = () => { if (currentPresentationData) nextSlide(); };
     doc.addEventListener('keydown', e => {
-        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        if (e.ctrlKey || e.metaKey || e.altKey || !currentPresentationData) return;
         const last = currentPresentationData.slides.length - 1;
         if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(e.key)) { e.preventDefault(); prevSlide(); }
         else if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(e.key)) { e.preventDefault(); nextSlide(); }
