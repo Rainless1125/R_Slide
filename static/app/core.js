@@ -31,6 +31,7 @@ let currentHistoryId = null;
 let autoplayTimer = null;
 let loadingTimer = null;
 let regeneratingSlideIdx = null;
+let regeneratingDeck = null;     // 正在重產的頁面所屬的簡報（重產期間可切換到其他簡報）
 let regenerateModalSlideIdx = null;
 let currentStep = 1;
 

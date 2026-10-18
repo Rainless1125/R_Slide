@@ -129,6 +129,7 @@ function _exportSanitizeOnce(html) {
             const u = _exportNormalizeUrl(value);
             if (name === 'srcset') { el.removeAttribute(attr.name); continue; }
             if (/^(javascript|vbscript):/.test(u)) { el.removeAttribute(attr.name); continue; }
+            if (tag === 'img' && name === 'src' && value === EXPORT_PLACEHOLDER_IMG) continue;   // 先前清理放入的佔位圖（固定內容的 SVG）
             if (u.startsWith('data:') && !(u.startsWith('data:image/') && !u.startsWith('data:image/svg'))) {
                 el.removeAttribute(attr.name); continue;           // data:text/html、data:image/svg+xml 等
             }

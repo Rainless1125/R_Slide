@@ -330,7 +330,7 @@ function renderReviewSection(quiet = false) {
         container.appendChild(card);
     });
     fitReviewThumbs();
-    if (regeneratingSlideIdx !== null) setReviewRegenerateState(regeneratingSlideIdx, true);
+    if (regeneratingSlideIdx !== null && regeneratingDeck === currentPresentationData) setReviewRegenerateState(regeneratingSlideIdx, true);
 
     if (!quiet) review.scrollIntoView({ behavior: 'smooth' });
 }
@@ -449,6 +449,7 @@ async function regenerateSingleSlide(idx, customPrompt = '') {
     const deck = currentPresentationData;
     const targetSlide = deck.slides[idx];
     regeneratingSlideIdx = idx;
+    regeneratingDeck = deck;
     updateUndoButtons();
     setReviewRegenerateState(idx, true);
     setCurrentRegenerateState(true);
@@ -519,6 +520,7 @@ async function regenerateSingleSlide(idx, customPrompt = '') {
         setReviewRegenerateState(idx, false);
         setCurrentRegenerateState(false);
         regeneratingSlideIdx = null;
+        regeneratingDeck = null;
         updateUndoButtons();
         modalConfirmBtn.disabled = false;
         modalCancelBtn.disabled = false;
