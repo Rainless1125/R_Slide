@@ -342,9 +342,49 @@ body.sb-open #sidebar {
     }
 }
 
+/* ---------- 流光漸層按鈕：平時緩慢流動，hover／生成中加速 ----------
+ * 直接改 animation-duration 會讓漸層位置瞬間跳動，所以疊兩層：
+ * ::before 慢速常駐，::after 快速、平時透明，hover／disabled 時淡入。 */
+.btn-flow {
+    isolation: isolate;
+    box-shadow: 0 8px 24px -8px rgba(168, 85, 247, .6);
+}
+
+.btn-flow::before,
+.btn-flow::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background-image: linear-gradient(110deg, #3b82f6, #a855f7, #ec4899, #a855f7, #3b82f6);
+    background-size: 300% 100%;
+    animation: btnFlow 6s linear infinite;
+}
+
+.btn-flow::after {
+    animation-duration: 1.6s;
+    opacity: 0;
+    transition: opacity .4s;
+}
+
+.btn-flow:hover::after,
+.btn-flow:disabled::after {
+    opacity: 1;
+}
+
+@keyframes btnFlow {
+    to { background-position: 300% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .btn-flow::before,
+    .btn-flow::after { animation: none; }
+}
+
 /* ---------- 粒子爆發按鈕 ---------- */
 #btnGenerate:not(:disabled):hover {
-    box-shadow: 0 8px 22px rgba(124, 92, 255, .35);
+    box-shadow: 0 14px 32px -10px rgba(168, 85, 247, .75);
 }
 
 #btnGenerate .dots {
