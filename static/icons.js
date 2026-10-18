@@ -1,4 +1,4 @@
-/* 快速插入圖示：內建 150 個 Font Awesome 6 Free（solid）辦公室簡報常用圖示
+/* 快速插入圖示：內建 300 個 Font Awesome 6 Free（solid）辦公室簡報常用圖示
  * 依用途分組；每個圖示附中英文關鍵字，搜尋時比對圖示名稱、關鍵字與分組名稱。
  * 名稱須存在於 index.html 載入的 Font Awesome 6.5.1 free（tests/test_icons.py 會檢查數量與重複）。 */
 const RS_ICON_GROUPS = [
@@ -17,6 +17,14 @@ const RS_ICON_GROUPS = [
             ['flag-checkered', 'finish goal complete 終點 完成 達標'],
             ['trophy', 'win award champion 獎盃 冠軍 獲勝 成就'],
             ['award', 'prize badge certificate 獎章 獎項 認證'],
+            ['scale-balanced', 'balance fair legal 天平 公平 法務 平衡'],
+            ['compass', 'direction navigation guide 指南針 方向 導引'],
+            ['mountain', 'challenge peak summit 山 挑戰 高峰'],
+            ['medal', 'honor rank achievement 勳章 榮譽 名次'],
+            ['gem', 'value premium quality 寶石 價值 優質'],
+            ['seedling', 'start growth sprout 新芽 萌芽 起步 培育'],
+            ['brain', 'think intelligence strategy 大腦 思考 智慧'],
+            ['stairs', 'progress step ladder 階梯 進程 步驟'],
         ]
     },
     {
@@ -34,6 +42,14 @@ const RS_ICON_GROUPS = [
             ['hand-holding-dollar', 'cash investment donation pay 投資 捐款 給付 現金'],
             ['file-invoice-dollar', 'invoice bill accounting 發票 帳單 請款 會計'],
             ['landmark', 'bank government finance 銀行 政府 機構'],
+            ['receipt', 'bill expense 收據 帳單 費用'],
+            ['money-check-dollar', 'check payment cheque 支票 付款 票據'],
+            ['ticket', 'coupon voucher ticket 票券 優惠券 門票'],
+            ['circle-dollar-to-slot', 'donation charity 捐款 公益 捐助'],
+            ['scale-unbalanced', 'risk imbalance deficit 失衡 赤字 不平衡'],
+            ['chart-simple', 'simple chart statistics 簡易圖表 統計'],
+            ['file-invoice', 'invoice bill document 發票 帳單 單據'],
+            ['hand-holding-heart', 'donate care support 捐贈 關懷 支持'],
         ]
     },
     {
@@ -51,6 +67,14 @@ const RS_ICON_GROUPS = [
             ['table', 'spreadsheet grid data 表格 試算表 資料'],
             ['database', 'data storage 資料庫 數據 儲存'],
             ['magnifying-glass-chart', 'analysis research insight 分析 研究 洞察'],
+            ['chart-area', 'area graph trend 面積圖 趨勢'],
+            ['chart-gantt', 'gantt schedule project 甘特圖 排程 專案'],
+            ['list-ol', 'numbered ranking steps 編號 排序 步驟'],
+            ['arrow-up-wide-short', 'sort ascending order 升冪 排序 由小到大'],
+            ['arrow-down-wide-short', 'sort descending order 降冪 排序 由大到小'],
+            ['square-poll-vertical', 'poll survey vote 投票 民調 問卷'],
+            ['binoculars', 'explore insight monitor 探索 觀察 監控'],
+            ['table-list', 'table list rows 表格 清單 列表'],
         ]
     },
     {
@@ -68,6 +92,14 @@ const RS_ICON_GROUPS = [
             ['id-badge', 'employee badge identity 識別證 員工證'],
             ['id-card', 'identity card 身分證 證件'],
             ['address-card', 'contact business card 名片 聯絡人'],
+            ['user-clock', 'attendance late schedule 出勤 遲到 排班'],
+            ['user-pen', 'edit profile sign 編輯 個人資料 簽名'],
+            ['user-gear', 'role setting account 角色 設定 帳號'],
+            ['user-xmark', 'absent remove deny 缺席 移除 拒絕'],
+            ['user-slash', 'disable blocked inactive 停用 封鎖 無效'],
+            ['people-line', 'team growth 團隊 成長 人力'],
+            ['hands-helping', 'support help assist 協助 幫忙 支援'],
+            ['users-gear', 'team settings group 群組設定 團隊管理'],
         ]
     },
     {
@@ -85,6 +117,14 @@ const RS_ICON_GROUPS = [
             ['video', 'meeting camera conference 視訊 會議 影片'],
             ['microphone', 'speech voice podcast 麥克風 演講 語音'],
             ['headset', 'support customer service 客服 支援 耳機'],
+            ['at', 'mention email handle 提及 帳號 電子郵件'],
+            ['inbox', 'mailbox incoming 收件匣 待處理'],
+            ['message', 'chat text 訊息 文字'],
+            ['phone-volume', 'call ring 來電 響鈴'],
+            ['podcast', 'audio broadcast 播客 廣播 音訊'],
+            ['tower-broadcast', 'live broadcast signal 直播 訊號 廣播'],
+            ['rss', 'feed subscribe 訂閱 資訊流'],
+            ['quote-left', 'quote citation 引言 引述 語錄'],
         ]
     },
     {
@@ -102,6 +142,14 @@ const RS_ICON_GROUPS = [
             ['clipboard-check', 'done approved checklist 已完成 核對 檢查'],
             ['book', 'manual guide reading 書 手冊 指南'],
             ['newspaper', 'news press article 新聞 報紙 文章'],
+            ['file-circle-check', 'approved document ready 已核准 文件就緒'],
+            ['file-circle-plus', 'new document create 新增文件 建立'],
+            ['file-arrow-up', 'upload document 上傳文件'],
+            ['file-arrow-down', 'download document 下載文件'],
+            ['file-image', 'image picture 圖片檔 影像'],
+            ['file-code', 'source code script 程式碼 原始碼'],
+            ['file-zipper', 'zip compressed archive 壓縮檔 封存'],
+            ['file-signature', 'sign signature 簽名 簽署 簽呈'],
         ]
     },
     {
@@ -116,6 +164,14 @@ const RS_ICON_GROUPS = [
             ['timeline', 'roadmap history schedule 時間軸 里程 路線圖'],
             ['list-check', 'todo task checklist 待辦清單 任務 進度'],
             ['bars-progress', 'progress status gantt 進度 甘特圖 狀態'],
+            ['hourglass-start', 'begin start pending 開始 啟動'],
+            ['hourglass-end', 'deadline ending finish 結束 截止'],
+            ['calendar-plus', 'add event new 新增行程 新增日程'],
+            ['calendar-xmark', 'cancel canceled 取消 停辦'],
+            ['calendar-week', 'week weekly 週曆 週間'],
+            ['calendar-day', 'today day 今天 當日'],
+            ['hourglass', 'duration timer countdown 時長 計時 倒數'],
+            ['clock-rotate-left', 'history undo revert 歷史 復原 紀錄'],
         ]
     },
     {
@@ -134,6 +190,14 @@ const RS_ICON_GROUPS = [
             ['shield-halved', 'security protection safe 資安 防護 安全'],
             ['lock', 'secure private password 鎖 加密 安全 隱私'],
             ['key', 'password access 鑰匙 密碼 權限'],
+            ['hard-drive', 'storage disk hardware 硬碟 儲存 硬體'],
+            ['memory', 'ram memory chip 記憶體 內存'],
+            ['plug', 'power electric connect 插頭 電源 連接'],
+            ['terminal', 'command line console 終端機 指令 命令列'],
+            ['bug', 'issue defect error 錯誤 缺陷 除錯'],
+            ['code-branch', 'git branch version 分支 版本'],
+            ['qrcode', 'qr scan code 二維碼 掃描'],
+            ['fingerprint', 'biometric identity 指紋 生物辨識 身分驗證'],
         ]
     },
     {
@@ -152,6 +216,14 @@ const RS_ICON_GROUPS = [
             ['triangle-exclamation', 'warning risk caution danger 警告 風險 危險'],
             ['circle-info', 'information note about 資訊 說明'],
             ['circle-question', 'help faq question 問題 說明 常見問題'],
+            ['sliders', 'adjust settings control 調整 參數 控制'],
+            ['toggle-on', 'switch enable on 開關 啟用'],
+            ['toggle-off', 'switch disable off 關閉 停用'],
+            ['play', 'start run 開始 執行 播放'],
+            ['pause', 'suspend hold 暫停 保留'],
+            ['stop', 'end halt 停止 結束'],
+            ['arrow-rotate-left', 'undo back revert 復原 還原'],
+            ['arrow-rotate-right', 'redo forward 重做 再次'],
         ]
     },
     {
@@ -166,6 +238,14 @@ const RS_ICON_GROUPS = [
             ['arrows-split-up-and-left', 'split branch decision 分流 分支 決策'],
             ['angles-right', 'fast forward next 快轉 推進'],
             ['share-nodes', 'share network connect 分享 連結 節點'],
+            ['arrow-up-right-from-square', 'open external link 開啟 外部連結'],
+            ['arrow-pointer', 'click cursor select 游標 點選'],
+            ['hand-pointer', 'click select touch 點擊 手指 指向'],
+            ['arrow-turn-down', 'next line follow up 換行 後續'],
+            ['arrow-up-right-dots', 'growth potential 成長 潛力'],
+            ['arrow-right-to-bracket', 'login enter sign in 登入 進入'],
+            ['arrow-right-from-bracket', 'logout exit leave 登出 離開'],
+            ['circle-arrow-right', 'next continue 下一個 繼續'],
         ]
     },
     {
@@ -180,6 +260,14 @@ const RS_ICON_GROUPS = [
             ['box', 'package product 箱子 包裹 產品'],
             ['plane', 'flight travel trip 飛機 出差 旅行 航空'],
             ['car', 'vehicle transport 汽車 交通'],
+            ['city', 'urban metropolis 城市 都市'],
+            ['hotel', 'accommodation lodging 飯店 住宿'],
+            ['location-crosshairs', 'target locate 定位 定點'],
+            ['route', 'path itinerary 路線 行程'],
+            ['train', 'rail transport 火車 鐵路 交通'],
+            ['ship', 'sea cargo ocean 船 海運'],
+            ['boxes-stacked', 'inventory stock 庫存 堆疊 貨物'],
+            ['dolly', 'cargo freight hand truck 貨運 搬運'],
         ]
     },
     {
@@ -198,6 +286,92 @@ const RS_ICON_GROUPS = [
             ['magnifying-glass', 'search find 搜尋 查詢 放大鏡'],
             ['eye', 'view vision visibility 觀看 願景 檢視'],
             ['crown', 'premium vip king leader 皇冠 頂級 領導'],
+            ['hashtag', 'tag number 標籤 編號'],
+            ['certificate', 'verified badge 認證 證書'],
+            ['check', 'done yes 勾選 完成'],
+            ['xmark', 'close cancel no 關閉 取消 叉'],
+            ['plus', 'add new 新增 加號'],
+            ['minus', 'remove less 減號 移除'],
+            ['ellipsis', 'more options 更多 省略'],
+            ['wand-magic-sparkles', 'ai magic creative 魔術 創新 智慧生成'],
+        ]
+    },
+    {
+        name: '操作介面', en: 'editing actions', icons: [
+            ['download', 'save export 下載 儲存 匯出'],
+            ['upload', 'import send 上傳 匯入'],
+            ['print', 'printer output 列印 印表機'],
+            ['copy', 'duplicate clone 複製 副本'],
+            ['paste', 'clipboard insert 貼上 剪貼簿'],
+            ['trash-can', 'delete remove bin 刪除 垃圾桶 移除'],
+            ['floppy-disk', 'save store 儲存 存檔'],
+            ['pen-to-square', 'edit write modify 編輯 修改 撰寫'],
+            ['link', 'url hyperlink connect 連結 超連結'],
+            ['bookmark', 'save mark favorite 書籤 收藏 標記'],
+        ]
+    },
+    {
+        name: '醫療健康', en: 'health medical', icons: [
+            ['stethoscope', 'doctor checkup 聽診器 診療 健檢'],
+            ['heart-pulse', 'heartbeat health pulse 心跳 健康 脈搏'],
+            ['kit-medical', 'first aid kit medical 急救箱 醫療 急救'],
+            ['pills', 'medicine drug pharmacy 藥丸 藥品 藥局'],
+            ['syringe', 'vaccine injection shot 注射 疫苗 打針'],
+            ['hospital', 'clinic hospital facility 醫院 診所 醫療機構'],
+            ['tooth', 'dental dentist 牙齒 牙科'],
+            ['user-doctor', 'doctor physician 醫生 醫師'],
+            ['user-nurse', 'nurse care 護理師 照護'],
+            ['notes-medical', 'medical record chart 病歷 醫療紀錄'],
+        ]
+    },
+    {
+        name: '教育學習', en: 'education learning', icons: [
+            ['graduation-cap', 'education degree student 畢業 學位 學生'],
+            ['book-open', 'read learning course 閱讀 學習 課程'],
+            ['book-open-reader', 'reading study literature 閱讀 研讀 文獻'],
+            ['chalkboard-user', 'teacher lecture class 教師 講課 上課'],
+            ['pen', 'write note pen 筆 書寫 筆記'],
+            ['pencil', 'draft sketch 鉛筆 草稿 素描'],
+            ['pen-nib', 'writing ink signature 鋼筆 書寫 簽名'],
+            ['school', 'campus school 學校 校園'],
+            ['flask', 'lab experiment science 實驗 試管 科學'],
+            ['atom', 'science physics 原子 科學 物理'],
+        ]
+    },
+    {
+        name: '環境能源', en: 'environment energy', icons: [
+            ['sun', 'daytime solar bright 太陽 白天 陽光'],
+            ['moon', 'night dark mode 月亮 夜間 深色'],
+            ['umbrella', 'rain protection insurance 雨傘 保險 防護'],
+            ['droplet', 'water liquid drop 水滴 液體'],
+            ['water', 'flood water sea 水 海洋 水資源'],
+            ['tree', 'forest nature plant 樹 森林 自然'],
+            ['solar-panel', 'solar renewable energy 太陽能板 再生能源'],
+            ['battery-full', 'battery charge power 電池 電量 充電'],
+            ['temperature-half', 'temperature weather heat 溫度 天氣 氣溫'],
+            ['wind', 'air wind energy 風 空氣 風力'],
+        ]
+    },
+    {
+        name: '建築工地', en: 'construction', icons: [
+            ['helmet-safety', 'safety helmet site 安全帽 工安 工地'],
+            ['toolbox', 'tools kit maintenance 工具箱 工具 維修'],
+            ['road', 'street highway road 道路 馬路 公路'],
+            ['building-columns', 'building institution architecture 建築 機構 柱廊'],
+        ]
+    },
+    {
+        name: '創意設計', en: 'creative design', icons: [
+            ['camera', 'photo shoot 相機 拍照 攝影'],
+            ['image', 'picture photo 圖片 影像'],
+            ['images', 'gallery photos 圖庫 多張圖片 相簿'],
+            ['palette', 'color design art 調色盤 配色 設計'],
+            ['paintbrush', 'paint brush art 畫筆 繪製 美術'],
+            ['film', 'movie video cinema 電影 影片 影音'],
+            ['music', 'audio song sound 音樂 歌曲 音效'],
+            ['compact-disc', 'media disc cd 光碟 媒體'],
+            ['vector-square', 'vector shape design 向量 形狀 設計'],
+            ['crop', 'crop trim frame 裁切 修剪 畫框'],
         ]
     },
 ];
