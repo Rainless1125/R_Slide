@@ -93,6 +93,12 @@ def test_history_crud():
     assert full["title"] == "改名" and full["pages"] == 1 and full["data"] == new_data
     assert c.patch("/api/history/zz", json={"title": "x"}).status_code == 404
 
+    # 重產時改用另一種簡報模式：只更新生成設定，不動標題與投影片
+    new_input = {"content": "素材", "deck_mode": "document"}
+    assert c.patch("/api/history/a1", json={"input": new_input}).status_code == 200
+    full = c.get("/api/history/a1").json()
+    assert full["input"] == new_input and full["title"] == "改名" and full["data"] == new_data
+
     assert c.delete("/api/history/a1").status_code == 200
     assert c.get("/api/history/a1").status_code == 404
     assert c.delete("/api/history").status_code == 200

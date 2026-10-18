@@ -226,12 +226,16 @@ function renderHistory(animate = false) {
         const active = h.id === currentHistoryId;
         const style = (h.input?.style_preference || '').split(' (')[0];
         const pages = h.pages ?? h.data?.slides?.length ?? 0;
+        const mode = normDeckMode(h.input?.deck_mode);
         return `
   <div data-id="${esc(h.id)}" data-act="open" class="hist-item group spot rounded-xl p-2.5 cursor-pointer transition-all duration-300 ${active
                 ? 'hist-active bg-violet-50 dark:bg-violet-500/10 ring-1 ring-violet-300/70 dark:ring-violet-400/30'
                 : 'hover:bg-zinc-100 dark:hover:bg-zinc-800/70'}">
     <div class="relative flex items-center gap-3">
-      ${styleThumbHtml(styleColors(h.input?.style_preference || ''))}
+      <div class="w-14 shrink-0 flex flex-col items-center gap-1">
+        ${styleThumbHtml(styleColors(h.input?.style_preference || ''))}
+        <span class="deck-mode-badge hist-mode" data-mode="${mode}">${DECK_MODE_SHORT[mode]}</span>
+      </div>
       <div class="min-w-0 flex-1">
         <div class="text-sm font-semibold truncate ${active ? 'text-violet-700 dark:text-violet-200' : ''}" title="${esc(h.title)}">${esc(h.title)}</div>
         <div class="text-[11px] text-zinc-400 mt-0.5 truncate">${fmtTime(h.createdAt)} · ${pages} 頁${style ? ' · ' + esc(style) : ''}</div>
@@ -278,6 +282,27 @@ function getCurrentGenerationInput() {
         style_preference: getStylePreference(),
         deck_mode: getDeckMode()
     };
+}
+
+// 目前開啟的簡報所用的模式（重產時沿用；舊紀錄沒有此欄位時視為演講型）
+function currentDeckMode() { return normDeckMode(getCurrentGenerationInput().deck_mode); }
+function updateDeckModeBadges() {
+    const mode = currentDeckMode();
+    document.querySelectorAll('[data-deck-mode-badge]').forEach(el => {
+        el.textContent = DECK_MODE_SHORT[mode];
+        el.dataset.mode = mode;
+        el.title = mode === 'document' ? '詳細模式（閱讀型）：單頁重產會沿用此模式' : '簡易模式（演講型）：單頁重產會沿用此模式';
+    });
+}
+// 重產時改用另一種模式：寫回這份簡報的生成設定，之後的重產都沿用
+function setCurrentDeckMode(mode) {
+    const item = historyItems.find(x => x.id === currentHistoryId);
+    if (!item) return;
+    item.input = { ...item.input, deck_mode: normDeckMode(mode) };
+    queueHistorySave(item.id, { input: item.input });
+    setDeckMode(mode);
+    renderHistory();
+    updateDeckModeBadges();
 }
 
 function syncCurrentPresentationToHistory() {

@@ -279,6 +279,7 @@ function renderReviewSection(quiet = false) {
     document.getElementById('sectionPlayer').classList.add('hidden');
     if (!quiet) animateIn(review);
     setStep(2);
+    updateDeckModeBadges();
 
     const container = document.getElementById('reviewContainer');
     container.innerHTML = '';
@@ -363,6 +364,7 @@ function confirmAndPlay() {
     setStep(3);
 
     document.getElementById('presentationTitleDisplay').innerText = currentPresentationData.presentation_title;
+    updateDeckModeBadges();
     buildThumbnails();
     renderSlide(currentSlideIdx, 'fade');
     player.scrollIntoView({ behavior: 'smooth' });
@@ -409,6 +411,9 @@ function openRegenerateModal(idx) {
     const modal = document.getElementById('regenModal');
     const ta = document.getElementById('regenPromptInput');
     ta.value = '';
+    // 預設沿用這份簡報的模式（不是輸入區目前選的模式）
+    const mode = currentDeckMode();
+    document.querySelectorAll('input[name="regenDeckMode"]').forEach(r => { r.checked = r.value === mode; });
     modal.classList.remove('hidden');
     setTimeout(() => ta.focus(), 0);
 }
@@ -423,10 +428,12 @@ function closeRegenerateModal(force = false) {
 async function confirmRegenerateFromModal() {
     if (regenerateModalSlideIdx === null) return;
     const prompt = document.getElementById('regenPromptInput').value.trim();
-    await regenerateSingleSlide(regenerateModalSlideIdx, prompt);
+    const mode = document.querySelector('input[name="regenDeckMode"]:checked')?.value;
+    await regenerateSingleSlide(regenerateModalSlideIdx, prompt, mode);
 }
 
-async function regenerateSingleSlide(idx, customPrompt = '') {
+// deckMode 省略時沿用這份簡報的模式；與原模式不同時，成功後寫回簡報設定
+async function regenerateSingleSlide(idx, customPrompt = '', deckMode) {
     if (!currentPresentationData || !Array.isArray(currentPresentationData.slides)) {
         showToast('目前沒有可重產的簡報內容', 'info', 2200);
         return;
@@ -446,6 +453,7 @@ async function regenerateSingleSlide(idx, customPrompt = '') {
         showToast('缺少原始內容，無法重產此頁', 'error', 3200);
         return;
     }
+    const mode = normDeckMode(deckMode ?? input.deck_mode);
 
     // 重產期間使用者仍可切換 / 新增 / 刪除簡報：記下發出請求時的簡報與頁面，回來後依物件找回位置
     const deck = currentPresentationData;
@@ -478,7 +486,7 @@ async function regenerateSingleSlide(idx, customPrompt = '') {
                 target_audience: input.target_audience || '',
                 num_pages: currentPresentationData.slides.length,
                 style_preference: input.style_preference || '',
-                deck_mode: input.deck_mode || 'speaker',
+                deck_mode: mode,
                 presentation_title: currentPresentationData.presentation_title || '未命名簡報',
                 slide_index: idx,
                 slides: slim.slides,
@@ -506,6 +514,7 @@ async function regenerateSingleSlide(idx, customPrompt = '') {
         };
 
         syncCurrentPresentationToHistory();
+        if (mode !== normDeckMode(input.deck_mode)) setCurrentDeckMode(mode);
 
         const inPlayer = !document.getElementById('sectionPlayer').classList.contains('hidden');
         const inReview = !document.getElementById('sectionReview').classList.contains('hidden');
@@ -518,7 +527,7 @@ async function regenerateSingleSlide(idx, customPrompt = '') {
         if (modalOpen) closeRegenerateModal(true);
         showToast(`第 ${at + 1} 頁已重產完成`, 'success', 2200);
     } catch (err) {
-        showToast(friendlyError(err), 'error', 8000, { label: '重試', onClick: () => regenerateSingleSlide(idx, customPrompt) });
+        showToast(friendlyError(err), 'error', 8000, { label: '重試', onClick: () => regenerateSingleSlide(idx, customPrompt, mode) });
     } finally {
         setReviewRegenerateState(idx, false);
         setCurrentRegenerateState(false);
