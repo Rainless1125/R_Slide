@@ -11,8 +11,8 @@ def _groups():
     return [(name, en, re.findall(r"\['([^']+)', '([^']*)'\]", body)) for name, en, body in blocks]
 
 
-def test_icon_count_is_150():
-    assert sum(len(icons) for _, _, icons in _groups()) == 150
+def test_icon_count_is_300():
+    assert sum(len(icons) for _, _, icons in _groups()) == 300
 
 
 def test_icon_names_unique_and_valid():

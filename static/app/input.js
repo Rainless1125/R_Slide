@@ -194,6 +194,14 @@ function getStylePreference() {
     const v = document.getElementById('stylePreference').value;
     return v === CUSTOM_STYLE ? buildCustomStyle(customColors) : v;
 }
+// 簡報模式：speaker = 簡易模式（演講型），document = 詳細模式（閱讀型）；舊紀錄沒有此欄位時視為演講型
+function getDeckMode() {
+    return document.querySelector('input[name="deckMode"]:checked')?.value || 'speaker';
+}
+function setDeckMode(mode) {
+    const radio = document.querySelector(`input[name="deckMode"][value="${mode === 'document' ? 'document' : 'speaker'}"]`);
+    if (radio) radio.checked = true;
+}
 function setStylePreference(value) {
     const sel = document.getElementById('stylePreference');
     const custom = parseCustomStyle(value);
@@ -294,7 +302,8 @@ function saveDraft() {
                 content,
                 audience: document.getElementById('targetAudience').value,
                 pages: document.getElementById('numPages').value,
-                style: getStylePreference()
+                style: getStylePreference(),
+                mode: getDeckMode()
             }));
         } catch (e) { }
     }, 400);
@@ -307,9 +316,11 @@ function restoreDraft() {
     document.getElementById('targetAudience').value = d.audience || '';
     if (d.pages != null) document.getElementById('numPages').value = d.pages;
     if (d.style) setStylePreference(d.style);
+    if (d.mode) setDeckMode(d.mode);
     updateCount();
     showToast('已還原上次未送出的草稿', 'info', 2400);
 }
 ['inputContent', 'targetAudience'].forEach(id => document.getElementById(id).addEventListener('input', saveDraft));
 ['numPages', 'stylePreference'].forEach(id => document.getElementById(id).addEventListener('change', saveDraft));
+document.querySelectorAll('input[name="deckMode"]').forEach(r => r.addEventListener('change', saveDraft));
 initStyleCards();
