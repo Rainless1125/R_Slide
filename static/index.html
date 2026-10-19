@@ -25,7 +25,7 @@
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/app/app.css?v=8">
+    <link rel="stylesheet" href="/static/app/app.css?v=9">
 </head>
 
 <body
@@ -465,6 +465,11 @@
                         aria-label="插入圖示" title="從常用圖示中快速插入（可搜尋關鍵字）">
                         <i class="fa-solid fa-icons text-[11px]"></i><span class="hidden xl:inline">圖示</span>
                     </button>
+                    <button id="shapePickerBtn" onclick="toggleShapePicker()" data-edit-only aria-haspopup="dialog" aria-expanded="false" aria-controls="shapePicker"
+                        class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
+                        aria-label="插入圖案" title="插入矩形、三角形、箭頭等圖案（可調整外框粗細與填滿顏色）">
+                        <i class="fa-solid fa-shapes text-[11px]"></i><span class="hidden xl:inline">圖案</span>
+                    </button>
                     <input id="slideImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" class="hidden">
                     <button id="regenCurrentBtn" onclick="regenerateCurrentSlide()"
                         class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
@@ -629,6 +634,10 @@
         <div id="iconGrid" class="flex-1 min-h-0 overflow-y-auto p-2.5"></div>
     </div>
 
+    <!-- 插入圖案面板（static/app/shapes.js 建立按鈕） -->
+    <div id="shapePicker" role="dialog" aria-label="插入圖案"
+        class="hidden fixed z-[80] p-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl"></div>
+
     <!-- 圖表資料 Modal -->
     <div id="chartModal" role="dialog" aria-modal="true" aria-labelledby="chartModalTitle"
         class="hidden fixed inset-0 z-[90] bg-black/45 backdrop-blur-sm p-4 flex items-center justify-center">
@@ -712,11 +721,12 @@
     <script src="/static/app/core.js?v=6"></script>
     <script src="/static/app/input.js?v=4"></script>
     <script src="/static/app/generate.js?v=6"></script>
-    <script src="/static/app/editor.js?v=2"></script>
-    <script src="/static/app/media.js?v=2"></script>
+    <script src="/static/app/shapes.js?v=1"></script>
+    <script src="/static/app/editor.js?v=3"></script>
+    <script src="/static/app/media.js?v=3"></script>
     <script src="/static/app/player.js?v=2"></script>
     <script src="/static/app/auth.js?v=2"></script>
-    <script src="/static/app/main.js?v=3"></script>
+    <script src="/static/app/main.js?v=4"></script>
 </body>
 
 </html>

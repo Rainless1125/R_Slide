@@ -95,6 +95,7 @@ function toggleEditMode(force) {
         stopAutoplay();
     } else {
         closeIconPicker();
+        closeShapePicker();
         stopTextEdit();
         clearSelection();
         commitSlideEdit();
@@ -107,7 +108,7 @@ function toggleEditMode(force) {
     document.getElementById('editLabel').textContent = editMode ? '完成編輯' : '編輯';
     document.getElementById('editIcon').className = 'fa-solid text-[11px] ' + (editMode ? 'fa-check' : 'fa-pen-to-square');
     document.querySelectorAll('[data-edit-only]').forEach(b => { b.classList.toggle('hidden', !editMode); b.classList.toggle('flex', editMode); });
-    if (editMode) { prepareEditing(); showToast('單擊選取元素、雙擊編輯文字；插入的文字、圖片、圖表與圖示可拖曳移動、拉角落縮放（Esc 取消選取，可撤銷）', 'info', 4000); }
+    if (editMode) { prepareEditing(); showToast('單擊選取元素、雙擊編輯文字；插入的文字、圖片、圖表、圖示與圖案可拖曳移動、拉角落縮放（Esc 取消選取，可撤銷）', 'info', 4000); }
 }
 
 // 把畫面上的修改寫回資料（一次編輯 = 一個撤銷步驟）
@@ -183,6 +184,8 @@ function stopTextEdit() {
         if (selectedEl === el) clearSelection();
         el.remove();
     }
+    // 圖案文字編輯結束：選取回到整個圖案，方便接著調整外框與填色
+    if (el.hasAttribute('data-rs-shape-text') && selectedEl === el && el.parentElement) selectElement(el.parentElement);
     commitSlideEdit();
 }
 
@@ -206,6 +209,12 @@ slideCanvasEl.addEventListener('dblclick', e => {
     const scaler = getScaler();
     let el = e.target;
     if (el.closest('[data-rs-icon]')) return;                // 圖示沒有文字可編輯
+    const shapeText = el.closest('[data-rs-shape]')?.querySelector(':scope > [data-rs-shape-text]');
+    if (shapeText && scaler.contains(shapeText)) {           // 圖案：雙擊任何位置都編輯圖案內的文字（可能還是空的）
+        e.preventDefault();
+        startTextEdit(shapeText, e.clientX, e.clientY);
+        return;
+    }
     while (el && el !== scaler && !hasOwnText(el)) el = el.parentElement;
     if (!el || el === scaler || el.closest('svg')) return;
     e.preventDefault();
@@ -302,8 +311,9 @@ const FMT_ACTIONS = {
     },
     weight(v) { setClass(selectedEl, [RE.weight], 'font-' + v); },
     radius(v) { if (v !== '__custom') setClass(selectedEl, [RE.radius], v === '' ? 'rounded' : 'rounded-' + v); },
-    color(kind, c) {                         // c === '' → 移除
+    color(kind, c) {                         // c === '' → 移除；圖案的 fill / stroke 為 HEX 或 none
         const el = selectedEl;
+        if (kind === 'fill' || kind === 'stroke') { const s = shapeOf(el); if (s) setShapeStyle(s, kind, c); return; }
         if (kind === 'text') { setClass(el, [RE.textColor], c ? 'text-' + c : ''); clearInlineStyle(el, 'color'); }
         else { setClass(el, [RE.bgColor], c ? 'bg-' + c : ''); clearInlineStyle(el, 'background', 'background-color', 'background-image'); }
     },
@@ -339,6 +349,7 @@ const FMT_ACTIONS = {
         el.after(c);
         selectElement(c);
     },
+    shapeProp(prop, v) { const s = shapeOf(selectedEl); if (s) setShapeStyle(s, prop, v); },
     moveUp() { moveSibling(-1); },
     moveDown() { moveSibling(1); }
 };
@@ -389,10 +400,15 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
   ${btn('align-right', '<i class="fa-solid fa-align-right text-[11px]"></i>', '靠右')}
   <span class="sep"></span>
   ${btn('pal-text', '<span class="font-bold">A</span><span id="fmtTextChip" class="chipbox"></span>', '文字顏色')}
-  ${btn('pal-bg', '<i class="fa-solid fa-fill-drip text-[11px]"></i><span id="fmtBgChip" class="chipbox"></span>', '背景顏色')}
+  ${btn('pal-bg', '<i class="fa-solid fa-fill-drip text-[11px]"></i><span id="fmtBgChip" class="chipbox"></span>', '背景顏色', 'no-shape')}
+  <span class="sep no-shape"></span>
+  <select id="fmtRadius" class="no-shape" title="圓角" aria-label="圓角"><option value="__custom" disabled hidden>圓角</option>${RADII.map(r => `<option value="${r[0]}">圓角：${r[1]}</option>`).join('')}</select>
   <span class="sep"></span>
-  <select id="fmtRadius" title="圓角" aria-label="圓角"><option value="__custom" disabled hidden>圓角</option>${RADII.map(r => `<option value="${r[0]}">圓角：${r[1]}</option>`).join('')}</select>
-  <span class="sep"></span>
+  ${btn('pal-fill', '<i class="fa-solid fa-fill-drip text-[11px]"></i><span id="fmtFillChip" class="chipbox"></span>', '圖案填滿顏色', 'shape-only shape-fill')}
+  ${btn('pal-stroke', '<i class="fa-regular fa-square text-[11px]"></i><span id="fmtStrokeChip" class="chipbox"></span>', '外框顏色', 'shape-only')}
+  <select id="fmtStrokeW" class="shape-only" title="外框粗細" aria-label="外框粗細">${SHAPE_STROKE_WIDTHS.map(w => `<option value="${w}">${w ? `外框：${w}px` : '無外框'}</option>`).join('')}</select>
+  <select id="fmtDash" class="shape-only" title="外框樣式" aria-label="外框樣式">${SHAPE_DASHES.map(d => `<option value="${d[0]}">${d[1]}</option>`).join('')}</select>
+  <span class="sep shape-only"></span>
   ${btn('chart', '<i class="fa-solid fa-chart-column text-[11px]"></i><span>圖表資料</span>', '編輯圖表資料', 'chart-only')}
   <span class="sep chart-only"></span>
   ${btn('duplicate', '<i class="fa-regular fa-clone text-[11px]"></i>', '複製元素')}
@@ -409,27 +425,39 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
     <button type="button" class="fb text-[11px] px-2 h-6 rounded-md border border-zinc-300 dark:border-zinc-600" data-color="" >預設（移除）</button>
     ${chip('white', 'white')}${chip('black', 'black')}<button type="button" class="pal-chip" data-color="transparent" title="transparent" aria-label="transparent" style="background:linear-gradient(135deg,#fff 45%,#ef4444 45%,#ef4444 55%,#fff 55%)"></button>
   </div>
-  ${TW_HUES.map(h => `<div class="pal-row">${TW_SHADES.map(sh => chip(`${h}-${sh}`, `${h}-${sh}`)).join('')}</div>`).join('')}`;
+  ${TW_HUES.map(h => `<div class="pal-row">${TW_SHADES.map(sh => chip(`${h}-${sh}`, `${h}-${sh}`)).join('')}</div>`).join('')}
+  <label class="pal-custom"><span>自訂顏色</span><input id="palCustom" type="color" aria-label="自訂顏色"></label>`;
     document.body.appendChild(pal);
 
     // 按鈕不搶走焦點（維持文字編輯中的游標）；select 例外
     tb.addEventListener('mousedown', e => { if (!e.target.closest('select')) e.preventDefault(); });
-    pal.addEventListener('mousedown', e => e.preventDefault());
+    pal.addEventListener('mousedown', e => { if (!e.target.closest('#palCustom')) e.preventDefault(); });
     tb.addEventListener('click', e => {
         const b = e.target.closest('[data-fmt]');
         if (!b || b.disabled) return;
         const id = b.dataset.fmt;
         if (id === 'chart') openChartEditor(selectedEl);
         else if (id.startsWith('align-')) runFmt('align', id.slice(6));
-        else if (id === 'pal-text' || id === 'pal-bg') togglePalette(id === 'pal-text' ? 'text' : 'bg', b);
+        else if (id.startsWith('pal-')) togglePalette(id.slice(4), b);
         else runFmt(id);
     });
     tb.querySelector('#fmtWeight').addEventListener('change', e => runFmt('weight', e.target.value));
     tb.querySelector('#fmtRadius').addEventListener('change', e => runFmt('radius', e.target.value));
+    tb.querySelector('#fmtStrokeW').addEventListener('change', e => runFmt('shapeProp', 'strokeW', e.target.value));
+    tb.querySelector('#fmtDash').addEventListener('change', e => runFmt('shapeProp', 'dash', e.target.value));
     pal.addEventListener('click', e => {
         const c = e.target.closest('[data-color]');
         if (!c) return;
-        runFmt('color', palMode, c.dataset.color);
+        let v = c.dataset.color;
+        // 圖案的填色 / 外框存實際色碼：從色塊的計算樣式取出；「預設」與透明代表無
+        if (palMode === 'fill' || palMode === 'stroke') v = v && v !== 'transparent' ? cssColorToHex(getComputedStyle(c).backgroundColor) : 'none';
+        runFmt('color', palMode, v);
+        hidePalette();
+    });
+    // 自訂顏色：文字 / 背景以 Tailwind 任意值 class（text-[#hex]）套用，圖案直接存 HEX
+    pal.querySelector('#palCustom').addEventListener('change', e => {
+        const hex = e.target.value;
+        runFmt('color', palMode, palMode === 'fill' || palMode === 'stroke' ? hex : `[${hex}]`);
         hidePalette();
     });
 })();
@@ -439,6 +467,10 @@ function togglePalette(mode, anchor) {
     const pal = document.getElementById('fmtPalette');
     if (pal.classList.contains('open') && palMode === mode) { hidePalette(); return; }
     palMode = mode;
+    const isShapeMode = mode === 'fill' || mode === 'stroke';
+    pal.querySelector('[data-color=""]').textContent = isShapeMode ? '無' : '預設（移除）';
+    const cur = isShapeMode ? shapeOf(selectedEl)?.getAttribute('data-' + mode) : cssColorToHex(getComputedStyle(selectedEl)[mode === 'text' ? 'color' : 'backgroundColor']);
+    pal.querySelector('#palCustom').value = /^#[0-9a-f]{6}$/i.test(cur || '') ? cur : '#3b82f6';
     pal.classList.add('open');
     const r = anchor.getBoundingClientRect();
     const h = pal.offsetHeight, w = pal.offsetWidth;
@@ -446,6 +478,12 @@ function togglePalette(mode, anchor) {
     if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
     pal.style.top = top + 'px';
     pal.style.left = Math.min(Math.max(8, r.left), window.innerWidth - w - 8) + 'px';
+}
+// getComputedStyle 的 rgb(r, g, b) → #rrggbb（透明或無法解析時回傳 none）
+function cssColorToHex(css) {
+    const m = String(css).match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:\s*[,/]\s*([\d.]+%?))?/);
+    if (!m || (m[4] !== undefined && parseFloat(m[4]) === 0)) return 'none';
+    return '#' + m.slice(1, 4).map(n => Number(n).toString(16).padStart(2, '0')).join('');
 }
 function hidePalette() { document.getElementById('fmtPalette')?.classList.remove('open'); }
 
@@ -478,6 +516,22 @@ function refreshToolbar() {
     tb.querySelector('[data-fmt="moveDown"]').disabled = root || !el.nextElementSibling;
     const isChart = el.hasAttribute('data-rs-chart');
     tb.querySelectorAll('.chart-only').forEach(n => n.style.display = isChart ? '' : 'none');
+    // 圖案：以填滿 / 外框控制取代背景與圓角；線條沒有填滿
+    const shape = shapeOf(el);
+    tb.querySelectorAll('.no-shape').forEach(n => n.style.display = shape ? 'none' : '');
+    tb.querySelectorAll('.shape-only').forEach(n => n.style.display = shape ? '' : 'none');
+    if (shape) {
+        const st = readShapeStyle(shape);
+        const line = isLineShape(shape);
+        tb.querySelector('.shape-fill').style.display = line ? 'none' : '';
+        document.getElementById('fmtFillChip').style.background = st.fill === 'none' ? 'transparent' : st.fill;
+        document.getElementById('fmtStrokeChip').style.background = st.sw ? st.stroke : 'transparent';
+        const swSel = document.getElementById('fmtStrokeW');
+        if (![...swSel.options].some(o => Number(o.value) === st.sw)) swSel.add(new Option(`外框：${st.sw}px`, String(st.sw)));
+        swSel.value = String(st.sw);
+        swSel.querySelector('option[value="0"]').disabled = line;
+        document.getElementById('fmtDash').value = st.dash;
+    }
     positionToolbar();
 }
 
