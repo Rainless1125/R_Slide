@@ -25,7 +25,7 @@
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/app/app.css?v=9">
+    <link rel="stylesheet" href="/static/app/app.css?v=10">
 </head>
 
 <body
@@ -445,6 +445,11 @@
                         aria-label="編輯投影片" title="直接修改投影片上的文字、圖片與圖表（不呼叫 AI）">
                         <i id="editIcon" class="fa-solid fa-pen-to-square text-[11px]"></i><span class="hidden sm:inline" id="editLabel">編輯</span>
                     </button>
+                    <button onclick="addBlankSlide(currentSlideIdx, true)" data-edit-only
+                        class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
+                        aria-label="新增空白頁" title="在目前頁面之後新增空白頁（沿用目前頁面的背景）">
+                        <i class="fa-solid fa-file-circle-plus text-[11px]"></i><span class="hidden xl:inline">空白頁</span>
+                    </button>
                     <button onclick="insertTextBox()" data-edit-only
                         class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
                         aria-label="插入文字" title="插入可自由移動的文字方塊">
@@ -720,13 +725,13 @@
     <script src="/static/icons.js?v=2"></script>
     <script src="/static/app/core.js?v=6"></script>
     <script src="/static/app/input.js?v=4"></script>
-    <script src="/static/app/generate.js?v=6"></script>
+    <script src="/static/app/generate.js?v=7"></script>
     <script src="/static/app/shapes.js?v=2"></script>
-    <script src="/static/app/editor.js?v=4"></script>
-    <script src="/static/app/media.js?v=3"></script>
-    <script src="/static/app/player.js?v=2"></script>
+    <script src="/static/app/editor.js?v=5"></script>
+    <script src="/static/app/media.js?v=4"></script>
+    <script src="/static/app/player.js?v=3"></script>
     <script src="/static/app/auth.js?v=2"></script>
-    <script src="/static/app/main.js?v=4"></script>
+    <script src="/static/app/main.js?v=5"></script>
 </body>
 
 </html>

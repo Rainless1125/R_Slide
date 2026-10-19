@@ -58,6 +58,40 @@ function deleteSlide(idx) {
     showToast(`已刪除第 ${idx + 1} 頁`, 'info', 5000, { label: '復原', onClick: undo });
 }
 
+// 空白頁沿用參考頁最外層容器的 class / style（背景、文字顏色、內距），內容留空，再以編輯模式插入文字、圖片等
+const BLANK_ROOT_CLASS = 'w-full h-full overflow-hidden flex flex-col p-10 bg-white text-zinc-900';
+function blankSlideFrom(ref) {
+    const doc = new DOMParser().parseFromString(`<!DOCTYPE html><html><body>${ref?.html_content || ''}</body></html>`, 'text/html');
+    const src = doc.body.children.length === 1 ? doc.body.firstElementChild : null;
+    const root = doc.createElement('div');
+    root.className = src?.getAttribute('class') || BLANK_ROOT_CLASS;
+    const style = src?.getAttribute('style');
+    if (style) root.setAttribute('style', style);
+    return { page_number: 0, layout_concept: '空白頁', slide_title: '空白頁', html_content: root.outerHTML, charts: [], speaker_notes: '' };
+}
+
+// 在第 afterIdx 頁之後新增空白頁；open = true 時（播放器）切換到新頁面
+function addBlankSlide(afterIdx, open = false) {
+    if (!slideOpsAllowed()) return;
+    const slides = currentPresentationData.slides;
+    const ref = slides[Math.min(Math.max(afterIdx, 0), slides.length - 1)];
+    const at = Math.min(Math.max(afterIdx + 1, 0), slides.length);
+    if (open) { stopTextEdit(); commitSlideEdit(); }         // 先寫回目前頁面尚未存入的修改
+    pushUndoSnapshot();
+    const keep = slides[currentSlideIdx];
+    slides.splice(at, 0, blankSlideFrom(ref));
+    slides.forEach((s, i) => { s.page_number = i + 1; });
+    if (open) {
+        syncCurrentPresentationToHistory();
+        buildThumbnails();
+        renderSlide(at, 'fade');
+        updateUndoButtons();
+    } else {
+        finishSlideOps(keep);
+    }
+    showToast(`已新增空白頁（第 ${at + 1} 頁）`, 'success', 1800);
+}
+
 function commitSlideTitle(idx, el) {
     const slide = currentPresentationData?.slides?.[idx];
     if (!slide) return;

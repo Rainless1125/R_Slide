@@ -7,6 +7,7 @@ window.addEventListener('scroll', () => { positionToolbar(); hidePalette(); posi
 window.addEventListener('resize', () => { positionToolbar(); hidePalette(); positionIconPicker(); positionShapePicker(); });
 new ResizeObserver(() => positionToolbar()).observe(document.getElementById('slideCanvas'));
 
+let nudgeHintShown = false;
 document.addEventListener('keydown', (e) => {
     if (isAuthOpen()) return;                     // 登入畫面開啟時不觸發任何快捷鍵
     if (!document.getElementById('chartModal').classList.contains('hidden')) {
@@ -30,8 +31,20 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && e.target.isContentEditable && e.target.closest('#slideCanvas')) { e.target.blur(); return; }
     if (e.key === 'Escape' && editMode && selectedEl && !typing) { clearSelection(); return; }
     if ((e.key === 'Delete' || e.key === 'Backspace') && editMode && selectedEl && !typing) { e.preventDefault(); runFmt('remove'); return; }
+    // 選取元素時方向鍵微調位置（Shift：10px），不換頁
+    const nudge = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (nudge && editMode && selectedEl && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        const step = e.shiftKey ? 10 : 1;
+        if (!nudgeSelected(nudge[0] * step, nudge[1] * step) && !nudgeHintShown) {
+            nudgeHintShown = true;
+            showToast('AI 產生的版面元素位置固定；方向鍵可微調自行插入的文字、圖片、圖表、圖示與圖案（Esc 取消選取後可換頁）', 'info', 4000);
+        }
+        return;
+    }
     if ((e.ctrlKey || e.metaKey) && !e.altKey && !typing && currentPresentationData) {
         const k = e.key.toLowerCase();
+        if (k === 'd' && !e.shiftKey && editMode && selectedEl) { e.preventDefault(); runFmt('duplicate'); return; }
         if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
         if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo(); return; }
     }

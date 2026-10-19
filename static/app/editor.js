@@ -108,7 +108,7 @@ function toggleEditMode(force) {
     document.getElementById('editLabel').textContent = editMode ? '完成編輯' : '編輯';
     document.getElementById('editIcon').className = 'fa-solid text-[11px] ' + (editMode ? 'fa-check' : 'fa-pen-to-square');
     document.querySelectorAll('[data-edit-only]').forEach(b => { b.classList.toggle('hidden', !editMode); b.classList.toggle('flex', editMode); });
-    if (editMode) { prepareEditing(); showToast('單擊選取元素、雙擊編輯文字；插入的文字、圖片、圖表、圖示與圖案可拖曳移動、拉角落縮放（Esc 取消選取，可撤銷）', 'info', 4000); }
+    if (editMode) { prepareEditing(); showToast('單擊選取元素、雙擊編輯文字；插入的文字、圖片、圖表、圖示與圖案可拖曳移動（自動對齊，按住 Alt 暫停）、拉角落縮放、方向鍵微調，Ctrl+C / V 複製貼上、Ctrl+D 再製（Esc 取消選取，可撤銷）', 'info', 5000); }
 }
 
 // 把畫面上的修改寫回資料（一次編輯 = 一個撤銷步驟）
@@ -412,7 +412,7 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
   <span class="sep shape-only"></span>
   ${btn('chart', '<i class="fa-solid fa-chart-column text-[11px]"></i><span>圖表資料</span>', '編輯圖表資料', 'chart-only')}
   <span class="sep chart-only"></span>
-  ${btn('duplicate', '<i class="fa-regular fa-clone text-[11px]"></i>', '複製元素')}
+  ${btn('duplicate', '<i class="fa-regular fa-clone text-[11px]"></i>', '複製元素（Ctrl+D）')}
   ${btn('moveUp', '<i class="fa-solid fa-arrow-up text-[11px]"></i>', '同層上移（往前）')}
   ${btn('moveDown', '<i class="fa-solid fa-arrow-down text-[11px]"></i>', '同層下移（往後）')}
   ${btn('remove', '<i class="fa-regular fa-trash-can text-[11px]"></i>', '刪除元素（Delete）', 'danger')}`;

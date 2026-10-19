@@ -144,11 +144,13 @@ slideCanvasEl.addEventListener('drop', e => {
     insertSlideImage(f, { x: (e.clientX - r.left) / s, y: (e.clientY - r.top) / s });
 });
 slideCanvasEl.addEventListener('dragstart', e => { if (editMode) e.preventDefault(); });
+// 貼上：剪貼簿有圖片時插入圖片；否則若剪貼簿仍是從投影片複製的浮動物件（見 copyFloat），貼上該物件
 document.addEventListener('paste', e => {
     if (!editMode || editingEl || /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
     if (document.getElementById('sectionPlayer').classList.contains('hidden')) return;
     const f = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/'));
-    if (f) { e.preventDefault(); insertSlideImage(f); }
+    if (f) { e.preventDefault(); insertSlideImage(f); return; }
+    if (floatClip && e.clipboardData?.getData('text/plain') === floatClip.text) { e.preventDefault(); pasteFloat(); }
 });
 
 /* ----- 插入文字方塊 ----- */
@@ -356,11 +358,16 @@ function startFloatDrag(e, handle) {
     e.preventDefault();
     e.stopPropagation();
     stopTextEdit();
-    floatDrag = { el, handle, sx: e.clientX, sy: e.clientY, r: floatRect(el), s: slideScale(), moved: false, keepRatio: el.hasAttribute('data-rs-img') || el.hasAttribute('data-rs-icon') };
+    floatDrag = { el, handle, sx: e.clientX, sy: e.clientY, r: floatRect(el), s: slideScale(), moved: false, keepRatio: el.hasAttribute('data-rs-img') || el.hasAttribute('data-rs-icon'), snap: collectSnapTargets(el) };
     e.target.setPointerCapture?.(e.pointerId);
     e.target.addEventListener('pointermove', onFloatDragMove);
     e.target.addEventListener('pointerup', endFloatDrag, { once: true });
     e.target.addEventListener('pointercancel', endFloatDrag, { once: true });
+}
+// 移動：至少保留 24px 在投影片內，避免拖出畫面找不回來
+const FLOAT_KEEP = 24;
+function clampFloatPos(x, y, w, h) {
+    return [Math.min(Math.max(x, FLOAT_KEEP - w), SLIDE_W - FLOAT_KEEP), Math.min(Math.max(y, FLOAT_KEEP - h), SLIDE_H - FLOAT_KEEP)];
 }
 function onFloatDragMove(e) {
     const d = floatDrag;
@@ -370,29 +377,51 @@ function onFloatDragMove(e) {
     d.moved = true;
     const { x, y, w, h } = d.r;
     const MIN = 24;
+    const snapOn = !e.altKey;                     // 按住 Alt 暫時關閉吸附
+    const th = SNAP_PX / d.s;
+    const guides = { x: [], y: [] };
     if (!d.handle) {
-        // 移動：至少保留 24px 在投影片內，避免拖出畫面找不回來
-        const nx = Math.min(Math.max(x + dx, MIN - w), SLIDE_W - MIN);
-        const ny = Math.min(Math.max(y + dy, MIN - h), SLIDE_H - MIN);
+        let nx = x + dx, ny = y + dy;
+        if (snapOn) {
+            // 物件的左 / 中 / 右（上 / 中 / 下）任一條線靠近參考線時對齊過去
+            const sx = snapAxis([nx, nx + w / 2, nx + w], d.snap.x, th);
+            const sy = snapAxis([ny, ny + h / 2, ny + h], d.snap.y, th);
+            nx += sx.delta; ny += sy.delta;
+            guides.x = sx.lines; guides.y = sy.lines;
+        }
+        [nx, ny] = clampFloatPos(nx, ny, w, h);
         d.el.style.left = Math.round(nx) + 'px';
         d.el.style.top = Math.round(ny) + 'px';
     } else {
         const west = d.handle.includes('w'), north = d.handle.includes('n');
         let nw = Math.max(MIN, w + (west ? -dx : dx));
         let nh = Math.max(MIN, h + (north ? -dy : dy));
-        if (d.keepRatio) nh = nw * h / w;
         const isText = d.el.hasAttribute('data-rs-text');                 // 文字方塊只調寬度，高度隨文字
         const autoH = isText || d.el.hasAttribute('data-rs-img');
+        if (snapOn) {
+            // 只吸附正在拖動的那一側邊線；等比縮放與文字方塊的高度由寬度決定，不另外吸附
+            const sx = snapAxis([west ? x + w - nw : x + nw], d.snap.x, th);
+            nw = Math.max(MIN, nw + (west ? -sx.delta : sx.delta));
+            guides.x = sx.lines;
+            if (!d.keepRatio && !autoH) {
+                const sy = snapAxis([north ? y + h - nh : y + nh], d.snap.y, th);
+                nh = Math.max(MIN, nh + (north ? -sy.delta : sy.delta));
+                guides.y = sy.lines;
+            }
+        }
+        if (d.keepRatio) nh = nw * h / w;
         if (isText) nh = h;
         // 從左 / 上方的控制點縮放時，對側固定不動
         setFloatRect(d.el, west ? x + w - nw : x, north ? y + h - nh : y, nw, autoH ? null : nh);
         if (d.el.hasAttribute('data-rs-icon')) d.el.style.fontSize = iconFontPx(nw);
         if (d.el.hasAttribute('data-rs-shape')) renderShape(d.el);       // 圖案依新尺寸重畫，外框粗細不變形
     }
+    showSnapGuides(guides);
     positionToolbar();
 }
 function endFloatDrag(e) {
     e.target.removeEventListener('pointermove', onFloatDragMove);
+    showSnapGuides(null);
     const d = floatDrag;
     floatDrag = null;
     if (!d || !d.moved) return;
@@ -414,6 +443,137 @@ slideCanvasEl.addEventListener('pointerdown', e => {
 slideCanvasEl.addEventListener('click', e => {
     if (suppressNextClick) { suppressNextClick = false; e.stopImmediatePropagation(); e.preventDefault(); }
 }, true);
+
+/* ----- 對齊參考線與吸附 ----- */
+// 參考線：投影片的四邊與中線，以及其他元素（浮動物件、版面的前兩層區塊）的邊緣與中線；
+// 拖曳開始時量一次，座標為投影片座標（1024×576）
+const SNAP_PX = 6;                                // 吸附距離（螢幕像素）
+function collectSnapTargets(el) {
+    const xs = [0, SLIDE_W / 2, SLIDE_W], ys = [0, SLIDE_H / 2, SLIDE_H];
+    const scaler = getScaler(), root = slideRoot();
+    if (!scaler || !root) return { x: xs, y: ys };
+    const sr = scaler.getBoundingClientRect(), s = slideScale();
+    const scope = root === scaler ? ':scope > *, :scope > * > *' : ':scope > *, :scope > * > *, :scope > * > * > *';
+    root.querySelectorAll(scope).forEach(n => {
+        if (n === el || el.contains(n) || n.contains(el) || n.closest('svg')) return;
+        const r = n.getBoundingClientRect();
+        const x = (r.left - sr.left) / s, y = (r.top - sr.top) / s, w = r.width / s, h = r.height / s;
+        if (w < 8 || h < 8 || (w >= SLIDE_W - 1 && h >= SLIDE_H - 1)) return;   // 太小或滿版的容器沒有參考價值
+        xs.push(x, x + w / 2, x + w);
+        ys.push(y, y + h / 2, y + h);
+    });
+    return { x: xs, y: ys };
+}
+// 回傳最接近的吸附位移，以及吸附後對齊到的參考線（可能同時對齊多條）
+function snapAxis(cands, targets, th) {
+    let delta = null;
+    cands.forEach(c => targets.forEach(t => {
+        const d = t - c;
+        if (Math.abs(d) <= th && (delta === null || Math.abs(d) < Math.abs(delta))) delta = d;
+    }));
+    if (delta === null) return { delta: 0, lines: [] };
+    const lines = [...new Set(targets.filter(t => cands.some(c => Math.abs(c + delta - t) < 0.5)).map(t => Math.round(t)))];
+    return { delta, lines };
+}
+// 參考線畫在 body 層的固定定位容器（不在投影片內，不會被存進 html_content）
+const snapGuidesEl = document.createElement('div');
+snapGuidesEl.id = 'snapGuides';
+document.body.appendChild(snapGuidesEl);
+function showSnapGuides(g) {
+    if (!g || (!g.x.length && !g.y.length)) { snapGuidesEl.replaceChildren(); return; }
+    const r = slideCanvasEl.getBoundingClientRect(), s = slideScale();
+    snapGuidesEl.innerHTML = g.x.map(x => `<span class="sg-v" style="left:${r.left + x * s}px;top:${r.top}px;height:${r.height}px"></span>`).join('')
+        + g.y.map(y => `<span class="sg-h" style="top:${r.top + y * s}px;left:${r.left}px;width:${r.width}px"></span>`).join('');
+}
+
+/* ----- 方向鍵微調位置 ----- */
+// 每按一次移動 1px（Shift：10px）；連續按鍵（間隔 800ms 內、同一個物件）合併成一個撤銷步驟
+let nudgeState = null;
+function nudgeSelected(dx, dy) {
+    const el = selectedEl;
+    if (!editMode || !isFloat(el) || !el.isConnected) return false;
+    stopTextEdit();
+    const r = floatRect(el);
+    const [nx, ny] = clampFloatPos(r.x + dx, r.y + dy, r.w, r.h);
+    if (Math.round(nx) === r.x && Math.round(ny) === r.y) return true;   // 已到邊界
+    el.style.left = Math.round(nx) + 'px';
+    el.style.top = Math.round(ny) + 'px';
+    const merge = nudgeState && nudgeState.el === el && Date.now() - nudgeState.at < 800 && undoStack[undoStack.length - 1] === nudgeState.snap;
+    commitSlideEdit(!merge);
+    nudgeState = { el, at: Date.now(), snap: merge ? nudgeState.snap : undoStack[undoStack.length - 1] };
+    positionToolbar();
+    return true;
+}
+
+/* ----- 浮動物件：複製、剪下、貼上（Ctrl+C / Ctrl+X / Ctrl+V） ----- */
+// 物件存在頁面內的變數（含圖表資料），系統剪貼簿只放物件的文字；貼上時剪貼簿文字仍相同才貼物件，
+// 期間若從其他地方複製了文字或圖片，就以剪貼簿的新內容為準
+let floatClip = null;
+function clipTarget(e) {
+    if (!editMode || editingEl || !isFloat(selectedEl) || !selectedEl.isConnected) return null;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable) return null;
+    if (document.getElementById('sectionPlayer').classList.contains('hidden')) return null;
+    return selectedEl;
+}
+function copyFloat(el, dt) {
+    const c = el.cloneNode(true);
+    [c, ...c.querySelectorAll(EDIT_ATTRS.map(a => `[${a}]`).join(','))].forEach(n => EDIT_ATTRS.forEach(a => n.removeAttribute(a)));
+    const slide = currentPresentationData.slides[currentSlideIdx];
+    const charts = {};
+    [c, ...c.querySelectorAll('[data-rs-chart]')].filter(n => n.hasAttribute('data-rs-chart')).forEach(n => {
+        const i = n.getAttribute('data-rs-chart');
+        if (slide.charts?.[Number(i)]) charts[i] = JSON.parse(JSON.stringify(slide.charts[Number(i)]));
+    });
+    // 文字方塊與圖案放入其文字（可貼到其他程式）；圖片、圖示、圖表的文字沒有意義，改放標記
+    const text = (el.matches('[data-rs-text],[data-rs-shape]') ? el.textContent.replace(/\s+/g, ' ').trim() : '') || '[R Slide 物件]';
+    floatClip = { html: c.outerHTML, charts, text };
+    dt?.setData('text/plain', text);
+}
+function pasteFloat() {
+    const slide = currentPresentationData?.slides?.[currentSlideIdx];
+    const root = slideRoot();
+    if (!floatClip || !slide || !root) return;
+    stopTextEdit();
+    const tpl = document.createElement('template');
+    tpl.innerHTML = floatClip.html;
+    const el = tpl.content.firstElementChild;
+    if (!el) return;
+    // 同時修改 slide.charts 與 HTML：先記錄撤銷點，再以 commitSlideEdit(false) 寫回
+    pushUndoSnapshot();
+    slide.charts = Array.isArray(slide.charts) ? slide.charts : [];
+    [el, ...el.querySelectorAll('[data-rs-chart]')].filter(n => n.hasAttribute('data-rs-chart')).forEach(n => {
+        const spec = floatClip.charts[n.getAttribute('data-rs-chart')];
+        if (!spec) return;
+        slide.charts.push(JSON.parse(JSON.stringify(spec)));
+        n.setAttribute('data-rs-chart', String(slide.charts.length - 1));
+    });
+    // 原位置已有同樣位置的物件（貼在同一頁、或連續貼上）時往右下錯開
+    const x0 = parseFloat(el.style.left) || 0, y0 = parseFloat(el.style.top) || 0;
+    const taken = new Set([...root.querySelectorAll(':scope > [data-rs-float]')].map(n => `${parseFloat(n.style.left) || 0},${parseFloat(n.style.top) || 0}`));
+    let k = 0;
+    while (k < 40 && taken.has(`${x0 + k * 24},${y0 + k * 24}`)) k++;
+    const w = parseFloat(el.style.width) || 0, h = parseFloat(el.style.height) || 0;
+    const [nx, ny] = clampFloatPos(x0 + k * 24, y0 + k * 24, w, h);
+    el.style.left = Math.round(nx) + 'px';
+    el.style.top = Math.round(ny) + 'px';
+    root.appendChild(el);
+    commitSlideEdit(false);
+    selectElement(el);
+}
+document.addEventListener('copy', e => {
+    const el = clipTarget(e);
+    if (!el) return;
+    e.preventDefault();
+    copyFloat(el, e.clipboardData);
+    showToast('已複製物件，可按 Ctrl+V 貼上（也可貼到其他頁）', 'info', 1800);
+});
+document.addEventListener('cut', e => {
+    const el = clipTarget(e);
+    if (!el) return;
+    e.preventDefault();
+    copyFloat(el, e.clipboardData);
+    runFmt('remove');
+});
 
 /* ----- 圖表資料編輯 ----- */
 let chartEditTarget = null;      // null = 插入新圖表；否則為 [data-rs-chart] 容器
