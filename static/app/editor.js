@@ -407,6 +407,7 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
   ${btn('pal-fill', '<i class="fa-solid fa-fill-drip text-[11px]"></i><span id="fmtFillChip" class="chipbox"></span>', '圖案填滿顏色', 'shape-only shape-fill')}
   ${btn('pal-stroke', '<i class="fa-regular fa-square text-[11px]"></i><span id="fmtStrokeChip" class="chipbox"></span>', '外框顏色', 'shape-only')}
   <select id="fmtStrokeW" class="shape-only" title="外框粗細" aria-label="外框粗細">${SHAPE_STROKE_WIDTHS.map(w => `<option value="${w}">${w ? `外框：${w}px` : '無外框'}</option>`).join('')}</select>
+  <select id="fmtShapeRadius" class="shape-only shape-radius" title="圖案圓角（轉角倒圓）" aria-label="圖案圓角">${SHAPE_RADII.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
   <select id="fmtDash" class="shape-only" title="外框樣式" aria-label="外框樣式">${SHAPE_DASHES.map(d => `<option value="${d[0]}">${d[1]}</option>`).join('')}</select>
   <span class="sep shape-only"></span>
   ${btn('chart', '<i class="fa-solid fa-chart-column text-[11px]"></i><span>圖表資料</span>', '編輯圖表資料', 'chart-only')}
@@ -444,6 +445,7 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
     tb.querySelector('#fmtWeight').addEventListener('change', e => runFmt('weight', e.target.value));
     tb.querySelector('#fmtRadius').addEventListener('change', e => runFmt('radius', e.target.value));
     tb.querySelector('#fmtStrokeW').addEventListener('change', e => runFmt('shapeProp', 'strokeW', e.target.value));
+    tb.querySelector('#fmtShapeRadius').addEventListener('change', e => runFmt('shapeProp', 'radius', e.target.value));
     tb.querySelector('#fmtDash').addEventListener('change', e => runFmt('shapeProp', 'dash', e.target.value));
     pal.addEventListener('click', e => {
         const c = e.target.closest('[data-color]');
@@ -531,6 +533,10 @@ function refreshToolbar() {
         swSel.value = String(st.sw);
         swSel.querySelector('option[value="0"]').disabled = line;
         document.getElementById('fmtDash').value = st.dash;
+        const shapeRadSel = document.getElementById('fmtShapeRadius');
+        shapeRadSel.style.display = shapeHasRadius(shape) ? '' : 'none';
+        if (![...shapeRadSel.options].some(o => Number(o.value) === st.radius)) shapeRadSel.add(new Option(`圓角：${st.radius}px`, String(st.radius)));
+        shapeRadSel.value = String(st.radius);
     }
     positionToolbar();
 }

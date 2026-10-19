@@ -3,6 +3,7 @@
 /* ===================== 圖案 ===================== */
 // 圖案為浮動物件（data-rs-shape + data-rs-float），外框與填色存在容器的 data-* 屬性：
 //   data-fill（HEX 或 none）、data-stroke（HEX 或 none）、data-stroke-w（px）、data-dash（solid / dash / dot）
+//   data-radius（圓角 px，套用在圖形的每個轉角；橢圓與線條沒有轉角）
 // 容器內是依實際尺寸畫出的靜態 SVG（縮放後重畫，外框粗細不隨尺寸變形，匯出時也不需要腳本），
 // 以及可雙擊輸入文字的 [data-rs-shape-text]；文字格式（字級、粗細、對齊、文字顏色）沿用格式工具列。
 const RS_SHAPES = [
@@ -26,6 +27,12 @@ const RS_SHAPES = [
 const SHAPE_BY_ID = Object.fromEntries(RS_SHAPES.map(s => [s.id, s]));
 const SHAPE_STROKE_WIDTHS = [0, 1, 2, 3, 4, 6, 8, 12, 16];
 const SHAPE_DASHES = [['solid', '實線'], ['dash', '虛線'], ['dot', '點線']];
+// 999 = 最大：每個轉角都圓到相鄰邊長的一半（矩形變成膠囊形）
+const SHAPE_RADII = [[0, '直角'], [4, '圓角：4px'], [8, '圓角：8px'], [12, '圓角：12px'], [16, '圓角：16px'], [24, '圓角：24px'], [32, '圓角：32px'], [48, '圓角：48px'], [999, '圓角：最大']];
+// 沒有 data-radius 時的預設圓角
+const SHAPE_DEFAULT_RADIUS = { 'round-rect': 24, callout: 20 };
+const SHAPE_NO_RADIUS = new Set(['ellipse', 'line', 'arrow-line']);
+function shapeHasRadius(el) { return !SHAPE_NO_RADIUS.has(el?.getAttribute('data-rs-shape')); }
 const SHAPE_DEFAULT = { fill: '#3b82f6', stroke: '#1e40af', strokeW: 2 };
 const SHAPE_LINE_DEFAULT = { stroke: '#3f3f46', strokeW: 3 };
 const SHAPE_COLOR_RE = /^#[0-9a-f]{6}$/i;
@@ -48,7 +55,9 @@ function readShapeStyle(el) {
         fill: line ? 'none' : color(el.getAttribute('data-fill')),
         stroke: line && stroke === 'none' ? SHAPE_LINE_DEFAULT.stroke : stroke,
         sw,
-        dash: SHAPE_DASHES.some(d => d[0] === el.getAttribute('data-dash')) ? el.getAttribute('data-dash') : 'solid'
+        dash: SHAPE_DASHES.some(d => d[0] === el.getAttribute('data-dash')) ? el.getAttribute('data-dash') : 'solid',
+        radius: el.hasAttribute('data-radius') ? Math.min(999, Math.max(0, Math.round(Number(el.getAttribute('data-radius')) || 0)))
+            : (SHAPE_DEFAULT_RADIUS[el.getAttribute('data-rs-shape')] || 0)
     };
 }
 
@@ -60,9 +69,25 @@ function shapeSvgInner(type, w, h, st) {
     const r = n => Math.round(n * 100) / 100;
     const inset = sw / 2;
     const x0 = inset, y0 = inset, W = Math.max(1, w - sw), H = Math.max(1, h - sw);
-    const poly = pts => `<polygon points="${pts.map(([x, y]) => `${r(x0 + x * W)},${r(y0 + y * H)}`).join(' ')}" ${paint}/>`;
+    const rad = st.radius || 0;
+    // 多邊形：有圓角時，每個頂點以二次曲線圓過去（圓角長度不超過相鄰邊長的一半，避免兩個圓角重疊）
+    const polygon = pts => {
+        if (!rad) return `<polygon points="${pts.map(([x, y]) => `${r(x)},${r(y)}`).join(' ')}" ${paint}/>`;
+        const n = pts.length;
+        let d = '';
+        pts.forEach((p, i) => {
+            const a = pts[(i + n - 1) % n], b = pts[(i + 1) % n];
+            const la = Math.hypot(a[0] - p[0], a[1] - p[1]) || 1, lb = Math.hypot(b[0] - p[0], b[1] - p[1]) || 1;
+            const k = Math.min(rad, la / 2, lb / 2);
+            const s = [p[0] + (a[0] - p[0]) * k / la, p[1] + (a[1] - p[1]) * k / la];
+            const e = [p[0] + (b[0] - p[0]) * k / lb, p[1] + (b[1] - p[1]) * k / lb];
+            d += `${i ? 'L' : 'M'}${r(s[0])} ${r(s[1])}Q${r(p[0])} ${r(p[1])} ${r(e[0])} ${r(e[1])}`;
+        });
+        return `<path d="${d}Z" ${paint}/>`;
+    };
+    const poly = pts => polygon(pts.map(([x, y]) => [x0 + x * W, y0 + y * H]));
     // 以像素指定的頂點（箭頭等：箭頭頭部長度不隨寬度拉長變形）
-    const polyPx = pts => `<polygon points="${pts.map(([x, y]) => `${r(x0 + x)},${r(y0 + y)}`).join(' ')}" ${paint}/>`;
+    const polyPx = pts => polygon(pts.map(([x, y]) => [x0 + x, y0 + y]));
     // 正多邊形 / 星形：頂點正規化到外框，填滿整個容器
     const regular = (n, inner) => {
         const pts = [];
@@ -78,9 +103,10 @@ function shapeSvgInner(type, w, h, st) {
     };
 
     switch (type) {
-        case 'rect': return `<rect x="${r(x0)}" y="${r(y0)}" width="${r(W)}" height="${r(H)}" ${paint}/>`;
-        case 'round-rect': {
-            const rx = r(Math.min(W, H) * 0.18);
+        case 'rect':
+        case 'round-rect': {                     // 兩者只差在預設圓角（SHAPE_DEFAULT_RADIUS）
+            const rx = r(Math.min(rad, W / 2, H / 2));
+            if (!rx) return `<rect x="${r(x0)}" y="${r(y0)}" width="${r(W)}" height="${r(H)}" ${paint}/>`;
             return `<rect x="${r(x0)}" y="${r(y0)}" width="${r(W)}" height="${r(H)}" rx="${rx}" ry="${rx}" ${paint}/>`;
         }
         case 'ellipse': return `<ellipse cx="${r(w / 2)}" cy="${r(h / 2)}" rx="${r(W / 2)}" ry="${r(H / 2)}" ${paint}/>`;
@@ -102,7 +128,7 @@ function shapeSvgInner(type, w, h, st) {
         }
         case 'callout': {
             const x1 = x0 + W, yb = y0 + H * 0.78, ye = y0 + H;
-            const c = r(Math.min(W, yb - y0) * 0.15);
+            const c = r(Math.min(rad, W * 0.2, (yb - y0) / 2));     // 不超過左下角到尾巴的距離
             const tl = x0 + W * 0.2, tr = x0 + W * 0.38, tip = x0 + W * 0.14;
             return `<path d="M${r(x0 + c)} ${r(y0)}H${r(x1 - c)}A${c} ${c} 0 0 1 ${r(x1)} ${r(y0 + c)}V${r(yb - c)}A${c} ${c} 0 0 1 ${r(x1 - c)} ${r(yb)}H${r(tr)}L${r(tip)} ${r(ye)}L${r(tl)} ${r(yb)}H${r(x0 + c)}A${c} ${c} 0 0 1 ${r(x0)} ${r(yb - c)}V${r(y0 + c)}A${c} ${c} 0 0 1 ${r(x0 + c)} ${r(y0)}Z" ${paint}/>`;
         }
@@ -156,6 +182,7 @@ function setShapeStyle(el, prop, v) {
         // 原本沒有外框時調了粗細：給一個預設顏色
         if (n > 0 && !SHAPE_COLOR_RE.test(el.getAttribute('data-stroke') || '')) el.setAttribute('data-stroke', SHAPE_DEFAULT.stroke);
     } else if (prop === 'dash') el.setAttribute('data-dash', v);
+    else if (prop === 'radius') el.setAttribute('data-radius', String(Math.min(999, Math.max(0, Math.round(Number(v) || 0)))));
     renderShape(el);
 }
 
@@ -183,6 +210,7 @@ function insertSlideShape(type) {
         el.appendChild(t);
     }
     el.setAttribute('data-dash', 'solid');
+    if (shapeHasRadius(el)) el.setAttribute('data-radius', String(SHAPE_DEFAULT_RADIUS[type] || 0));
     // 連續插入時錯開位置，避免疊在一起
     const n = root.querySelectorAll(':scope > [data-rs-shape]').length % 6;
     setFloatRect(el, (SLIDE_W - def.w) / 2 + n * 24, (SLIDE_H - def.h) / 2 + n * 24, def.w, def.h);
