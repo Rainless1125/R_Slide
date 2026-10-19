@@ -1348,6 +1348,17 @@ body.sb-open #sidebar {
     white-space: nowrap;
 }
 
+/* 拖曳時的對齊參考線（media.js 的 showSnapGuides） */
+#snapGuides span {
+    position: fixed;
+    z-index: 53;
+    pointer-events: none;
+    background: #ec4899;
+}
+
+#snapGuides .sg-v { width: 1px; }
+#snapGuides .sg-h { height: 1px; }
+
 .slide-title-edit {
     cursor: text;
     border-radius: 4px;

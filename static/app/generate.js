@@ -319,6 +319,7 @@ function renderReviewSection(quiet = false) {
     <button onclick="moveSlide(${idx}, ${idx - 1})" ${idx === 0 ? 'disabled' : ''} class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center" title="前移" aria-label="前移"><i class="fa-solid fa-arrow-left text-[11px]"></i></button>
     <button onclick="moveSlide(${idx}, ${idx + 1})" ${idx === currentPresentationData.slides.length - 1 ? 'disabled' : ''} class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center" title="後移" aria-label="後移"><i class="fa-solid fa-arrow-right text-[11px]"></i></button>
     <button onclick="duplicateSlide(${idx})" class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5" title="複製此頁" aria-label="複製此頁"><i class="fa-regular fa-clone text-[11px]"></i><span>複製</span></button>
+    <button onclick="addBlankSlide(${idx})" class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center" title="在此頁後新增空白頁" aria-label="在此頁後新增空白頁"><i class="fa-solid fa-plus text-[11px]"></i></button>
     <button onclick="deleteSlide(${idx})" ${currentPresentationData.slides.length <= 1 ? 'disabled' : ''} class="icon-btn h-8 px-3 rounded-full hover:bg-red-50 hover:text-red-500 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed text-xs font-semibold flex items-center gap-1.5" title="刪除此頁" aria-label="刪除此頁"><i class="fa-regular fa-trash-can text-[11px]"></i><span>刪除</span></button>
   </div>
 `;
@@ -332,6 +333,13 @@ function renderReviewSection(quiet = false) {
         });
         container.appendChild(card);
     });
+    // 最後一格：在最後一頁之後新增空白頁
+    const addTile = document.createElement('button');
+    addTile.type = 'button';
+    addTile.className = 'rv-add min-h-[10rem] rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-200 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-50 dark:hover:bg-zinc-950 transition-colors flex flex-col items-center justify-center gap-2 text-sm font-semibold';
+    addTile.innerHTML = '<i class="fa-solid fa-plus text-lg"></i><span>新增空白頁</span>';
+    addTile.onclick = () => addBlankSlide(currentPresentationData.slides.length - 1);
+    container.appendChild(addTile);
     fitReviewThumbs();
     if (regeneratingSlideIdx !== null && regeneratingDeck === currentPresentationData) setReviewRegenerateState(regeneratingSlideIdx, true);
 
