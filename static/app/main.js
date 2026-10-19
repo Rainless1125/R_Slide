@@ -3,8 +3,8 @@
 /* ===================== 全域事件 ===================== */
 // 捲動 / 縮放時重新定位格式工具列與浮動物件框。放在最後載入的 main.js：這些事件在頁面載入途中就可能觸發，
 // 而 positionToolbar 會呼叫 media.js 的 positionFloatBox，必須等所有 app/*.js 都載入後才註冊
-window.addEventListener('scroll', () => { positionToolbar(); hidePalette(); positionIconPicker(); }, { passive: true });
-window.addEventListener('resize', () => { positionToolbar(); hidePalette(); positionIconPicker(); });
+window.addEventListener('scroll', () => { positionToolbar(); hidePalette(); positionIconPicker(); positionShapePicker(); }, { passive: true });
+window.addEventListener('resize', () => { positionToolbar(); hidePalette(); positionIconPicker(); positionShapePicker(); });
 new ResizeObserver(() => positionToolbar()).observe(document.getElementById('slideCanvas'));
 
 document.addEventListener('keydown', (e) => {
@@ -16,6 +16,10 @@ document.addEventListener('keydown', (e) => {
     if (isIconPickerOpen()) {
         if (e.key === 'Escape') { e.preventDefault(); closeIconPicker(); document.getElementById('iconPickerBtn').focus(); return; }
         if (e.target.closest?.('#iconPicker')) return;   // 面板內的輸入 / 方向鍵不觸發換頁等快捷鍵
+    }
+    if (isShapePickerOpen()) {
+        if (e.key === 'Escape') { e.preventDefault(); closeShapePicker(); document.getElementById('shapePickerBtn').focus(); return; }
+        if (e.target.closest?.('#shapePicker')) return;
     }
     if (e.key === 'Escape' && !document.getElementById('regenModal').classList.contains('hidden')) {
         e.preventDefault();

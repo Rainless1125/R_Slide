@@ -387,6 +387,7 @@ function onFloatDragMove(e) {
         // 從左 / 上方的控制點縮放時，對側固定不動
         setFloatRect(d.el, west ? x + w - nw : x, north ? y + h - nh : y, nw, autoH ? null : nh);
         if (d.el.hasAttribute('data-rs-icon')) d.el.style.fontSize = iconFontPx(nw);
+        if (d.el.hasAttribute('data-rs-shape')) renderShape(d.el);       // 圖案依新尺寸重畫，外框粗細不變形
     }
     positionToolbar();
 }
