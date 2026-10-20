@@ -25,7 +25,7 @@
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/app/app.css?v=10">
+    <link rel="stylesheet" href="/static/app/app.css?v=11">
 </head>
 
 <body
@@ -70,6 +70,11 @@
                     <i class="fa-solid fa-right-from-bracket"></i>
                 </button>
             </div>
+            <button id="guideBtn" onclick="openGuide()"
+                class="icon-btn w-9 h-9 shrink-0 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-violet-300 focus:outline-none"
+                aria-label="使用教學" title="使用教學" aria-haspopup="dialog" aria-controls="guideModal">
+                <i class="fa-regular fa-circle-question"></i>
+            </button>
             <button id="themeBtn" onclick="toggleTheme()"
                 class="icon-btn h-9 px-3 shrink-0 whitespace-nowrap rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-2 text-sm font-semibold text-zinc-600 dark:text-zinc-300 focus:outline-none"
                 aria-label="切換深色／淺色模式" title="切換深色／淺色模式">
@@ -643,6 +648,178 @@
     <div id="shapePicker" role="dialog" aria-label="插入圖案"
         class="hidden fixed z-[80] p-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl"></div>
 
+    <!-- 使用教學 Modal（static/app/guide.js 切換分頁） -->
+    <div id="guideModal" role="dialog" aria-modal="true" aria-labelledby="guideTitle" onclick="if(event.target===this)closeGuide()"
+        class="hidden fixed inset-0 z-[90] bg-black/45 backdrop-blur-sm p-4 flex items-center justify-center">
+        <div
+            class="guide-panel w-full max-w-4xl h-[min(44rem,92vh)] flex flex-col rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl overflow-hidden">
+            <div class="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-b border-zinc-200 dark:border-zinc-800">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div
+                        class="w-9 h-9 shrink-0 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 text-white shadow-md shadow-purple-500/30 rounded-md flex items-center justify-center">
+                        <i class="fa-solid fa-book-open text-sm"></i></div>
+                    <div class="min-w-0">
+                        <h3 id="guideTitle" class="text-base sm:text-lg font-bold leading-tight">使用教學</h3>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5 truncate">三個步驟：輸入素材 → 審查頁面 → 播放、編輯與匯出</p>
+                    </div>
+                </div>
+                <button onclick="closeGuide()" class="icon-btn w-8 h-8 shrink-0 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    aria-label="關閉使用教學">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="flex-1 min-h-0 flex flex-col md:flex-row">
+                <nav id="guideNav" role="tablist" aria-label="教學章節" aria-orientation="vertical"
+                    class="guide-nav shrink-0 md:w-48 flex md:flex-col gap-1 p-2 md:p-3 overflow-x-auto md:overflow-y-auto no-scrollbar border-b md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50/70 dark:bg-zinc-950/40">
+                    <button type="button" role="tab" data-guide="start"><i class="fa-solid fa-flag-checkered"></i>快速開始</button>
+                    <button type="button" role="tab" data-guide="input"><i class="fa-solid fa-pen-to-square"></i>輸入素材</button>
+                    <button type="button" role="tab" data-guide="review"><i class="fa-solid fa-list-check"></i>審查與重產</button>
+                    <button type="button" role="tab" data-guide="player"><i class="fa-solid fa-display"></i>播放與講者</button>
+                    <button type="button" role="tab" data-guide="edit"><i class="fa-solid fa-pen-ruler"></i>編輯模式</button>
+                    <button type="button" role="tab" data-guide="export"><i class="fa-solid fa-file-export"></i>匯出與記錄</button>
+                    <button type="button" role="tab" data-guide="keys"><i class="fa-regular fa-keyboard"></i>快捷鍵</button>
+                </nav>
+                <div id="guideBody" class="guide-body flex-1 min-h-0 overflow-y-auto p-5 sm:p-6">
+                    <section data-guide-panel="start" role="tabpanel">
+                        <h4>歡迎使用 R Slide</h4>
+                        <p>貼上文字素材，AI 會依內容自動規劃版面並產生可編輯的簡報，完成後可直接播放，或匯出為 PDF、PowerPoint、HTML。</p>
+                        <ol class="guide-steps">
+                            <li><b>01 / 輸入</b><span>貼上或上傳素材，選擇簡報模式、頁數與視覺風格，按「生成」。</span></li>
+                            <li><b>02 / 審查</b><span>瀏覽每一頁的縮圖，修改標題、刪除或調整順序，不滿意的頁面可單獨重產。</span></li>
+                            <li><b>03 / 簡報</b><span>全螢幕播放、撰寫講者備註、進入編輯模式微調內容，最後匯出。</span></li>
+                        </ol>
+                        <div class="guide-tip"><i class="fa-regular fa-lightbulb"></i><span>畫面上方的步驟條可隨時點擊，在三個步驟之間切換；生成與重產需要先登入帳號。</span></div>
+                    </section>
+
+                    <section data-guide-panel="input" role="tabpanel" hidden>
+                        <h4>輸入素材</h4>
+                        <ul>
+                            <li><b>輸入文字</b>：直接在輸入框貼上內容（上限 50,000 字），或點「試試範例」快速體驗。</li>
+                            <li><b>匯入檔案</b>：點「上傳檔案」、拖放或貼上 PDF、Word（.docx）、Markdown、TXT（單檔 10 MB）；文字抽出後會先填入輸入框，可檢查、修改再生成。掃描影像型 PDF 與舊版 .doc 不支援。</li>
+                            <li><b>AI 模型</b>：右上角的模型選單可切換 Gemini、OpenAI 或 Databricks 的模型（依伺服器設定而定）。</li>
+                        </ul>
+                        <h5>簡報模式</h5>
+                        <div class="guide-grid">
+                            <div class="guide-card"><b>簡易模式 · 演講型</b><span>少字大圖、一頁一重點，論述細節寫進講者備註，適合上台報告。</span></div>
+                            <div class="guide-card"><b>詳細模式 · 閱讀型</b><span>以結論句當標題、附完整論述與數據出處，不需講者也能看懂，適合會後寄送。</span></div>
+                        </div>
+                        <h5>其他選項</h5>
+                        <ul>
+                            <li><b>頁數</b>：可指定 2~12 頁或由 AI 決定；詳細模式資訊量較大，素材豐富時建議由 AI 決定。</li>
+                            <li><b>受眾與視覺風格</b>：例如「主管會議」「蘋果極簡白」「科技深色風」，AI 會依此調整語氣與配色。</li>
+                        </ul>
+                        <div class="guide-tip"><i class="fa-regular fa-lightbulb"></i><span>按 <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>Enter</kbd> 可快速生成；輸入內容會自動保存為草稿。</span></div>
+                    </section>
+
+                    <section data-guide-panel="review" role="tabpanel" hidden>
+                        <h4>審查與重產</h4>
+                        <p>生成後會進入審查頁，以卡片列出每一頁的縮圖與標題。</p>
+                        <ul>
+                            <li><b>修改標題</b>：直接點擊卡片上的標題文字修改，Enter 確定、Esc 取消。</li>
+                            <li><b>調整頁序與刪除</b>：拖曳卡片左上角的把手，或用左右箭頭前移 / 後移；「刪除」可移除該頁。</li>
+                            <li><b>新增空白頁</b>：每張卡片的「+」可在該頁後新增空白頁，最後一格可新增到最後；空白頁沿用參考頁的背景與文字顏色。</li>
+                            <li><b>重產此頁</b>：對某頁不滿意時，可輸入提示詞（例如「重點三點式、加上 KPI 資訊卡」）單獨重新生成，其他頁面維持不變。</li>
+                            <li><b>切換模式重產</b>：重產視窗可改用另一種簡報模式，之後這份簡報的重產都會沿用。</li>
+                        </ul>
+                        <div class="guide-tip"><i class="fa-regular fa-lightbulb"></i><span>想放自己的圖片時，可先在重產提示詞中說明「右半邊留白，之後放產品照片」，再到編輯模式插入圖片並拖曳到留白處。</span></div>
+                    </section>
+
+                    <section data-guide-panel="player" role="tabpanel" hidden>
+                        <h4>播放與講者</h4>
+                        <ul>
+                            <li><b>換頁</b>：工具列的左右箭頭、鍵盤 <kbd>←</kbd> <kbd>→</kbd>、簡報筆（PageUp / PageDown），或在觸控螢幕上左右滑動。</li>
+                            <li><b>全螢幕</b>：按「全螢幕」或 <kbd>F</kbd>；<b>自動播放</b>：按「自動播放」或空白鍵。</li>
+                            <li><b>講者備註</b>：AI 會為每頁產生口語化講稿，按「備註」或 <kbd>N</kbd> 顯示在投影片下方，可直接修改；備註會寫入 PPTX 的備忘稿。</li>
+                            <li><b>講者檢視</b>：按「講者檢視」或 <kbd>P</kbd> 另開視窗，顯示目前頁、下一頁、備註與計時器，適合主畫面投影、筆電看講稿。</li>
+                        </ul>
+                        <div class="guide-tip"><i class="fa-regular fa-lightbulb"></i><span>開啟講者檢視後，將主視窗拖到投影機畫面並按 <kbd>F</kbd> 全螢幕，在講者檢視中換頁即可同步。</span></div>
+                    </section>
+
+                    <section data-guide-panel="edit" role="tabpanel" hidden>
+                        <h4>編輯模式</h4>
+                        <p>在簡報頁按「編輯」進入編輯模式，直接修改投影片內容，不會呼叫 AI。</p>
+                        <h5>修改 AI 生成的版面</h5>
+                        <ul>
+                            <li>點擊文字即可修改；選取元素後，格式工具列可調整字級、粗細、對齊、顏色與圓角，或複製、刪除、調整同層順序。</li>
+                            <li>AI 生成的元素位置與大小固定；AI 產生的圖表可修改數據。</li>
+                        </ul>
+                        <h5>插入內容</h5>
+                        <div class="guide-grid">
+                            <div class="guide-card"><b><i class="fa-solid fa-font"></i>文字</b><span>插入可自由移動的文字方塊。</span></div>
+                            <div class="guide-card"><b><i class="fa-regular fa-image"></i>圖片</b><span>上傳、拖放或貼上圖片，在瀏覽器端壓縮後內嵌。</span></div>
+                            <div class="guide-card"><b><i class="fa-solid fa-chart-column"></i>圖表</b><span>以試算表輸入數據，可直接貼上 Excel 多格資料，並可加參考虛線。</span></div>
+                            <div class="guide-card"><b><i class="fa-solid fa-icons"></i>圖示</b><span>內建 300 個常用圖示，可用中英文關鍵字搜尋，Enter 插入第一個。</span></div>
+                            <div class="guide-card"><b><i class="fa-solid fa-shapes"></i>圖案</b><span>16 種圖案，可調整填滿、外框、線條樣式與圓角，雙擊輸入文字。</span></div>
+                            <div class="guide-card"><b><i class="fa-regular fa-square-plus"></i>空白頁</b><span>在目前頁面之後新增空白頁並直接切換過去。</span></div>
+                        </div>
+                        <h5>擺放與微調</h5>
+                        <ul>
+                            <li>自行插入的內容可拖曳移動、拉角落縮放，會自動對齊邊緣、中線與其他元素（按住 <kbd>Alt</kbd> 暫停吸附）。</li>
+                            <li>選取後用方向鍵微調位置（<kbd>Shift</kbd> 一次 10px）；<kbd>Delete</kbd> 刪除、<kbd>Esc</kbd> 取消選取。</li>
+                            <li>操作失誤可按「撤銷」「重做」，或使用 <kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd>。</li>
+                        </ul>
+                    </section>
+
+                    <section data-guide-panel="export" role="tabpanel" hidden>
+                        <h4>匯出與歷史記錄</h4>
+                        <h5>匯出格式</h5>
+                        <div class="guide-grid">
+                            <div class="guide-card"><b><i class="fa-regular fa-file-pdf"></i>PDF</b><span>每頁為 2 倍解析度圖片，外觀與畫面一致，文字無法再編輯。</span></div>
+                            <div class="guide-card"><b><i class="fa-regular fa-file-powerpoint"></i>PowerPoint</b><span>每頁為圖片，並保留講者備註於備忘稿。</span></div>
+                            <div class="guide-card"><b><i class="fa-regular fa-file-code"></i>HTML</b><span>可直接用瀏覽器播放的單一檔案，按 N 可顯示備註。</span></div>
+                        </div>
+                        <h5>歷史記錄</h5>
+                        <ul>
+                            <li>點左上角的 <i class="fa-solid fa-bars"></i> 開啟側邊欄，可搜尋、重新開啟或刪除過去的簡報。</li>
+                            <li>記錄存放在伺服器並依帳號分開，換電腦或瀏覽器登入同一帳號即可接續使用；每個帳號最多保留 200 筆。</li>
+                            <li>「新增簡報」可清空目前內容，回到輸入步驟。</li>
+                        </ul>
+                    </section>
+
+                    <section data-guide-panel="keys" role="tabpanel" hidden>
+                        <h4>快捷鍵</h4>
+                        <h5>播放</h5>
+                        <dl class="guide-keys">
+                            <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>上一頁 / 下一頁（也支援 PageUp / PageDown）</dd>
+                            <dt><kbd>Home</kbd> <kbd>End</kbd></dt><dd>第一頁 / 最後一頁</dd>
+                            <dt><kbd>F</kbd></dt><dd>全螢幕</dd>
+                            <dt><kbd>Space</kbd></dt><dd>自動播放</dd>
+                            <dt><kbd>N</kbd></dt><dd>顯示 / 隱藏講者備註</dd>
+                            <dt><kbd>P</kbd></dt><dd>開啟講者檢視</dd>
+                        </dl>
+                        <h5>編輯</h5>
+                        <dl class="guide-keys">
+                            <dt><kbd>Ctrl</kbd> <kbd>Z</kbd></dt><dd>撤銷</dd>
+                            <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Z</kbd></dt><dd>重做（也可用 Ctrl + Y）</dd>
+                            <dt><kbd>Ctrl</kbd> <kbd>C</kbd> / <kbd>X</kbd> / <kbd>V</kbd></dt><dd>複製、剪下、貼上自行插入的元素（可跨頁）</dd>
+                            <dt><kbd>Ctrl</kbd> <kbd>D</kbd></dt><dd>再製選取的元素</dd>
+                            <dt><kbd>方向鍵</kbd></dt><dd>微調位置 1px（按住 Shift 為 10px）</dd>
+                            <dt><kbd>Alt</kbd></dt><dd>拖曳時暫停對齊吸附</dd>
+                            <dt><kbd>Delete</kbd></dt><dd>刪除選取的元素</dd>
+                            <dt><kbd>Esc</kbd></dt><dd>取消選取 / 關閉視窗</dd>
+                        </dl>
+                        <h5>輸入</h5>
+                        <dl class="guide-keys">
+                            <dt><kbd>Ctrl</kbd> <kbd>Enter</kbd></dt><dd>快速生成簡報</dd>
+                        </dl>
+                        <div class="text-[11px] text-zinc-400 mt-4">macOS 請以 <kbd>⌘</kbd> 取代 <kbd>Ctrl</kbd>。</div>
+                    </section>
+                </div>
+            </div>
+            <div class="flex items-center justify-between gap-2 px-5 sm:px-6 py-3 border-t border-zinc-200 dark:border-zinc-800">
+                <button id="guidePrev" onclick="stepGuide(-1)"
+                    class="icon-btn h-9 px-4 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-sm font-semibold flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
+                    <i class="fa-solid fa-arrow-left text-[11px]"></i>上一步
+                </button>
+                <span id="guideProgress" class="text-xs font-mono tabular-nums text-zinc-400"></span>
+                <button id="guideNext" onclick="stepGuide(1)"
+                    class="icon-btn h-9 px-4 rounded-full bg-black text-white dark:bg-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 text-sm font-semibold flex items-center gap-2">
+                    <span id="guideNextLabel">下一步</span><i id="guideNextIcon" class="fa-solid fa-arrow-right text-[11px]"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- 圖表資料 Modal -->
     <div id="chartModal" role="dialog" aria-modal="true" aria-labelledby="chartModalTitle"
         class="hidden fixed inset-0 z-[90] bg-black/45 backdrop-blur-sm p-4 flex items-center justify-center">
@@ -731,7 +908,8 @@
     <script src="/static/app/media.js?v=4"></script>
     <script src="/static/app/player.js?v=3"></script>
     <script src="/static/app/auth.js?v=2"></script>
-    <script src="/static/app/main.js?v=5"></script>
+    <script src="/static/app/guide.js?v=1"></script>
+    <script src="/static/app/main.js?v=6"></script>
 </body>
 
 </html>

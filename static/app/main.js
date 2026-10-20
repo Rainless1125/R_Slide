@@ -10,6 +10,10 @@ new ResizeObserver(() => positionToolbar()).observe(document.getElementById('sli
 let nudgeHintShown = false;
 document.addEventListener('keydown', (e) => {
     if (isAuthOpen()) return;                     // 登入畫面開啟時不觸發任何快捷鍵
+    if (isGuideOpen()) {
+        if (e.key === 'Escape') { e.preventDefault(); closeGuide(); }
+        return;                                   // 使用教學開啟時不觸發換頁等快捷鍵
+    }
     if (!document.getElementById('chartModal').classList.contains('hidden')) {
         if (e.key === 'Escape') { e.preventDefault(); closeChartEditor(); }
         return;                                   // 圖表視窗開啟時不觸發換頁 / 刪除等快捷鍵
