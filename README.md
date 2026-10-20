@@ -91,7 +91,8 @@ DATABRICKS_MODELS=databricks-claude-sonnet-4-5,databricks-gpt-oss-120b
 - 資料庫為單一 SQLite 檔案,預設 `data/rslide.db`(第一次使用時自動建立),**備份時複製整個 `data/` 資料夾即可**。請放在本機磁碟,不要放在 NFS / SMB 等網路磁碟上。
 - 舊版存在瀏覽器 localStorage 的歷史記錄,會在該瀏覽器第一次登入時詢問是否匯入到目前的帳號。
 - 密碼以 scrypt 雜湊儲存;登入狀態為 HttpOnly cookie,有效 30 天。
-- 防暴力破解:同一 IP 在 15 分鐘內登入失敗 3 次(不分帳號),該 IP 會被鎖定 15 分鐘,期間即使密碼正確也無法登入;中間成功登入不會重設失敗次數。管理者可用 `manage_users.py lockouts` 查看、`manage_users.py unlock <IP>` 提前解除。部署在反向代理之後時務必設定 uvicorn 的 `--forwarded-allow-ips`(見下方部署),否則所有人共用代理的 IP,一人輸錯 3 次就會鎖住所有使用者。
+- 防暴力破解:同一 IP 在 30 分鐘內登入失敗 5 次(不分帳號),該 IP 會被鎖定 30 分鐘,期間即使密碼正確也無法登入;中間成功登入不會重設失敗次數。管理者可用 `manage_users.py lockouts` 查看、`manage_users.py unlock <IP>` 提前解除。部署在反向代理之後時務必設定 uvicorn 的 `--forwarded-allow-ips`(見下方部署),否則所有人共用代理的 IP,一人輸錯 5 次就會鎖住所有使用者。
+- 密碼規則:註冊、`manage_users.py add` 與 `reset-password` 設定的密碼需為 8~128 個字元,且至少包含一個英文字母與一個數字;規則調整前建立的舊密碼仍可登入。
 
 | 變數 | 說明 | 預設 |
 |------|------|------|

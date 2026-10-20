@@ -13,9 +13,16 @@ router = APIRouter()
 
 SESSION_COOKIE = "rslide_session"
 USERNAME_RE = re.compile(r"^[\w.@-]{2,32}$")
-MIN_PASSWORD, MAX_PASSWORD = 6, 128
+MIN_PASSWORD, MAX_PASSWORD = 8, 128
+PASSWORD_RULE = f"密碼需為 {MIN_PASSWORD}~{MAX_PASSWORD} 個字元，且至少包含一個英文字母與一個數字"
 # 投影片可能內嵌圖片（data URL），單筆紀錄上限與匯出 PPTX 相同
 MAX_HISTORY_BODY_BYTES = 40 * 1024 * 1024
+
+
+def password_ok(password: str) -> bool:
+    """新密碼的規則（註冊、管理者建立帳號與重設密碼）；既有帳號的舊密碼不受影響，仍可登入。"""
+    return (MIN_PASSWORD <= len(password) <= MAX_PASSWORD and re.search(r"[A-Za-z]", password) is not None
+            and re.search(r"[0-9]", password) is not None)
 
 
 def env_flag(name: str, default: bool) -> bool:
@@ -56,8 +63,8 @@ def auth_register(body: Credentials, response: Response):
     username = body.username.strip()
     if not USERNAME_RE.match(username):
         raise HTTPException(status_code=400, detail="帳號需為 2~32 個字，只能包含文字、數字與 . _ - @")
-    if not MIN_PASSWORD <= len(body.password) <= MAX_PASSWORD:
-        raise HTTPException(status_code=400, detail=f"密碼長度需為 {MIN_PASSWORD}~{MAX_PASSWORD} 個字元")
+    if not password_ok(body.password):
+        raise HTTPException(status_code=400, detail=PASSWORD_RULE)
     try:
         user = store.create_user(username, body.password)
     except store.UsernameTaken:

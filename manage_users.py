@@ -19,13 +19,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import store  # noqa: E402  （需在 load_dotenv 之後，才會讀到 .env 的 RSLIDE_DB_PATH）
-from accounts import MAX_PASSWORD, MIN_PASSWORD, USERNAME_RE  # noqa: E402
+from accounts import PASSWORD_RULE, USERNAME_RE, password_ok  # noqa: E402
 
 
 def ask_password() -> str:
     pw = getpass.getpass("密碼：")
-    if not MIN_PASSWORD <= len(pw) <= MAX_PASSWORD:
-        sys.exit(f"密碼長度需為 {MIN_PASSWORD}~{MAX_PASSWORD} 個字元")
+    if not password_ok(pw):
+        sys.exit(PASSWORD_RULE)
     if getpass.getpass("再輸入一次：") != pw:
         sys.exit("兩次輸入的密碼不一致")
     return pw

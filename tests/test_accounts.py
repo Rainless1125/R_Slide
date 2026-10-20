@@ -52,6 +52,23 @@ def test_register_validation():
     assert c.post("/api/auth/register", json={"username": "Bob", "password": "secret123"}).status_code == 409
 
 
+def test_register_password_rule():
+    c = TestClient(app_module.app)
+    for bad in ["abc1234", "abcdefgh", "12345678", "密碼密碼密碼密碼1", "x1" * 65]:   # 太短、缺數字、缺英文、只有中文 + 數字、太長
+        res = c.post("/api/auth/register", json={"username": "dave", "password": bad})
+        assert res.status_code == 400, bad
+        assert "8~128" in res.json()["detail"] and "英文字母與一個數字" in res.json()["detail"]
+    for good in ["abcdefg1", "1234567A", "pass word 99"]:
+        res = TestClient(app_module.app).post("/api/auth/register", json={"username": "u" + good.replace(" ", ""), "password": good})
+        assert res.status_code == 200, good
+
+
+def test_old_short_password_can_still_login():
+    store.create_user("legacy", "123456")    # 規則調整前建立的帳號
+    c = TestClient(app_module.app)
+    assert c.post("/api/auth/login", json={"username": "legacy", "password": "123456"}).status_code == 200
+
+
 def test_registration_can_be_disabled(monkeypatch):
     monkeypatch.setenv("ALLOW_REGISTRATION", "false")
     c = TestClient(app_module.app)

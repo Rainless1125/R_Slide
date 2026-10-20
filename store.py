@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS feedback (
 );
 CREATE INDEX IF NOT EXISTS idx_feedback_user_time ON feedback(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_feedback_time ON feedback(created_at);
--- 登入失敗紀錄與 IP 鎖定（防暴力破解密碼）：同一 IP 在 15 分鐘內失敗 3 次即鎖定 15 分鐘
+-- 登入失敗紀錄與 IP 鎖定（防暴力破解密碼）：同一 IP 在 30 分鐘內失敗 5 次即鎖定 30 分鐘
 CREATE TABLE IF NOT EXISTS login_failures (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     ip         TEXT NOT NULL,
@@ -239,8 +239,8 @@ def delete_session(token: str | None):
 
 
 # ===================== 登入失敗鎖定 =====================
-LOGIN_MAX_FAILURES = 3                  # 同一 IP 在 LOGIN_LOCKOUT_MS 內失敗幾次就鎖定
-LOGIN_LOCKOUT_MS = 15 * 60 * 1000       # 失敗次數的計算區間，也是鎖定時間
+LOGIN_MAX_FAILURES = 5                  # 同一 IP 在 LOGIN_LOCKOUT_MS 內失敗幾次就鎖定
+LOGIN_LOCKOUT_MS = 30 * 60 * 1000       # 失敗次數的計算區間，也是鎖定時間
 
 
 class LoginLocked(Exception):
