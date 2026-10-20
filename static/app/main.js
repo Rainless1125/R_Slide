@@ -14,6 +14,10 @@ document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') { e.preventDefault(); closeGuide(); }
         return;                                   // 使用教學開啟時不觸發換頁等快捷鍵
     }
+    if (isFeedbackOpen()) {
+        if (e.key === 'Escape') { e.preventDefault(); closeFeedback(); }
+        return;                                   // 意見回饋開啟時不觸發換頁等快捷鍵（Ctrl+Enter 送出由 feedback.js 處理）
+    }
     if (!document.getElementById('chartModal').classList.contains('hidden')) {
         if (e.key === 'Escape') { e.preventDefault(); closeChartEditor(); }
         return;                                   // 圖表視窗開啟時不觸發換頁 / 刪除等快捷鍵

@@ -23,6 +23,7 @@
 - **匯出 PDF / PPTX / HTML**:PDF 與 PPTX 的每一頁為 2 倍解析度的圖片,外觀與畫面一致,但文字無法再編輯;HTML 為可直接播放的單一檔案,匯出時會清理 AI 產生的內容(移除 script、事件屬性、外部資源白名單)。
 - **帳號與歷史記錄**:以帳號密碼登入,每位使用者的簡報歷史記錄分開存放於伺服器的 SQLite 檔案,換電腦或瀏覽器也能接續使用。
 - **使用教學**:右上角深色 / 淺色模式切換旁的「?」可開啟使用教學,依章節說明輸入、審查、播放、編輯、匯出與快捷鍵。
+- **意見回饋**:使用教學旁的對話框圖示可為使用體驗評 1~5 星並輸入一段意見文字(兩者至少擇一,文字上限 2,000 字,`Ctrl` / `⌘` + `Enter` 送出),存於伺服器的 `feedback` 資料表,管理者以 `manage_users.py feedback` 查看;每個帳號每小時最多送出 10 則。
 - **輕量部署**:後端為單一 FastAPI 服務,前端為靜態檔案;資料庫為內建的 SQLite,不需另外架設資料庫伺服器。
 
 > **編輯模式的限制**:LLM 生成的版面目前**只能修改文字與樣式**(字級、粗細、對齊、顏色、圓角),以及調整同層順序、複製或刪除元素,**無法自由拖曳移動或縮放**;LLM 產生的圖表也只能修改數據,位置與大小固定。若需要自由擺放,請使用編輯模式的「插入文字」「插入圖片」「插入圖表」「插入圖示」「插入圖案」,自行插入的內容可以拖曳移動、拉角落調整大小。
@@ -106,6 +107,7 @@ python manage_users.py add <帳號>               # 建立帳號(關閉註冊時
 python manage_users.py reset-password <帳號>    # 重設密碼,該帳號所有裝置需重新登入
 python manage_users.py usage [--days 30]         # 各使用者的 LLM 用量,依 token 由多到少排序
 python manage_users.py usage <帳號> [--days 30]  # 單一使用者按日、模型的用量明細
+python manage_users.py feedback [帳號] [--days 30]  # 使用者送出的意見回饋與使用體驗評分(含平均星數),新的在前
 ```
 
 ### LLM 使用紀錄
@@ -136,7 +138,7 @@ client_max_body_size 40m;   # 檔案匯入上限 10 MB;匯出 PPTX 與儲存單�
 
 ### 網路與資料流向(地端部署前請務必了解)
 
-伺服器只保存帳號、歷史記錄與 LLM 使用紀錄(SQLite,見上方「帳號與歷史記錄」),上傳的檔案與匯出的簡報都不保存;目前並非完全離線:
+伺服器只保存帳號、歷史記錄、LLM 使用紀錄與意見回饋(SQLite,見上方「帳號與歷史記錄」),上傳的檔案與匯出的簡報都不保存;目前並非完全離線:
 
 | 項目 | 說明 |
 |------|------|
@@ -155,9 +157,9 @@ client_max_body_size 40m;   # 檔案匯入上限 10 MB;匯出 PPTX 與儲存單�
 ```
 charts.py         圖表資料的 schema、LLM 提示規則與正規化
 app.py            FastAPI 後端(/api/generate、/api/regenerate-slide、/api/extract、/api/export/pptx、/api/models)
-accounts.py       登入 / 註冊與歷史記錄 API(/api/auth/*、/api/history)
-store.py          SQLite 資料存取(帳號、登入 session、歷史記錄、LLM 使用紀錄)
-manage_users.py   帳號管理指令(列出、建立帳號、重設密碼、查詢 LLM 用量)
+accounts.py       登入 / 註冊、歷史記錄與意見回饋 API(/api/auth/*、/api/history、/api/feedback)
+store.py          SQLite 資料存取(帳號、登入 session、歷史記錄、LLM 使用紀錄、意見回饋)
+manage_users.py   帳號管理指令(列出、建立帳號、重設密碼、查詢 LLM 用量與意見回饋)
 extract.py        上傳檔案的文字抽取(PDF / DOCX / Markdown / TXT)
 exporter.py       將投影片圖片組成 PPTX(/api/export/pptx)
 static/index.html 前端介面(HTML 結構;樣式與程式在 static/app/)
@@ -171,6 +173,7 @@ static/app/       主畫面的樣式與程式,依功能分檔,以一般 <script>
   player.js       頁面管理、播放器、自動播放、全螢幕、匯出選單
   auth.js         登入 / 註冊、登出、匯入舊版 localStorage 歷史記錄
   guide.js        右上角「使用教學」視窗（章節分頁、上一步 / 下一步）
+  feedback.js     右上角「意見回饋」視窗（輸入一段文字送到 /api/feedback）
   main.js         全域快捷鍵、捲動 / 縮放事件與啟動(最後載入)
 static/charts.js  圖表 → 靜態 SVG 繪製
 static/chart-grid.js 圖表數據的試算表式輸入表格

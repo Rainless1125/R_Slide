@@ -25,7 +25,7 @@
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/app/app.css?v=11">
+    <link rel="stylesheet" href="/static/app/app.css?v=12">
 </head>
 
 <body
@@ -74,6 +74,11 @@
                 class="icon-btn w-9 h-9 shrink-0 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-violet-300 focus:outline-none"
                 aria-label="使用教學" title="使用教學" aria-haspopup="dialog" aria-controls="guideModal">
                 <i class="fa-regular fa-circle-question"></i>
+            </button>
+            <button id="feedbackBtn" onclick="openFeedback()"
+                class="icon-btn w-9 h-9 shrink-0 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center text-zinc-500 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-violet-300 focus:outline-none"
+                aria-label="意見回饋" title="意見回饋" aria-haspopup="dialog" aria-controls="feedbackModal">
+                <i class="fa-regular fa-comment-dots"></i>
             </button>
             <button id="themeBtn" onclick="toggleTheme()"
                 class="icon-btn h-9 px-3 shrink-0 whitespace-nowrap rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center gap-2 text-sm font-semibold text-zinc-600 dark:text-zinc-300 focus:outline-none"
@@ -821,6 +826,60 @@
         </div>
     </div>
 
+    <!-- 意見回饋 Modal（static/app/feedback.js） -->
+    <div id="feedbackModal" role="dialog" aria-modal="true" aria-labelledby="feedbackTitle" onclick="if(event.target===this)closeFeedback()"
+        class="hidden fixed inset-0 z-[90] bg-black/45 backdrop-blur-sm p-4 flex items-center justify-center">
+        <form id="feedbackForm" onsubmit="submitFeedback(event)" novalidate
+            class="guide-panel w-full max-w-lg rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-5 sm:p-6">
+            <div class="flex items-center justify-between gap-3">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div
+                        class="w-9 h-9 shrink-0 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 text-white shadow-md shadow-purple-500/30 rounded-md flex items-center justify-center">
+                        <i class="fa-solid fa-comment-dots text-sm"></i></div>
+                    <div class="min-w-0">
+                        <h3 id="feedbackTitle" class="text-base sm:text-lg font-bold leading-tight">意見回饋</h3>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">為使用體驗評分，或告訴我們遇到的問題、建議與想要的功能。</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeFeedback()" class="icon-btn w-8 h-8 shrink-0 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    aria-label="關閉意見回饋">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span id="feedbackRatingLabel" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">使用體驗</span>
+                <div id="feedbackRating" role="radiogroup" aria-labelledby="feedbackRatingLabel" class="star-rating flex items-center">
+                    <button type="button" role="radio" data-rating="1" aria-label="1 星：很差"><i class="fa-solid fa-star"></i></button>
+                    <button type="button" role="radio" data-rating="2" aria-label="2 星：不太好"><i class="fa-solid fa-star"></i></button>
+                    <button type="button" role="radio" data-rating="3" aria-label="3 星：普通"><i class="fa-solid fa-star"></i></button>
+                    <button type="button" role="radio" data-rating="4" aria-label="4 星：不錯"><i class="fa-solid fa-star"></i></button>
+                    <button type="button" role="radio" data-rating="5" aria-label="5 星：非常好"><i class="fa-solid fa-star"></i></button>
+                </div>
+                <span id="feedbackRatingText" class="text-xs text-zinc-400" aria-hidden="true">選填</span>
+            </div>
+            <div class="mt-3">
+                <label for="feedbackInput" class="sr-only">回饋內容</label>
+                <textarea id="feedbackInput" rows="6" maxlength="2000" aria-describedby="feedbackCount feedbackError"
+                    class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow resize-y"
+                    placeholder="例如：希望匯出 PPTX 時文字可以編輯；或某個操作遇到的問題與步驟"></textarea>
+                <div class="mt-1 flex items-start justify-between gap-3 text-[11px]">
+                    <span id="feedbackError" class="text-red-500" role="alert"></span>
+                    <span id="feedbackCount" class="shrink-0 font-mono tabular-nums text-zinc-400">0 / 2000</span>
+                </div>
+            </div>
+            <div class="mt-4 flex items-center justify-end gap-2">
+                <button type="button" onclick="closeFeedback()"
+                    class="icon-btn h-9 px-4 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-sm font-semibold">
+                    取消
+                </button>
+                <button id="feedbackSubmit" type="submit"
+                    class="icon-btn h-9 px-4 rounded-full bg-black text-white dark:bg-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 text-sm font-semibold flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
+                    <i id="feedbackSubmitIcon" class="fa-solid fa-paper-plane text-[11px]"></i>送出
+                </button>
+            </div>
+        </form>
+    </div>
+
     <!-- 圖表資料 Modal -->
     <div id="chartModal" role="dialog" aria-modal="true" aria-labelledby="chartModalTitle"
         class="hidden fixed inset-0 z-[90] bg-black/45 backdrop-blur-sm p-4 flex items-center justify-center">
@@ -910,7 +969,8 @@
     <script src="/static/app/player.js?v=3"></script>
     <script src="/static/app/auth.js?v=2"></script>
     <script src="/static/app/guide.js?v=1"></script>
-    <script src="/static/app/main.js?v=6"></script>
+    <script src="/static/app/feedback.js?v=2"></script>
+    <script src="/static/app/main.js?v=7"></script>
 </body>
 
 </html>
