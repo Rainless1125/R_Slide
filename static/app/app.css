@@ -1497,3 +1497,150 @@ body.sb-open #sidebar {
     background: transparent;
     cursor: pointer;
 }
+
+/* 使用教學 Modal：章節分頁（選取狀態沿用簡報模式卡的紫色）與內文排版 */
+.guide-panel { animation: guideIn .25s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes guideIn {
+    from { opacity: 0; transform: translateY(12px) scale(.98); }
+    to { opacity: 1; transform: none; }
+}
+.guide-nav button {
+    display: flex;
+    align-items: center;
+    gap: .625rem;
+    flex: none;
+    padding: .5rem .75rem;
+    border-radius: .625rem;
+    font-size: .8125rem;
+    font-weight: 600;
+    white-space: nowrap;
+    color: rgb(82 82 91);
+    transition: background-color .15s, color .15s, box-shadow .15s;
+}
+.guide-nav button i { width: 1rem; text-align: center; font-size: .75rem; color: rgb(161 161 170); transition: color .15s; }
+.guide-nav button:hover { background: rgb(244 244 245); color: rgb(24 24 27); }
+.guide-nav button[aria-selected="true"] {
+    background: rgb(245 243 255);
+    color: rgb(109 40 217);
+    box-shadow: inset 0 0 0 1px rgb(139 92 246 / .35);
+}
+.guide-nav button[aria-selected="true"] i { color: rgb(139 92 246); }
+.guide-nav button:focus-visible { outline: 2px solid rgb(139 92 246); outline-offset: 1px; }
+.dark .guide-nav button { color: rgb(161 161 170); }
+.dark .guide-nav button i { color: rgb(113 113 122); }
+.dark .guide-nav button:hover { background: rgb(39 39 42); color: rgb(244 244 245); }
+.dark .guide-nav button[aria-selected="true"] {
+    background: rgb(139 92 246 / .15);
+    color: rgb(221 214 254);
+    box-shadow: inset 0 0 0 1px rgb(167 139 250 / .35);
+}
+.dark .guide-nav button[aria-selected="true"] i { color: rgb(167 139 250); }
+
+.guide-body section { animation: fadeIn .2s both; }
+.guide-body h4 { font-size: 1.125rem; font-weight: 700; letter-spacing: -.01em; margin-bottom: .5rem; }
+.guide-body h5 {
+    margin: 1.25rem 0 .5rem;
+    font-size: .6875rem;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: rgb(113 113 122);
+}
+.guide-body p, .guide-body li { font-size: .875rem; line-height: 1.7; color: rgb(63 63 70); }
+.dark .guide-body p, .dark .guide-body li { color: rgb(212 212 216); }
+.guide-body ul { display: flex; flex-direction: column; gap: .375rem; margin-top: .5rem; }
+.guide-body ul li { position: relative; padding-left: 1rem; }
+.guide-body ul li::before {
+    content: '';
+    position: absolute;
+    left: .125rem;
+    top: .7em;
+    width: .3125rem;
+    height: .3125rem;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #3b82f6, #a855f7);
+}
+.guide-body li b { color: rgb(24 24 27); font-weight: 600; }
+.dark .guide-body li b { color: rgb(244 244 245); }
+
+.guide-steps { display: flex; flex-direction: column; gap: .625rem; margin-top: 1.25rem; }
+.guide-steps li {
+    display: flex;
+    gap: .875rem;
+    align-items: baseline;
+    padding: .75rem .875rem;
+    border: 1px solid rgb(228 228 231);
+    border-radius: .75rem;
+    background: rgb(250 250 250);
+}
+.dark .guide-steps li { border-color: rgb(39 39 42); background: rgb(9 9 11); }
+.guide-steps b {
+    flex: none;
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .03em;
+    background: linear-gradient(90deg, #3b82f6, #a855f7);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent !important;
+}
+
+.guide-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: .625rem; }
+.guide-card {
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+    padding: .75rem .875rem;
+    border: 1px solid rgb(228 228 231);
+    border-radius: .75rem;
+    background: rgb(250 250 250);
+    transition: transform .2s, border-color .2s;
+}
+.guide-card:hover { transform: translateY(-1px); border-color: rgb(212 212 216); }
+.dark .guide-card { border-color: rgb(39 39 42); background: rgb(9 9 11); }
+.dark .guide-card:hover { border-color: rgb(63 63 70); }
+.guide-card b { display: flex; align-items: center; gap: .5rem; font-size: .8125rem; font-weight: 600; }
+.guide-card b i { color: rgb(139 92 246); }
+.dark .guide-card b i { color: rgb(167 139 250); }
+.guide-card span { font-size: .75rem; line-height: 1.6; color: rgb(113 113 122); }
+.dark .guide-card span { color: rgb(161 161 170); }
+
+.guide-tip {
+    display: flex;
+    gap: .625rem;
+    margin-top: 1.25rem;
+    padding: .75rem .875rem;
+    border-radius: .75rem;
+    font-size: .8125rem;
+    line-height: 1.6;
+    color: rgb(91 33 182);
+    background: rgb(245 243 255);
+    border: 1px solid rgb(139 92 246 / .2);
+}
+.guide-tip i { margin-top: .2rem; }
+.dark .guide-tip { color: rgb(221 214 254); background: rgb(139 92 246 / .1); border-color: rgb(167 139 250 / .25); }
+
+.guide-keys { display: grid; grid-template-columns: max-content 1fr; gap: .5rem 1rem; align-items: center; font-size: .8125rem; }
+.guide-keys dt { white-space: nowrap; }
+.guide-keys dd { color: rgb(63 63 70); }
+.dark .guide-keys dd { color: rgb(212 212 216); }
+.guide-body kbd {
+    display: inline-block;
+    min-width: 1.5rem;
+    padding: .0625rem .375rem;
+    border: 1px solid rgb(212 212 216);
+    border-bottom-width: 2px;
+    border-radius: .375rem;
+    background: #fff;
+    font-family: inherit;
+    font-size: .6875rem;
+    font-weight: 600;
+    line-height: 1.4;
+    text-align: center;
+    color: rgb(63 63 70);
+}
+.dark .guide-body kbd { border-color: rgb(63 63 70); background: rgb(39 39 42); color: rgb(228 228 231); }
+
+@media (prefers-reduced-motion: reduce) {
+    .guide-panel, .guide-body section { animation: none; }
+}
