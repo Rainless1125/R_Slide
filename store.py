@@ -1,4 +1,4 @@
-"""SQLite 儲存：使用者帳號、登入 session、各使用者的簡報歷史記錄、LLM 使用紀錄與使用者回饋。
+"""SQLite 儲存：使用者帳號、登入 session、登入失敗鎖定、各使用者的簡報歷史記錄、LLM 使用紀錄與使用者回饋。
 
 資料庫是單一檔案（預設為專案目錄下的 data/rslide.db，可用 RSLIDE_DB_PATH 指定），備份時複製該檔即可。
 每次操作開一個新連線：SQLite 開連線很便宜，也不必處理跨執行緒共用連線的問題。
@@ -86,6 +86,17 @@ CREATE TABLE IF NOT EXISTS feedback (
 );
 CREATE INDEX IF NOT EXISTS idx_feedback_user_time ON feedback(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_feedback_time ON feedback(created_at);
+-- 登入失敗紀錄與 IP 鎖定（防暴力破解密碼）：同一 IP 在 30 分鐘內失敗 5 次即鎖定 30 分鐘
+CREATE TABLE IF NOT EXISTS login_failures (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    ip         TEXT NOT NULL,
+    created_at INTEGER NOT NULL           -- 毫秒
+);
+CREATE INDEX IF NOT EXISTS idx_login_failures_ip_time ON login_failures(ip, created_at);
+CREATE TABLE IF NOT EXISTS login_lockouts (
+    ip           TEXT PRIMARY KEY,
+    locked_until INTEGER NOT NULL         -- 毫秒
+);
 """
 
 
@@ -225,6 +236,64 @@ def delete_session(token: str | None):
     if token:
         with connect() as conn:
             conn.execute("DELETE FROM sessions WHERE token_hash = ?", (_token_hash(token),))
+
+
+# ===================== 登入失敗鎖定 =====================
+LOGIN_MAX_FAILURES = 5                  # 同一 IP 在 LOGIN_LOCKOUT_MS 內失敗幾次就鎖定
+LOGIN_LOCKOUT_MS = 30 * 60 * 1000       # 失敗次數的計算區間，也是鎖定時間
+
+
+class LoginLocked(Exception):
+    def __init__(self, locked_until: int):
+        super().__init__(locked_until)
+        self.locked_until = locked_until
+
+
+def begin_login_attempt(ip: str) -> tuple[int, int]:
+    """驗證密碼前先登記一次嘗試（視為失敗），回傳 (嘗試 id, 這次也失敗後剩下的次數)；IP 已被鎖定時丟出 LoginLocked。
+    先登記再驗證，同一 IP 同時送出大量請求也無法超過次數上限；BEGIN IMMEDIATE 讓多個請求依序讀寫計數。
+    這次嘗試達到上限時先寫入鎖定，驗證成功再由 end_login_attempt 解除。"""
+    now = now_ms()
+    with connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute("DELETE FROM login_lockouts WHERE locked_until <= ?", (now,))
+        conn.execute("DELETE FROM login_failures WHERE created_at <= ?", (now - LOGIN_LOCKOUT_MS,))
+        row = conn.execute("SELECT locked_until FROM login_lockouts WHERE ip = ?", (ip,)).fetchone()
+        if row is not None:
+            raise LoginLocked(row["locked_until"])
+        cur = conn.execute("INSERT INTO login_failures (ip, created_at) VALUES (?, ?)", (ip, now))
+        failures = conn.execute("SELECT COUNT(*) FROM login_failures WHERE ip = ?", (ip,)).fetchone()[0]
+        if failures >= LOGIN_MAX_FAILURES:
+            conn.execute("INSERT OR REPLACE INTO login_lockouts (ip, locked_until) VALUES (?, ?)",
+                         (ip, now + LOGIN_LOCKOUT_MS))
+        return cur.lastrowid, max(0, LOGIN_MAX_FAILURES - failures)
+
+
+def end_login_attempt(ip: str, attempt_id: int):
+    """密碼驗證成功：移除這次預先登記的失敗；剩下的失敗未達上限時一併解除鎖定。
+    之前的失敗不清除，避免攻擊者穿插登入自己的帳號來重設次數。"""
+    with connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute("DELETE FROM login_failures WHERE id = ?", (attempt_id,))
+        failures = conn.execute("SELECT COUNT(*) FROM login_failures WHERE ip = ? AND created_at > ?",
+                                (ip, now_ms() - LOGIN_LOCKOUT_MS)).fetchone()[0]
+        if failures < LOGIN_MAX_FAILURES:
+            conn.execute("DELETE FROM login_lockouts WHERE ip = ?", (ip,))
+
+
+def list_login_lockouts() -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute("SELECT ip, locked_until FROM login_lockouts WHERE locked_until > ? "
+                            "ORDER BY locked_until DESC", (now_ms(),)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def unlock_login_ip(ip: str) -> bool:
+    """管理者手動解除鎖定，並清除該 IP 的失敗紀錄；回傳該 IP 原本是否被鎖定。"""
+    with connect() as conn:
+        cur = conn.execute("DELETE FROM login_lockouts WHERE ip = ? AND locked_until > ?", (ip, now_ms()))
+        conn.execute("DELETE FROM login_failures WHERE ip = ?", (ip,))
+        return cur.rowcount > 0
 
 
 # ===================== 歷史記錄 =====================

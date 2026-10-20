@@ -13,9 +13,16 @@ router = APIRouter()
 
 SESSION_COOKIE = "rslide_session"
 USERNAME_RE = re.compile(r"^[\w.@-]{2,32}$")
-MIN_PASSWORD, MAX_PASSWORD = 6, 128
+MIN_PASSWORD, MAX_PASSWORD = 8, 128
+PASSWORD_RULE = f"密碼需為 {MIN_PASSWORD}~{MAX_PASSWORD} 個字元，且至少包含一個英文字母與一個數字"
 # 投影片可能內嵌圖片（data URL），單筆紀錄上限與匯出 PPTX 相同
 MAX_HISTORY_BODY_BYTES = 40 * 1024 * 1024
+
+
+def password_ok(password: str) -> bool:
+    """新密碼的規則（註冊、管理者建立帳號與重設密碼）；既有帳號的舊密碼不受影響，仍可登入。"""
+    return (MIN_PASSWORD <= len(password) <= MAX_PASSWORD and re.search(r"[A-Za-z]", password) is not None
+            and re.search(r"[0-9]", password) is not None)
 
 
 def env_flag(name: str, default: bool) -> bool:
@@ -56,8 +63,8 @@ def auth_register(body: Credentials, response: Response):
     username = body.username.strip()
     if not USERNAME_RE.match(username):
         raise HTTPException(status_code=400, detail="帳號需為 2~32 個字，只能包含文字、數字與 . _ - @")
-    if not MIN_PASSWORD <= len(body.password) <= MAX_PASSWORD:
-        raise HTTPException(status_code=400, detail=f"密碼長度需為 {MIN_PASSWORD}~{MAX_PASSWORD} 個字元")
+    if not password_ok(body.password):
+        raise HTTPException(status_code=400, detail=PASSWORD_RULE)
     try:
         user = store.create_user(username, body.password)
     except store.UsernameTaken:
@@ -65,11 +72,27 @@ def auth_register(body: Credentials, response: Response):
     return start_session(response, user)
 
 
+def locked_error(locked_until: int) -> HTTPException:
+    seconds = max(1, -(-(locked_until - store.now_ms()) // 1000))
+    return HTTPException(status_code=429, headers={"Retry-After": str(seconds)},
+                         detail=f"密碼錯誤次數過多，此 IP 已暫時鎖定，請於 {-(-seconds // 60)} 分鐘後再試")
+
+
 @router.post("/api/auth/login")
-def auth_login(body: Credentials, response: Response):
+def auth_login(body: Credentials, request: Request, response: Response):
+    # 部署於反向代理之後時，需以 uvicorn 的 --forwarded-allow-ips 採用 X-Forwarded-For，否則所有人共用代理的 IP
+    ip = request.client.host if request.client else "unknown"
+    try:
+        attempt_id, remaining = store.begin_login_attempt(ip)
+    except store.LoginLocked as e:
+        raise locked_error(e.locked_until)
     user = store.authenticate(body.username.strip(), body.password[:MAX_PASSWORD + 1])
     if user is None:
-        raise HTTPException(status_code=401, detail="帳號或密碼錯誤")
+        lock_minutes = store.LOGIN_LOCKOUT_MS // 60000
+        detail = (f"帳號或密碼錯誤，再錯 {remaining} 次此 IP 將鎖定 {lock_minutes} 分鐘" if remaining
+                  else f"帳號或密碼錯誤次數過多，此 IP 已鎖定 {lock_minutes} 分鐘")
+        raise HTTPException(status_code=401 if remaining else 429, detail=detail)
+    store.end_login_attempt(ip, attempt_id)
     return start_session(response, user)
 
 
