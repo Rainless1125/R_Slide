@@ -1,9 +1,13 @@
 import os
 import json
+import hashlib
+import logging
+import time
+from contextlib import contextmanager
 from typing import Literal
 from pathlib import Path
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
@@ -13,10 +17,13 @@ from google.genai import types
 from openai import BadRequestError, OpenAI
 from starlette.datastructures import UploadFile
 
-from accounts import router as accounts_router
+import store
+from accounts import current_user, router as accounts_router
 from charts import CHART_RULES, MAX_CHARTS_PER_SLIDE, ChartSpec, normalize_charts
 from exporter import ExportError, build_pptx
 from extract import MAX_UPLOAD_BYTES, ExtractError, extract_text
+
+logger = logging.getLogger("rslide")
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"   # 以本檔所在位置為基準，從其他目錄啟動 uvicorn 也找得到
@@ -84,8 +91,36 @@ def parse_json_reply(text: str, schema: type[BaseModel]) -> dict:
     return schema.model_validate_json(text[start:end + 1]).model_dump()
 
 
+def token_usage(input_tokens, output_tokens, total_tokens=None, cached_tokens=None, reasoning_tokens=None) -> dict:
+    """統一各平台回傳的 token 數；平台沒給合計時以輸入 + 輸出計算。"""
+    if total_tokens is None and input_tokens is not None and output_tokens is not None:
+        total_tokens = input_tokens + output_tokens
+    return {"input_tokens": input_tokens, "output_tokens": output_tokens, "total_tokens": total_tokens,
+            "cached_tokens": cached_tokens, "reasoning_tokens": reasoning_tokens}
+
+
+def openai_usage(completion) -> dict:
+    u = getattr(completion, "usage", None)   # Databricks 部分模型不回傳 usage
+    if u is None:
+        return {}
+    return token_usage(getattr(u, "prompt_tokens", None), getattr(u, "completion_tokens", None),
+                       getattr(u, "total_tokens", None),
+                       getattr(getattr(u, "prompt_tokens_details", None), "cached_tokens", None),
+                       getattr(getattr(u, "completion_tokens_details", None), "reasoning_tokens", None))
+
+
+def gemini_usage(response) -> dict:
+    u = getattr(response, "usage_metadata", None)
+    if u is None:
+        return {}
+    return token_usage(getattr(u, "prompt_token_count", None), getattr(u, "candidates_token_count", None),
+                       getattr(u, "total_token_count", None), getattr(u, "cached_content_token_count", None),
+                       getattr(u, "thoughts_token_count", None))
+
+
 def call_openai_compatible(client: OpenAI, model: str, system_instruction: str, prompt: str,
-                           schema: type[BaseModel], allow_fallback: bool) -> dict:
+                           schema: type[BaseModel], allow_fallback: bool, usage: dict | None = None) -> dict:
+    usage = {} if usage is None else usage
     messages = [
         {"role": "system", "content": system_instruction},
         {"role": "user", "content": prompt},
@@ -93,6 +128,7 @@ def call_openai_compatible(client: OpenAI, model: str, system_instruction: str, 
     try:
         # 部分 OpenAI 模型（如推理類）只接受預設 temperature，故不傳入
         completion = client.beta.chat.completions.parse(model=model, messages=messages, response_format=schema)
+        usage.update(openai_usage(completion))
         message = completion.choices[0].message
         if message.refusal:
             raise HTTPException(status_code=502, detail=f"模型拒絕回應: {message.refusal}")
@@ -112,6 +148,7 @@ def call_openai_compatible(client: OpenAI, model: str, system_instruction: str, 
         model=model,
         messages=[{"role": "system", "content": fallback_system}, {"role": "user", "content": prompt}],
     )
+    usage.update(openai_usage(completion), fallback=1)
     return parse_json_reply(completion.choices[0].message.content, schema)
 
 
@@ -136,8 +173,9 @@ def gemini_response_text(response) -> str:
 
 
 def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
-             schema: type[BaseModel], temperature: float) -> dict:
-    """依平台呼叫 LLM，回傳符合 schema 的 dict。"""
+             schema: type[BaseModel], temperature: float, usage: dict | None = None) -> dict:
+    """依平台呼叫 LLM，回傳符合 schema 的 dict。傳入 usage 時會填入實際使用的模型與 token 數（供使用紀錄）。"""
+    usage = {} if usage is None else usage
     provider = (provider or "gemini").lower()
     if provider not in MODEL_CATALOG:
         raise HTTPException(status_code=400, detail=f"不支援的平台: {provider}")
@@ -147,6 +185,7 @@ def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
     if provider == "databricks" and model and model not in MODEL_CATALOG["databricks"]:
         raise HTTPException(status_code=400, detail=f"未開放的 Databricks 模型: {model}")
     model = model or MODEL_CATALOG[provider][0]
+    usage.update(provider=provider, model=model)
 
     if provider == "gemini":
         config = types.GenerateContentConfig(
@@ -157,10 +196,41 @@ def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
             system_instruction=system_instruction
         )
         response = client.models.generate_content(model=model, contents=prompt, config=config)
+        usage.update(gemini_usage(response))   # 先記用量：被擋下或輸出被截斷時 token 也已經用掉了
         return json.loads(gemini_response_text(response))
 
     return call_openai_compatible(client, model, system_instruction, prompt, schema,
-                                  allow_fallback=provider == "databricks")
+                                  allow_fallback=provider == "databricks", usage=usage)
+
+
+@contextmanager
+def llm_usage_log(request: Request, user: dict, action: str, req):
+    """記錄一次 LLM 呼叫（成功或失敗都記）；區塊內把 usage 傳給 call_llm 以填入模型與 token 數。
+    紀錄寫入失敗只記 log，不影響使用者的生成結果。"""
+    usage = {"provider": (req.provider or "gemini").lower(), "model": req.model}
+    status, http_status, error = "ok", 200, None
+    start = time.monotonic()
+    try:
+        yield usage
+    except HTTPException as e:
+        status, http_status, error = "error", e.status_code, str(e.detail)
+        raise
+    except Exception as e:
+        status, http_status, error = "error", 500, str(e)
+        raise
+    finally:
+        try:
+            store.log_llm_usage({
+                **usage, "user_id": user["id"], "username": user["username"], "action": action,
+                "deck_mode": req.deck_mode, "num_pages": req.num_pages, "input_chars": len(req.content),
+                "content_hash": hashlib.sha256(req.content.encode()).hexdigest(),
+                "status": status, "http_status": http_status, "error": error[:200] if error else None,
+                "latency_ms": int((time.monotonic() - start) * 1000),
+                # 部署於反向代理之後時，uvicorn 的 --forwarded-allow-ips 決定是否採用 X-Forwarded-For
+                "client_ip": request.client.host if request.client else None,
+            })
+        except Exception:
+            logger.exception("寫入 LLM 使用紀錄失敗")
 
 
 # 1. Pydantic 模型定義
@@ -288,7 +358,7 @@ async def list_models():
     }
 
 @app.post("/api/generate")
-def generate_slides(req: GenerateRequest):
+def generate_slides(req: GenerateRequest, request: Request, user: dict = Depends(current_user)):
     if not req.content.strip():
         raise HTTPException(status_code=400, detail="請提供輸入內容")
     if len(req.content) > MAX_CONTENT_CHARS:
@@ -324,15 +394,17 @@ def generate_slides(req: GenerateRequest):
     請深入理解內容，依【簡報模式】決定每頁的文字量，為每一頁構思最能凸顯該主題的獨特版面，並確保整體色彩與背景符合指定的【視覺風格】。
     """
     
-    try:
-        data = call_llm(req.provider, req.model, system_instruction, prompt, AdaptivePresentation, 0.6)
-        for slide in data.get("slides") or []:
-            slide["charts"] = normalize_charts(slide.get("charts"))
-        return data
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    with llm_usage_log(request, user, "generate", req) as usage:
+        try:
+            data = call_llm(req.provider, req.model, system_instruction, prompt, AdaptivePresentation, 0.6, usage)
+            for slide in data.get("slides") or []:
+                slide["charts"] = normalize_charts(slide.get("charts"))
+            usage["slides_returned"] = len(data.get("slides") or [])
+            return data
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/extract")
 async def extract_file(request: Request):
@@ -389,7 +461,7 @@ async def export_pptx(request: Request):
                     headers={"Content-Disposition": 'attachment; filename="presentation.pptx"'})
 
 @app.post("/api/regenerate-slide")
-def regenerate_slide(req: RegenerateSlideRequest):
+def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict = Depends(current_user)):
     if not req.content.strip():
         raise HTTPException(status_code=400, detail="請提供輸入內容")
     if len(req.content) > MAX_CONTENT_CHARS:
@@ -450,16 +522,18 @@ def regenerate_slide(req: RegenerateSlideRequest):
     注意：page_number 請維持為 {target_slide.page_number}。
     """
 
-    try:
-        data = call_llm(req.provider, req.model, system_instruction, prompt, AdaptiveSlide, 0.7)
-        data["page_number"] = target_slide.page_number
-        # 使用者可能自行插入超過 MAX_CHARTS_PER_SLIDE 張圖表：至少保留原頁的張數，避免重產後被截掉
-        data["charts"] = normalize_charts(data.get("charts"), max(MAX_CHARTS_PER_SLIDE, len(target_slide.charts)))
-        return data
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    with llm_usage_log(request, user, "regenerate", req) as usage:
+        try:
+            data = call_llm(req.provider, req.model, system_instruction, prompt, AdaptiveSlide, 0.7, usage)
+            data["page_number"] = target_slide.page_number
+            # 使用者可能自行插入超過 MAX_CHARTS_PER_SLIDE 張圖表：至少保留原頁的張數，避免重產後被截掉
+            data["charts"] = normalize_charts(data.get("charts"), max(MAX_CHARTS_PER_SLIDE, len(target_slide.charts)))
+            usage["slides_returned"] = 1
+            return data
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
 app.include_router(accounts_router)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

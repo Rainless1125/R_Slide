@@ -1,5 +1,6 @@
 import os
 
+import pytest
 from fastapi.testclient import TestClient
 
 os.environ.setdefault("GEMINI_API_KEY", "test-key")  # app.py 啟動時需要至少一組 Key，測試不會實際呼叫 LLM
@@ -8,6 +9,7 @@ import app as app_module  # noqa: E402
 from charts import MAX_CHARTS_PER_SLIDE, MAX_LABELS, normalize_chart, normalize_charts  # noqa: E402
 
 client = TestClient(app_module.app)
+pytestmark = pytest.mark.usefixtures("logged_in")   # 生成類 API 需要登入
 
 
 def chart(**kw):
@@ -89,7 +91,7 @@ SLIDE = {"page_number": 1, "layout_concept": "KPI", "slide_title": "營收", "ht
 def regenerate(monkeypatch, slides, llm_result):
     captured = {}
 
-    def fake_llm(provider, model, system_instruction, prompt, schema, temperature):
+    def fake_llm(provider, model, system_instruction, prompt, schema, temperature, usage=None):
         captured["prompt"] = prompt
         return dict(llm_result)
 

@@ -256,6 +256,7 @@ async function startGeneration() {
             })
         });
 
+        throwIfSessionExpired(res);
         if (!res.ok) throw await readApiError(res);
         const data = sanitizePresentation(await res.json());
         await bakeSlideCharts(data.slides);
@@ -269,7 +270,7 @@ async function startGeneration() {
         showToast('版面生成完成，已存入歷史記錄', 'success', 2200);
     } catch (err) {
         setLoading(false);
-        showToast(friendlyError(err), 'error', 8000, { label: '重試', onClick: startGeneration });
+        if (!err.handled) showToast(friendlyError(err), 'error', 8000, { label: '重試', onClick: startGeneration });
     }
 }
 
@@ -503,6 +504,7 @@ async function regenerateSingleSlide(idx, customPrompt = '', deckMode) {
             })
         });
 
+        throwIfSessionExpired(res);
         if (!res.ok) throw await readApiError(res);
 
         const newSlide = sanitizeSlide(await res.json());
@@ -535,7 +537,7 @@ async function regenerateSingleSlide(idx, customPrompt = '', deckMode) {
         if (modalOpen) closeRegenerateModal(true);
         showToast(`第 ${at + 1} 頁已重產完成`, 'success', 2200);
     } catch (err) {
-        showToast(friendlyError(err), 'error', 8000, { label: '重試', onClick: () => regenerateSingleSlide(idx, customPrompt, mode) });
+        if (!err.handled) showToast(friendlyError(err), 'error', 8000, { label: '重試', onClick: () => regenerateSingleSlide(idx, customPrompt, mode) });
     } finally {
         setReviewRegenerateState(idx, false);
         setCurrentRegenerateState(false);

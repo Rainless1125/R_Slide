@@ -1,4 +1,4 @@
-"""SQLite 儲存：使用者帳號、登入 session 與各使用者的簡報歷史記錄。
+"""SQLite 儲存：使用者帳號、登入 session、各使用者的簡報歷史記錄與 LLM 使用紀錄。
 
 資料庫是單一檔案（預設為專案目錄下的 data/rslide.db，可用 RSLIDE_DB_PATH 指定），備份時複製該檔即可。
 每次操作開一個新連線：SQLite 開連線很便宜，也不必處理跨執行緒共用連線的問題。
@@ -45,6 +45,35 @@ CREATE TABLE IF NOT EXISTS history (
     PRIMARY KEY (user_id, id)
 );
 CREATE INDEX IF NOT EXISTS idx_history_user_created ON history(user_id, created_at DESC);
+-- 每次呼叫 LLM 一筆（失敗也記），供查詢各使用者用量；不存提示詞與回覆內容，素材只記字數與雜湊。
+-- user_id 刻意不設外鍵：刪除帳號後仍保留稽核紀錄，username 為當時的帳號名稱
+CREATE TABLE IF NOT EXISTS llm_usage (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id          INTEGER NOT NULL,
+    username         TEXT NOT NULL,
+    created_at       INTEGER NOT NULL,          -- 毫秒
+    action           TEXT NOT NULL,             -- generate / regenerate
+    provider         TEXT NOT NULL,
+    model            TEXT NOT NULL,
+    deck_mode        TEXT,
+    num_pages        INTEGER,                   -- 要求的頁數，0 = 由 AI 決定
+    slides_returned  INTEGER,
+    input_chars      INTEGER NOT NULL,
+    content_hash     TEXT,                      -- 素材的 sha256，用來找出重複送出的相同內容
+    input_tokens     INTEGER,                   -- token 數由平台回傳，部分模型不提供時為 NULL
+    output_tokens    INTEGER,
+    total_tokens     INTEGER,
+    cached_tokens    INTEGER,
+    reasoning_tokens INTEGER,
+    status           TEXT NOT NULL,             -- ok / error
+    http_status      INTEGER,
+    error            TEXT,
+    latency_ms       INTEGER,
+    fallback         INTEGER NOT NULL DEFAULT 0, -- Databricks 改用提示詞附 schema 的備援路徑
+    client_ip        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_llm_usage_user_time ON llm_usage(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_llm_usage_time ON llm_usage(created_at);
 """
 
 
@@ -242,3 +271,66 @@ def delete_history(user_id: int, item_id: str | None = None):
             conn.execute("DELETE FROM history WHERE user_id = ?", (user_id,))
         else:
             conn.execute("DELETE FROM history WHERE user_id = ? AND id = ?", (user_id, item_id))
+
+
+# ===================== LLM 使用紀錄 =====================
+LLM_USAGE_COLUMNS = ("user_id", "username", "created_at", "action", "provider", "model", "deck_mode", "num_pages",
+                     "slides_returned", "input_chars", "content_hash", "input_tokens", "output_tokens",
+                     "total_tokens", "cached_tokens", "reasoning_tokens", "status", "http_status", "error",
+                     "latency_ms", "fallback", "client_ip")
+DEFAULT_USAGE_RETENTION_DAYS = 365
+DAY_MS = 24 * 3600 * 1000
+
+
+def usage_retention_days() -> int:
+    """LLM_USAGE_RETENTION_DAYS：保留天數，0 為永久保留。"""
+    try:
+        return max(0, int(os.getenv("LLM_USAGE_RETENTION_DAYS", DEFAULT_USAGE_RETENTION_DAYS)))
+    except ValueError:
+        return DEFAULT_USAGE_RETENTION_DAYS
+
+
+def log_llm_usage(entry: dict):
+    """寫入一筆 LLM 使用紀錄（未提供的欄位為 NULL），並順便刪除超過保留天數的紀錄。"""
+    row = {"created_at": now_ms(), "fallback": 0, **entry}
+    days = usage_retention_days()
+    with connect() as conn:
+        conn.execute(f"INSERT INTO llm_usage ({', '.join(LLM_USAGE_COLUMNS)}) "
+                     f"VALUES ({', '.join('?' * len(LLM_USAGE_COLUMNS))})",
+                     [row.get(c) for c in LLM_USAGE_COLUMNS])
+        if days:
+            conn.execute("DELETE FROM llm_usage WHERE created_at < ?", (now_ms() - days * DAY_MS,))
+
+
+def usage_by_user(since_ms: int) -> list[dict]:
+    """各使用者的用量摘要，依 token 合計由多到少排序。max_same_content 為同一份素材被送去「生成」的最多次數。"""
+    with connect() as conn:
+        rows = conn.execute("""
+            SELECT l.user_id, COALESCE(u.username, MAX(l.username)) AS username,
+                   COUNT(*) AS calls, SUM(l.status = 'error') AS errors,
+                   SUM(l.action = 'generate') AS generates, SUM(l.action = 'regenerate') AS regenerates,
+                   COALESCE(SUM(l.input_tokens), 0) AS input_tokens, COALESCE(SUM(l.output_tokens), 0) AS output_tokens,
+                   COALESCE(SUM(l.total_tokens), 0) AS total_tokens, MAX(l.created_at) AS last_used,
+                   (SELECT MAX(n) FROM (SELECT COUNT(*) AS n FROM llm_usage d
+                        WHERE d.user_id = l.user_id AND d.created_at >= ? AND d.action = 'generate'
+                        GROUP BY d.content_hash)) AS max_same_content
+            FROM llm_usage l LEFT JOIN users u ON u.id = l.user_id
+            WHERE l.created_at >= ?
+            GROUP BY l.user_id
+            ORDER BY total_tokens DESC, calls DESC""", (since_ms, since_ms)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def usage_by_day(username: str, since_ms: int) -> list[dict]:
+    """單一使用者按日（伺服器當地時間）與模型的用量明細；帳號已刪除時以紀錄中的帳號名稱查詢。"""
+    with connect() as conn:
+        rows = conn.execute("""
+            SELECT date(created_at / 1000, 'unixepoch', 'localtime') AS day, provider, model,
+                   COUNT(*) AS calls, SUM(status = 'error') AS errors,
+                   COALESCE(SUM(input_tokens), 0) AS input_tokens, COALESCE(SUM(output_tokens), 0) AS output_tokens,
+                   COALESCE(SUM(total_tokens), 0) AS total_tokens
+            FROM llm_usage
+            WHERE created_at >= ? AND (user_id IN (SELECT id FROM users WHERE username = ?) OR username = ? COLLATE NOCASE)
+            GROUP BY day, provider, model
+            ORDER BY day DESC, total_tokens DESC""", (since_ms, username, username)).fetchall()
+    return [dict(r) for r in rows]

@@ -1,6 +1,7 @@
 import io
 import os
 
+import pytest
 from fastapi.testclient import TestClient
 from pptx import Presentation
 
@@ -11,6 +12,7 @@ from exporter import MAX_NOTES_CHARS  # noqa: E402
 from test_export import export, image_data_url  # noqa: E402
 
 client = TestClient(app_module.app)
+pytestmark = pytest.mark.usefixtures("logged_in")   # 生成類 API 需要登入
 
 SLIDE = {"page_number": 1, "layout_concept": "KPI", "slide_title": "營收", "html_content": "<div></div>"}
 
@@ -18,7 +20,7 @@ SLIDE = {"page_number": 1, "layout_concept": "KPI", "slide_title": "營收", "ht
 def capture_llm(monkeypatch, result):
     captured = {}
 
-    def fake_llm(provider, model, system_instruction, prompt, schema, temperature):
+    def fake_llm(provider, model, system_instruction, prompt, schema, temperature, usage=None):
         captured.update(system=system_instruction, prompt=prompt, schema=schema)
         return dict(result)
 

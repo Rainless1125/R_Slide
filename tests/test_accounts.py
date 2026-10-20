@@ -9,12 +9,6 @@ import app as app_module  # noqa: E402
 import store  # noqa: E402
 
 
-@pytest.fixture(autouse=True)
-def temp_db(tmp_path, monkeypatch):
-    monkeypatch.setenv("RSLIDE_DB_PATH", str(tmp_path / "test.db"))
-    monkeypatch.delenv("ALLOW_REGISTRATION", raising=False)
-
-
 def new_client(username="alice", password="secret123"):
     c = TestClient(app_module.app)
     res = c.post("/api/auth/register", json={"username": username, "password": password})
