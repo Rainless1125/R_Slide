@@ -94,7 +94,7 @@ def test_logging_failure_does_not_break_generation(monkeypatch):
     def broken(entry):
         raise RuntimeError("disk full")
 
-    monkeypatch.setattr(store, "log_llm_usage", broken)
+    monkeypatch.setattr(store, "finish_llm_call", broken)
     assert new_client().post("/api/generate", json={"content": "素材"}).status_code == 200
 
 

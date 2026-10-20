@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS llm_usage (
     total_tokens     INTEGER,
     cached_tokens    INTEGER,
     reasoning_tokens INTEGER,
-    status           TEXT NOT NULL,             -- ok / error
+    status           TEXT NOT NULL,             -- pending（呼叫中）/ ok / error / rate_limited（超過次數上限，未呼叫 LLM）
     http_status      INTEGER,
     error            TEXT,
     latency_ms       INTEGER,
@@ -317,16 +317,99 @@ def usage_retention_days() -> int:
         return DEFAULT_USAGE_RETENTION_DAYS
 
 
+def _insert_usage(conn, entry: dict) -> int:
+    row = {"created_at": now_ms(), "fallback": 0, **entry}
+    cur = conn.execute(f"INSERT INTO llm_usage ({', '.join(LLM_USAGE_COLUMNS)}) "
+                       f"VALUES ({', '.join('?' * len(LLM_USAGE_COLUMNS))})",
+                       [row.get(c) for c in LLM_USAGE_COLUMNS])
+    return cur.lastrowid
+
+
+def _purge_usage(conn):
+    days = usage_retention_days()
+    if days:
+        conn.execute("DELETE FROM llm_usage WHERE created_at < ?", (now_ms() - days * DAY_MS,))
+
+
 def log_llm_usage(entry: dict):
     """寫入一筆 LLM 使用紀錄（未提供的欄位為 NULL），並順便刪除超過保留天數的紀錄。"""
-    row = {"created_at": now_ms(), "fallback": 0, **entry}
-    days = usage_retention_days()
     with connect() as conn:
-        conn.execute(f"INSERT INTO llm_usage ({', '.join(LLM_USAGE_COLUMNS)}) "
-                     f"VALUES ({', '.join('?' * len(LLM_USAGE_COLUMNS))})",
-                     [row.get(c) for c in LLM_USAGE_COLUMNS])
-        if days:
-            conn.execute("DELETE FROM llm_usage WHERE created_at < ?", (now_ms() - days * DAY_MS,))
+        _insert_usage(conn, entry)
+        _purge_usage(conn)
+
+
+# ===================== LLM 呼叫次數上限 =====================
+HOUR_MS = 3600 * 1000
+DEFAULT_LLM_LIMITS = {"LLM_RATE_LIMIT_PER_HOUR": 20, "LLM_RATE_LIMIT_PER_DAY": 100, "LLM_MAX_CONCURRENT": 2}
+# 呼叫中的紀錄超過這個時間仍未結束（例如服務在呼叫途中重啟），就不再算進同時進行中的數量
+PENDING_STALE_MS = 10 * 60 * 1000
+
+
+def llm_limit(name: str) -> int:
+    """各使用者的 LLM 呼叫上限（.env 可調整），0 為不限制。"""
+    try:
+        return max(0, int(os.getenv(name, DEFAULT_LLM_LIMITS[name])))
+    except ValueError:
+        return DEFAULT_LLM_LIMITS[name]
+
+
+class LlmRateLimited(Exception):
+    def __init__(self, message: str, retry_after: int):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+def begin_llm_call(entry: dict) -> int:
+    """呼叫 LLM 前先檢查該使用者的次數上限並登記一筆 pending 紀錄，回傳紀錄 id，呼叫結束後以 finish_llm_call 更新。
+    先登記再呼叫，同一帳號同時送出大量請求也無法超過上限；BEGIN IMMEDIATE 讓多個請求依序檢查與登記。
+    超過上限時另記一筆 rate_limited（供管理者查看，不算進次數）並丟出 LlmRateLimited。
+    失敗的呼叫也算次數：平台通常已經用掉 token。"""
+    now = now_ms()
+    user_id = entry["user_id"]
+    with connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+
+        def count_since(since: int, pending_only: bool = False) -> int:
+            status = "status = 'pending'" if pending_only else "status != 'rate_limited'"
+            return conn.execute(f"SELECT COUNT(*) FROM llm_usage WHERE user_id = ? AND created_at > ? AND {status}",
+                                (user_id, since)).fetchone()[0]
+
+        def oldest_kept(since: int, limit: int) -> int:
+            # 超過上限時，要等到區間內「倒數第 limit 筆」滑出區間才能再呼叫
+            return conn.execute("SELECT created_at FROM llm_usage WHERE user_id = ? AND created_at > ? "
+                                "AND status != 'rate_limited' ORDER BY created_at DESC LIMIT 1 OFFSET ?",
+                                (user_id, since, limit - 1)).fetchone()[0]
+
+        error = None
+        concurrent = llm_limit("LLM_MAX_CONCURRENT")
+        for name, window, label in (("LLM_RATE_LIMIT_PER_HOUR", HOUR_MS, "每小時"),
+                                    ("LLM_RATE_LIMIT_PER_DAY", DAY_MS, "每 24 小時")):
+            limit = llm_limit(name)
+            if limit and count_since(now - window) >= limit:
+                wait = max(1, -(-(oldest_kept(now - window, limit) + window - now) // 1000))
+                error = LlmRateLimited(f"本帳號{label}最多可生成 / 重產 {limit} 次，已達上限，"
+                                       f"請於 {fmt_wait(wait)}後再試", wait)
+                break
+        if error is None and concurrent and count_since(now - PENDING_STALE_MS, pending_only=True) >= concurrent:
+            error = LlmRateLimited(f"本帳號同時最多進行 {concurrent} 個生成 / 重產，請等目前的完成後再試", 5)
+        if error is None:
+            return _insert_usage(conn, {**entry, "status": "pending"})
+        _insert_usage(conn, {**entry, "status": "rate_limited", "http_status": 429, "error": str(error)[:200]})
+    raise error                         # 在 with 區塊外丟出：區塊內丟出會 rollback，rate_limited 紀錄就不會保存
+
+
+def fmt_wait(seconds: int) -> str:
+    minutes = -(-seconds // 60)
+    return f"{minutes} 分鐘" if minutes < 60 else f"{minutes // 60} 小時 {minutes % 60} 分鐘".replace(" 0 分鐘", "")
+
+
+def finish_llm_call(usage_id: int, entry: dict):
+    """以呼叫結果更新 begin_llm_call 登記的紀錄（created_at 維持登記時間），並順便刪除超過保留天數的紀錄。"""
+    columns = [c for c in LLM_USAGE_COLUMNS if c in entry and c not in ("created_at", "user_id")]
+    with connect() as conn:
+        conn.execute(f"UPDATE llm_usage SET {', '.join(c + ' = ?' for c in columns)} WHERE id = ?",
+                     [*(entry[c] for c in columns), usage_id])
+        _purge_usage(conn)
 
 
 def usage_by_user(since_ms: int) -> list[dict]:
@@ -334,12 +417,15 @@ def usage_by_user(since_ms: int) -> list[dict]:
     with connect() as conn:
         rows = conn.execute("""
             SELECT l.user_id, COALESCE(u.username, MAX(l.username)) AS username,
-                   COUNT(*) AS calls, SUM(l.status = 'error') AS errors,
-                   SUM(l.action = 'generate') AS generates, SUM(l.action = 'regenerate') AS regenerates,
+                   SUM(l.status != 'rate_limited') AS calls, SUM(l.status = 'error') AS errors,
+                   SUM(l.status = 'rate_limited') AS rate_limited,
+                   SUM(l.action = 'generate' AND l.status != 'rate_limited') AS generates,
+                   SUM(l.action = 'regenerate' AND l.status != 'rate_limited') AS regenerates,
                    COALESCE(SUM(l.input_tokens), 0) AS input_tokens, COALESCE(SUM(l.output_tokens), 0) AS output_tokens,
                    COALESCE(SUM(l.total_tokens), 0) AS total_tokens, MAX(l.created_at) AS last_used,
                    (SELECT MAX(n) FROM (SELECT COUNT(*) AS n FROM llm_usage d
                         WHERE d.user_id = l.user_id AND d.created_at >= ? AND d.action = 'generate'
+                              AND d.status != 'rate_limited'
                         GROUP BY d.content_hash)) AS max_same_content
             FROM llm_usage l LEFT JOIN users u ON u.id = l.user_id
             WHERE l.created_at >= ?
@@ -357,7 +443,7 @@ def usage_by_day(username: str, since_ms: int) -> list[dict]:
                    COALESCE(SUM(input_tokens), 0) AS input_tokens, COALESCE(SUM(output_tokens), 0) AS output_tokens,
                    COALESCE(SUM(total_tokens), 0) AS total_tokens
             FROM llm_usage
-            WHERE created_at >= ? AND (user_id IN (SELECT id FROM users WHERE username = ?) OR username = ? COLLATE NOCASE)
+            WHERE created_at >= ? AND status != 'rate_limited' AND (user_id IN (SELECT id FROM users WHERE username = ?) OR username = ? COLLATE NOCASE)
             GROUP BY day, provider, model
             ORDER BY day DESC, total_tokens DESC""", (since_ms, username, username)).fetchall()
     return [dict(r) for r in rows]
@@ -366,7 +452,6 @@ def usage_by_day(username: str, since_ms: int) -> list[dict]:
 # ===================== 使用者回饋 =====================
 MAX_FEEDBACK_CHARS = 2000
 FEEDBACK_RATE_LIMIT = 10                # 每位使用者每小時最多送出幾則，避免誤觸連送或灌爆資料庫
-HOUR_MS = 3600 * 1000
 
 
 class FeedbackRateLimited(Exception):

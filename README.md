@@ -98,6 +98,9 @@ DATABRICKS_MODELS=databricks-claude-sonnet-4-5,databricks-gpt-oss-120b
 | `ALLOW_REGISTRATION` | 是否開放在登入頁自行註冊;設為 `false` 時只能由管理員建立帳號 | `true` |
 | `COOKIE_SECURE` | 以 HTTPS 提供服務時設為 `true`,登入 cookie 只會經由 HTTPS 傳送 | `false` |
 | `LLM_USAGE_RETENTION_DAYS` | LLM 使用紀錄保留天數,`0` 為永久保留 | `365` |
+| `LLM_RATE_LIMIT_PER_HOUR` | 每個帳號每小時最多可生成 / 重產幾次,`0` 為不限制 | `20` |
+| `LLM_RATE_LIMIT_PER_DAY` | 每個帳號 24 小時內最多可生成 / 重產幾次,`0` 為不限制 | `100` |
+| `LLM_MAX_CONCURRENT` | 每個帳號同時最多進行幾個生成 / 重產,`0` 為不限制 | `2` |
 
 管理員可在伺服器上以指令管理帳號:
 
@@ -117,6 +120,8 @@ python manage_users.py feedback [帳號] [--days 30]  # 使用者送出的意見
 - 記錄內容:帳號、時間、動作(生成 / 重產)、平台與模型、簡報模式與頁數、素材字數、平台回傳的 token 數(輸入 / 輸出 / 合計,部分 Databricks 模型不提供時為空白)、成功或失敗原因、耗時與來源 IP。
 - **不保存素材與 AI 回覆的內容**,素材只記字數與 SHA-256 雜湊,用來找出同一份內容被反覆送出的情況。
 - 刪除帳號後紀錄仍會保留;超過 `LLM_USAGE_RETENTION_DAYS` 天的紀錄會自動刪除。
+- 次數上限:每個帳號每小時最多 20 次、24 小時內最多 100 次、同時最多 2 個(生成與重產合併計算,失敗的呼叫也算,因為平台通常已用掉 token),超過時回 429 並告知需等待多久,不會呼叫 LLM;可用上表的環境變數調整。被擋下的請求記為 `rate_limited`,不算進次數,`manage_users.py usage` 的「限流」欄可看出誰常撞到上限。
+- 欄位上限:素材 50,000 字、目標受眾 200 字、視覺風格 1,000 字、重產提示詞 2,000 字、簡報標題 200 字;重產時整份簡報最多 60 頁、要重產的那一頁 HTML 50,000 字、講者備註 5,000 字;生成與重產的請求本體最大 2 MB。
 - 部署在反向代理之後時,來源 IP 依 uvicorn 的 `--forwarded-allow-ips` 決定是否採用 `X-Forwarded-For`,否則會記成代理的位址。
 - `usage` 指令可留意:token 合計遠高於其他人、失敗次數偏高(反覆重試)、「同素材生成」次數偏高(同一份內容被大量送出)的帳號。
 
