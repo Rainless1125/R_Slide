@@ -270,9 +270,57 @@ async function startGeneration() {
         showToast('版面生成完成，已存入歷史記錄', 'success', 2200);
     } catch (err) {
         setLoading(false);
-        if (!err.handled) showToast(friendlyError(err), 'error', 8000, { label: '重試', onClick: startGeneration });
+        if (!err.handled) showToast(friendlyError(err), 'error', 8000, retryAction(err, startGeneration));
     }
+    refreshQuota();                // 成功或失敗都算次數
 }
+
+/* ===================== 剩餘次數 =====================
+ * 伺服器限制每個帳號 1 小時內與 24 小時內的生成 / 重產次數（兩者合併計算，失敗的呼叫也算；見 store.begin_llm_call），
+ * 剩餘次數顯示在生成按鈕旁與重產視窗。上限設為 0（不限制）的區間伺服器回傳 null，不顯示 */
+let llmQuota = null;
+let quotaTimer = null;
+
+async function refreshQuota() {
+    clearTimeout(quotaTimer);
+    if (!currentUser) { llmQuota = null; renderQuota(); return; }
+    try {
+        const res = await fetch('/api/quota');
+        llmQuota = res.ok ? await res.json() : null;
+    } catch (_) { llmQuota = null; }
+    renderQuota();
+    // 用完時到恢復的時間點（最多每分鐘）再查一次，倒數與按鈕旁的文字才會跟著更新
+    const waits = ['hour', 'day'].map(k => llmQuota?.[k]?.reset_in).filter(Boolean);
+    if (waits.length) quotaTimer = setTimeout(refreshQuota, Math.min(60, Math.max(...waits) + 1) * 1000);
+}
+
+// 次數已達上限（伺服器的 429 訊息以「本帳號」開頭）時重試一定也會被擋，錯誤提示不放「重試」按鈕
+function retryAction(err, onClick) {
+    return err?.status === 429 && /^本帳號/.test(err.message || '') ? null : { label: '重試', onClick };
+}
+
+function fmtQuotaWait(seconds) {
+    const m = Math.ceil(seconds / 60);
+    return m < 60 ? `${m} 分鐘` : `${Math.floor(m / 60)} 小時` + (m % 60 ? ` ${m % 60} 分鐘` : '');
+}
+
+function quotaText(label, q) {
+    if (!q) return '';
+    if (!q.remaining) return `<span class="text-red-500 font-semibold">${label}次數已用完，${fmtQuotaWait(q.reset_in)}後恢復</span>`;
+    return `<span${q.remaining <= 3 ? ' class="text-amber-600 dark:text-amber-400 font-semibold"' : ''}>${label}剩 ${q.remaining} / ${q.limit} 次</span>`;
+}
+
+function renderQuota() {
+    const html = llmQuota ? [quotaText('1 小時內', llmQuota.hour), quotaText('24 小時內', llmQuota.day)]
+        .filter(Boolean).join('<span class="mx-1.5 text-zinc-300 dark:text-zinc-600" aria-hidden="true">·</span>') : '';
+    ['quotaInfo', 'regenQuotaInfo'].forEach(id => {
+        const el = document.getElementById(id);
+        el.innerHTML = html;
+        el.classList.toggle('hidden', !html);
+    });
+}
+
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshQuota(); });
 
 function renderReviewSection(quiet = false) {
     const review = document.getElementById('sectionReview');
@@ -425,6 +473,7 @@ function openRegenerateModal(idx) {
     document.querySelectorAll('input[name="regenDeckMode"]').forEach(r => { r.checked = r.value === mode; });
     modal.classList.remove('hidden');
     setTimeout(() => ta.focus(), 0);
+    refreshQuota();
 }
 
 function closeRegenerateModal(force = false) {
@@ -537,7 +586,7 @@ async function regenerateSingleSlide(idx, customPrompt = '', deckMode) {
         if (modalOpen) closeRegenerateModal(true);
         showToast(`第 ${at + 1} 頁已重產完成`, 'success', 2200);
     } catch (err) {
-        if (!err.handled) showToast(friendlyError(err), 'error', 8000, { label: '重試', onClick: () => regenerateSingleSlide(idx, customPrompt, mode) });
+        if (!err.handled) showToast(friendlyError(err), 'error', 8000, retryAction(err, () => regenerateSingleSlide(idx, customPrompt, mode)));
     } finally {
         setReviewRegenerateState(idx, false);
         setCurrentRegenerateState(false);
@@ -548,5 +597,6 @@ async function regenerateSingleSlide(idx, customPrompt = '', deckMode) {
         modalCancelBtn.disabled = false;
         modalConfirmIcon.className = 'fa-solid fa-arrows-rotate text-[11px]';
         modalConfirmLabel.textContent = '確認重產';
+        refreshQuota();
     }
 }

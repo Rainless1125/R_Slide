@@ -405,6 +405,11 @@ async def list_models():
         for provider, models in MODEL_CATALOG.items()
     }
 
+@app.get("/api/quota")
+def llm_quota(user: dict = Depends(current_user)):
+    """目前帳號的生成 / 重產剩餘次數；hour、day 為 null 表示該區間不限制。"""
+    return store.llm_quota(user["id"])
+
 @app.post("/api/generate")
 def generate_slides(req: GenerateRequest, request: Request, user: dict = Depends(current_user)):
     check_field_lengths(req)

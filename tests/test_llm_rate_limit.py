@@ -213,3 +213,40 @@ def test_usage_report_counts_rate_limited_separately(llm, capsys):
     manage_users.main(["usage"])
     out = capsys.readouterr().out
     assert "限流" in out and "alice" in out
+
+
+# ===================== 剩餘次數 API =====================
+def test_quota_requires_login():
+    assert TestClient(app_module.app).get("/api/quota").status_code == 401
+
+
+def test_quota_counts_down(llm):
+    c = new_client()
+    assert c.get("/api/quota").json() == {"hour": {"limit": 20, "used": 0, "remaining": 20, "reset_in": None},
+                                          "day": {"limit": 100, "used": 0, "remaining": 100, "reset_in": None}}
+    generate(c)
+    c.post("/api/regenerate-slide", json=REGEN)
+    llm["error"] = HTTPException(status_code=502, detail="x")
+    generate(c)                                                  # 失敗也算
+    q = c.get("/api/quota").json()
+    assert q["hour"]["remaining"] == 17 and q["day"]["remaining"] == 97
+
+
+def test_quota_when_exhausted_matches_rejection(llm):
+    c = new_client()
+    for _ in range(20):
+        generate(c)
+    q = c.get("/api/quota").json()["hour"]
+    assert q["remaining"] == 0 and 3590 < q["reset_in"] <= 3600
+    res = generate(c)                                            # 被擋下的請求不再扣次數
+    assert res.status_code == 429 and abs(int(res.headers["Retry-After"]) - q["reset_in"]) <= 2
+    assert c.get("/api/quota").json()["hour"]["used"] == 20
+
+
+def test_quota_is_per_user_and_null_when_unlimited(llm, monkeypatch):
+    alice, bob = new_client("alice"), new_client("bob")
+    generate(alice)
+    assert bob.get("/api/quota").json()["hour"]["remaining"] == 20
+    monkeypatch.setenv("LLM_RATE_LIMIT_PER_DAY", "0")
+    q = alice.get("/api/quota").json()
+    assert q["day"] is None and q["hour"]["remaining"] == 19

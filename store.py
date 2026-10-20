@@ -359,6 +359,37 @@ class LlmRateLimited(Exception):
         self.retry_after = retry_after
 
 
+# (回傳鍵名, 環境變數, 區間, 訊息用的名稱)；每天以最近 24 小時滾動計算
+RATE_WINDOWS = (("hour", "LLM_RATE_LIMIT_PER_HOUR", HOUR_MS, "每小時"),
+                ("day", "LLM_RATE_LIMIT_PER_DAY", DAY_MS, "每 24 小時"))
+
+
+def _window_quota(conn, user_id: int, now: int, env_name: str, window: int) -> dict | None:
+    """單一區間的用量：limit / used / remaining，用完時 reset_in 為幾秒後恢復 1 次；上限為 0（不限制）時回傳 None。
+    rate_limited 的紀錄不算次數，pending（呼叫中）與失敗的呼叫都算。"""
+    limit = llm_limit(env_name)
+    if not limit:
+        return None
+    since = now - window
+    used = conn.execute("SELECT COUNT(*) FROM llm_usage WHERE user_id = ? AND created_at > ? "
+                        "AND status != 'rate_limited'", (user_id, since)).fetchone()[0]
+    reset_in = None
+    if used >= limit:
+        # 要等到區間內「倒數第 limit 筆」滑出區間才能再呼叫
+        oldest_kept = conn.execute("SELECT created_at FROM llm_usage WHERE user_id = ? AND created_at > ? "
+                                   "AND status != 'rate_limited' ORDER BY created_at DESC LIMIT 1 OFFSET ?",
+                                   (user_id, since, limit - 1)).fetchone()[0]
+        reset_in = max(1, -(-(oldest_kept + window - now) // 1000))
+    return {"limit": limit, "used": used, "remaining": max(0, limit - used), "reset_in": reset_in}
+
+
+def llm_quota(user_id: int) -> dict:
+    """該使用者目前的剩餘次數（供前端顯示），與 begin_llm_call 的檢查使用相同的計算方式。"""
+    now = now_ms()
+    with connect() as conn:
+        return {key: _window_quota(conn, user_id, now, env_name, window) for key, env_name, window, _ in RATE_WINDOWS}
+
+
 def begin_llm_call(entry: dict) -> int:
     """呼叫 LLM 前先檢查該使用者的次數上限並登記一筆 pending 紀錄，回傳紀錄 id，呼叫結束後以 finish_llm_call 更新。
     先登記再呼叫，同一帳號同時送出大量請求也無法超過上限；BEGIN IMMEDIATE 讓多個請求依序檢查與登記。
@@ -368,30 +399,19 @@ def begin_llm_call(entry: dict) -> int:
     user_id = entry["user_id"]
     with connect() as conn:
         conn.execute("BEGIN IMMEDIATE")
-
-        def count_since(since: int, pending_only: bool = False) -> int:
-            status = "status = 'pending'" if pending_only else "status != 'rate_limited'"
-            return conn.execute(f"SELECT COUNT(*) FROM llm_usage WHERE user_id = ? AND created_at > ? AND {status}",
-                                (user_id, since)).fetchone()[0]
-
-        def oldest_kept(since: int, limit: int) -> int:
-            # 超過上限時，要等到區間內「倒數第 limit 筆」滑出區間才能再呼叫
-            return conn.execute("SELECT created_at FROM llm_usage WHERE user_id = ? AND created_at > ? "
-                                "AND status != 'rate_limited' ORDER BY created_at DESC LIMIT 1 OFFSET ?",
-                                (user_id, since, limit - 1)).fetchone()[0]
-
         error = None
-        concurrent = llm_limit("LLM_MAX_CONCURRENT")
-        for name, window, label in (("LLM_RATE_LIMIT_PER_HOUR", HOUR_MS, "每小時"),
-                                    ("LLM_RATE_LIMIT_PER_DAY", DAY_MS, "每 24 小時")):
-            limit = llm_limit(name)
-            if limit and count_since(now - window) >= limit:
-                wait = max(1, -(-(oldest_kept(now - window, limit) + window - now) // 1000))
-                error = LlmRateLimited(f"本帳號{label}最多可生成 / 重產 {limit} 次，已達上限，"
-                                       f"請於 {fmt_wait(wait)}後再試", wait)
+        for _, env_name, window, label in RATE_WINDOWS:
+            quota = _window_quota(conn, user_id, now, env_name, window)
+            if quota and not quota["remaining"]:
+                error = LlmRateLimited(f"本帳號{label}最多可生成 / 重產 {quota['limit']} 次，已達上限，"
+                                       f"請於 {fmt_wait(quota['reset_in'])}後再試", quota["reset_in"])
                 break
-        if error is None and concurrent and count_since(now - PENDING_STALE_MS, pending_only=True) >= concurrent:
-            error = LlmRateLimited(f"本帳號同時最多進行 {concurrent} 個生成 / 重產，請等目前的完成後再試", 5)
+        concurrent = llm_limit("LLM_MAX_CONCURRENT")
+        if error is None and concurrent:
+            running = conn.execute("SELECT COUNT(*) FROM llm_usage WHERE user_id = ? AND created_at > ? "
+                                   "AND status = 'pending'", (user_id, now - PENDING_STALE_MS)).fetchone()[0]
+            if running >= concurrent:
+                error = LlmRateLimited(f"本帳號同時最多進行 {concurrent} 個生成 / 重產，請等目前的完成後再試", 5)
         if error is None:
             return _insert_usage(conn, {**entry, "status": "pending"})
         _insert_usage(conn, {**entry, "status": "rate_limited", "http_status": 429, "error": str(error)[:200]})
