@@ -65,11 +65,27 @@ def auth_register(body: Credentials, response: Response):
     return start_session(response, user)
 
 
+def locked_error(locked_until: int) -> HTTPException:
+    seconds = max(1, -(-(locked_until - store.now_ms()) // 1000))
+    return HTTPException(status_code=429, headers={"Retry-After": str(seconds)},
+                         detail=f"密碼錯誤次數過多，此 IP 已暫時鎖定，請於 {-(-seconds // 60)} 分鐘後再試")
+
+
 @router.post("/api/auth/login")
-def auth_login(body: Credentials, response: Response):
+def auth_login(body: Credentials, request: Request, response: Response):
+    # 部署於反向代理之後時，需以 uvicorn 的 --forwarded-allow-ips 採用 X-Forwarded-For，否則所有人共用代理的 IP
+    ip = request.client.host if request.client else "unknown"
+    try:
+        attempt_id, remaining = store.begin_login_attempt(ip)
+    except store.LoginLocked as e:
+        raise locked_error(e.locked_until)
     user = store.authenticate(body.username.strip(), body.password[:MAX_PASSWORD + 1])
     if user is None:
-        raise HTTPException(status_code=401, detail="帳號或密碼錯誤")
+        lock_minutes = store.LOGIN_LOCKOUT_MS // 60000
+        detail = (f"帳號或密碼錯誤，再錯 {remaining} 次此 IP 將鎖定 {lock_minutes} 分鐘" if remaining
+                  else f"帳號或密碼錯誤次數過多，此 IP 已鎖定 {lock_minutes} 分鐘")
+        raise HTTPException(status_code=401 if remaining else 429, detail=detail)
+    store.end_login_attempt(ip, attempt_id)
     return start_session(response, user)
 
 

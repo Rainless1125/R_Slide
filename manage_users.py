@@ -6,6 +6,8 @@
     python manage_users.py usage [--days 30]            各使用者的 LLM 用量（依 token 由多到少）
     python manage_users.py usage <帳號> [--days 30]     單一使用者按日、模型的用量明細
     python manage_users.py feedback [帳號] [--days 30]  使用者送出的意見回饋與使用體驗評分（新的在前）
+    python manage_users.py lockouts                     目前因密碼錯誤過多而被鎖定的 IP
+    python manage_users.py unlock <IP>                  解除 IP 鎖定並清除其登入失敗紀錄
 """
 import getpass
 import sys
@@ -124,6 +126,17 @@ def main(argv: list[str]):
         show_usage(args)
     elif cmd == "feedback":
         show_feedback(args)
+    elif cmd == "lockouts":
+        rows = store.list_login_lockouts()
+        if not rows:
+            print("目前沒有被鎖定的 IP")
+        else:
+            print_table(["IP", "鎖定至"], [[r["ip"], fmt_time(r["locked_until"])] for r in rows])
+    elif cmd == "unlock" and len(args) == 1:
+        if store.unlock_login_ip(args[0]):
+            print("已解除鎖定", args[0])
+        else:
+            print(f"{args[0]} 目前沒有被鎖定（已清除其登入失敗紀錄）")
     else:
         sys.exit(__doc__)
 

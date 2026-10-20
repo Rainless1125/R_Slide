@@ -91,6 +91,7 @@ DATABRICKS_MODELS=databricks-claude-sonnet-4-5,databricks-gpt-oss-120b
 - 資料庫為單一 SQLite 檔案,預設 `data/rslide.db`(第一次使用時自動建立),**備份時複製整個 `data/` 資料夾即可**。請放在本機磁碟,不要放在 NFS / SMB 等網路磁碟上。
 - 舊版存在瀏覽器 localStorage 的歷史記錄,會在該瀏覽器第一次登入時詢問是否匯入到目前的帳號。
 - 密碼以 scrypt 雜湊儲存;登入狀態為 HttpOnly cookie,有效 30 天。
+- 防暴力破解:同一 IP 在 15 分鐘內登入失敗 3 次(不分帳號),該 IP 會被鎖定 15 分鐘,期間即使密碼正確也無法登入;中間成功登入不會重設失敗次數。管理者可用 `manage_users.py lockouts` 查看、`manage_users.py unlock <IP>` 提前解除。部署在反向代理之後時務必設定 uvicorn 的 `--forwarded-allow-ips`(見下方部署),否則所有人共用代理的 IP,一人輸錯 3 次就會鎖住所有使用者。
 
 | 變數 | 說明 | 預設 |
 |------|------|------|
@@ -108,6 +109,8 @@ python manage_users.py reset-password <帳號>    # 重設密碼,該帳號所有
 python manage_users.py usage [--days 30]         # 各使用者的 LLM 用量,依 token 由多到少排序
 python manage_users.py usage <帳號> [--days 30]  # 單一使用者按日、模型的用量明細
 python manage_users.py feedback [帳號] [--days 30]  # 使用者送出的意見回饋與使用體驗評分(含平均星數),新的在前
+python manage_users.py lockouts                # 目前因密碼錯誤過多而被鎖定的 IP
+python manage_users.py unlock <IP>             # 解除 IP 鎖定並清除其登入失敗紀錄
 ```
 
 ### LLM 使用紀錄
@@ -128,7 +131,7 @@ python manage_users.py feedback [帳號] [--days 30]  # 使用者送出的意見
 uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
-並置於 Nginx / Caddy 等反向代理之後啟用 HTTPS。若使用 Nginx,其預設上傳上限為 1 MB,需調高才能匯入較大的檔案或匯出 PPTX:
+並置於 Nginx / Caddy 等反向代理之後啟用 HTTPS。此時需加上 `--forwarded-allow-ips <代理的 IP>`(例如同機的 `127.0.0.1`),並由代理送出 `X-Forwarded-For`,登入鎖定與使用紀錄才會以使用者真正的 IP 計算。若使用 Nginx,其預設上傳上限為 1 MB,需調高才能匯入較大的檔案或匯出 PPTX:
 
 ```nginx
 client_max_body_size 40m;   # 檔案匯入上限 10 MB;匯出 PPTX 與儲存單筆歷史記錄的上限 40 MB
@@ -158,8 +161,8 @@ client_max_body_size 40m;   # 檔案匯入上限 10 MB;匯出 PPTX 與儲存單�
 charts.py         圖表資料的 schema、LLM 提示規則與正規化
 app.py            FastAPI 後端(/api/generate、/api/regenerate-slide、/api/extract、/api/export/pptx、/api/models)
 accounts.py       登入 / 註冊、歷史記錄與意見回饋 API(/api/auth/*、/api/history、/api/feedback)
-store.py          SQLite 資料存取(帳號、登入 session、歷史記錄、LLM 使用紀錄、意見回饋)
-manage_users.py   帳號管理指令(列出、建立帳號、重設密碼、查詢 LLM 用量與意見回饋)
+store.py          SQLite 資料存取(帳號、登入 session、登入失敗鎖定、歷史記錄、LLM 使用紀錄、意見回饋)
+manage_users.py   帳號管理指令(列出、建立帳號、重設密碼、解除 IP 鎖定、查詢 LLM 用量與意見回饋)
 extract.py        上傳檔案的文字抽取(PDF / DOCX / Markdown / TXT)
 exporter.py       將投影片圖片組成 PPTX(/api/export/pptx)
 static/index.html 前端介面(HTML 結構;樣式與程式在 static/app/)
