@@ -102,7 +102,22 @@ def init_db(path: str):
     with closing(sqlite3.connect(path, timeout=10)) as conn:
         conn.execute("PRAGMA journal_mode = WAL")   # 讀寫可同時進行，多人使用時不互卡
         conn.executescript(SCHEMA)
+        _migrate(conn)
         conn.commit()
+
+
+# CREATE TABLE IF NOT EXISTS 不會替已存在的資料表加欄位：之後新增的欄位列在這裡，啟動時補上
+_ADDED_COLUMNS = {
+    "feedback": {"rating": "INTEGER"},
+}
+
+
+def _migrate(conn):
+    for table, columns in _ADDED_COLUMNS.items():
+        existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        for name, decl in columns.items():
+            if name not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
 
 
 @contextmanager

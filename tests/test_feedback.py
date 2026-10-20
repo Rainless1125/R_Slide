@@ -69,3 +69,19 @@ def test_manage_users_feedback_lists_newest_first(capsys):
     manage_users.main(["feedback", "ALICE", "--days", "7"])
     out = capsys.readouterr().out
     assert "第一則" in out and "第二則" not in out
+
+
+def test_existing_feedback_table_gets_rating_column(tmp_path, monkeypatch):
+    """舊版建立的 feedback 資料表沒有 rating 欄：啟動時自動補上，原有回饋保留。"""
+    import sqlite3
+
+    path = str(tmp_path / "old.db")
+    with sqlite3.connect(path) as conn:
+        conn.execute("CREATE TABLE feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, "
+                     "username TEXT NOT NULL, created_at INTEGER NOT NULL, content TEXT NOT NULL, client_ip TEXT)")
+        conn.execute("INSERT INTO feedback (user_id, username, created_at, content) VALUES (1, 'alice', ?, '舊回饋')",
+                     (store.now_ms(),))
+    monkeypatch.setenv("RSLIDE_DB_PATH", path)
+    assert new_client("bob").post("/api/feedback", json={"rating": 3}).status_code == 200
+    assert [(r["username"], r["rating"], r["content"]) for r in store.list_feedback(0)] == [
+        ("bob", 3, ""), ("alice", None, "舊回饋")]
