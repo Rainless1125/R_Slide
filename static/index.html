@@ -18,7 +18,7 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        // 英數用 Inter，中文用 Noto Sans TC；避免 Windows 以微軟正黑體的英文字形顯示
+                        // 英數用 Inter，中文用 Noto Sans TC；避免 Windows 以微軟正黑體的英文字形顯示（export.js 的 RS_FONT_STACK 需一致）
                         sans: ['Inter', '"Noto Sans TC"', '"PingFang TC"', '"Microsoft JhengHei"', 'sans-serif'],
                     }
                 }
@@ -715,8 +715,8 @@
 
     <script src="/static/charts.js?v=3"></script>
     <script src="/static/chart-grid.js?v=1"></script>
-    <script src="/static/export.js?v=7"></script>
-    <script src="/static/presenter.js?v=3"></script>
+    <script src="/static/export.js?v=8"></script>
+    <script src="/static/presenter.js?v=4"></script>
     <script src="/static/icons.js?v=2"></script>
     <script src="/static/app/core.js?v=6"></script>
     <script src="/static/app/input.js?v=4"></script>
