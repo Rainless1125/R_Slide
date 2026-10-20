@@ -5,7 +5,7 @@
     python manage_users.py reset-password <帳號>
     python manage_users.py usage [--days 30]            各使用者的 LLM 用量（依 token 由多到少）
     python manage_users.py usage <帳號> [--days 30]     單一使用者按日、模型的用量明細
-    python manage_users.py feedback [帳號] [--days 30]  使用者送出的意見回饋（新的在前）
+    python manage_users.py feedback [帳號] [--days 30]  使用者送出的意見回饋與使用體驗評分（新的在前）
 """
 import getpass
 import sys
@@ -90,10 +90,14 @@ def show_feedback(args: list[str]):
     if not rows:
         print(f"{who}最近 {days} 天沒有意見回饋")
         return
-    print(f"{who}最近 {days} 天的意見回饋，共 {len(rows)} 則")
+    ratings = [r["rating"] for r in rows if r["rating"]]
+    avg = f"，平均使用體驗 {sum(ratings) / len(ratings):.1f} 星（{len(ratings)} 則評分）" if ratings else ""
+    print(f"{who}最近 {days} 天的意見回饋，共 {len(rows)} 則{avg}")
     for r in rows:
-        print(f"\n[{fmt_time(r['created_at'])}] {r['username']}")
-        print("  " + r["content"].replace("\n", "\n  "))
+        stars = f"  {'★' * r['rating']}{'☆' * (5 - r['rating'])}" if r["rating"] else ""
+        print(f"\n[{fmt_time(r['created_at'])}] {r['username']}{stars}")
+        if r["content"]:
+            print("  " + r["content"].replace("\n", "\n  "))
 
 
 def main(argv: list[str]):

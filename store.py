@@ -74,13 +74,14 @@ CREATE TABLE IF NOT EXISTS llm_usage (
 );
 CREATE INDEX IF NOT EXISTS idx_llm_usage_user_time ON llm_usage(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_llm_usage_time ON llm_usage(created_at);
--- 使用者從右上角「意見回饋」送出的文字；與 llm_usage 相同，刪除帳號後仍保留，username 為當時的帳號名稱
+-- 使用者從右上角「意見回饋」送出的評分與文字（至少擇一）；與 llm_usage 相同，刪除帳號後仍保留，username 為當時的帳號名稱
 CREATE TABLE IF NOT EXISTS feedback (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id    INTEGER NOT NULL,
     username   TEXT NOT NULL,
     created_at INTEGER NOT NULL,          -- 毫秒
-    content    TEXT NOT NULL,
+    rating     INTEGER,                   -- 使用體驗 1~5 星，未評分為 NULL
+    content    TEXT NOT NULL DEFAULT '',  -- 未填文字時為空字串
     client_ip  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_feedback_user_time ON feedback(user_id, created_at);
@@ -357,7 +358,7 @@ class FeedbackRateLimited(Exception):
     pass
 
 
-def add_feedback(user: dict, content: str, client_ip: str | None = None) -> int:
+def add_feedback(user: dict, content: str, rating: int | None = None, client_ip: str | None = None) -> int:
     """寫入一則回饋；同一使用者最近一小時已達上限時丟出 FeedbackRateLimited。"""
     now = now_ms()
     with connect() as conn:
@@ -365,14 +366,14 @@ def add_feedback(user: dict, content: str, client_ip: str | None = None) -> int:
                               (user["id"], now - HOUR_MS)).fetchone()[0]
         if recent >= FEEDBACK_RATE_LIMIT:
             raise FeedbackRateLimited()
-        cur = conn.execute("INSERT INTO feedback (user_id, username, created_at, content, client_ip) VALUES (?, ?, ?, ?, ?)",
-                           (user["id"], user["username"], now, content, client_ip))
+        cur = conn.execute("INSERT INTO feedback (user_id, username, created_at, rating, content, client_ip) "
+                           "VALUES (?, ?, ?, ?, ?, ?)", (user["id"], user["username"], now, rating, content, client_ip))
         return cur.lastrowid
 
 
 def list_feedback(since_ms: int, username: str | None = None) -> list[dict]:
     """回饋列表，新的在前；指定 username 時只列該帳號（帳號已刪除時以紀錄中的帳號名稱查詢）。"""
-    sql = "SELECT id, username, created_at, content FROM feedback WHERE created_at >= ?"
+    sql = "SELECT id, username, created_at, rating, content FROM feedback WHERE created_at >= ?"
     args: list = [since_ms]
     if username is not None:
         sql += " AND username = ? COLLATE NOCASE"

@@ -170,16 +170,17 @@ def history_clear(user: dict = Depends(current_user)):
 
 # ===================== 意見回饋 =====================
 class FeedbackBody(BaseModel):
-    content: str = Field(max_length=store.MAX_FEEDBACK_CHARS)
+    content: str = Field("", max_length=store.MAX_FEEDBACK_CHARS)
+    rating: int | None = Field(None, ge=1, le=5)     # 使用體驗 1~5 星，選填
 
 
 @router.post("/api/feedback")
 def feedback_add(body: FeedbackBody, request: Request, user: dict = Depends(current_user)):
     content = body.content.strip()
-    if not content:
-        raise HTTPException(status_code=400, detail="請輸入回饋內容")
+    if not content and body.rating is None:
+        raise HTTPException(status_code=400, detail="請選擇使用體驗評分或輸入回饋內容")
     try:
-        store.add_feedback(user, content, request.client.host if request.client else None)
+        store.add_feedback(user, content, body.rating, request.client.host if request.client else None)
     except store.FeedbackRateLimited:
         raise HTTPException(status_code=429, detail="回饋送出太頻繁，請稍後再試")
     return {"ok": True}

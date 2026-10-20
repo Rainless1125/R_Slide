@@ -1644,3 +1644,24 @@ body.sb-open #sidebar {
 @media (prefers-reduced-motion: reduce) {
     .guide-panel, .guide-body section { animation: none; }
 }
+
+/* 意見回饋：使用體驗 1~5 星（.on 為已選或滑鼠預覽中的星） */
+.star-rating button {
+    width: 1.875rem;
+    height: 1.875rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: .5rem;
+    font-size: 1.125rem;
+    color: rgb(212 212 216);
+    transition: color .15s, transform .15s;
+}
+.dark .star-rating button { color: rgb(63 63 70); }
+.star-rating button.on { color: rgb(251 191 36); }
+.star-rating button:hover { transform: scale(1.15); }
+.star-rating button:focus-visible { outline: 2px solid rgb(139 92 246); outline-offset: 1px; }
+@media (prefers-reduced-motion: reduce) {
+    .star-rating button { transition: none; }
+    .star-rating button:hover { transform: none; }
+}

@@ -25,7 +25,7 @@
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/app/app.css?v=11">
+    <link rel="stylesheet" href="/static/app/app.css?v=12">
 </head>
 
 <body
@@ -838,7 +838,7 @@
                         <i class="fa-solid fa-comment-dots text-sm"></i></div>
                     <div class="min-w-0">
                         <h3 id="feedbackTitle" class="text-base sm:text-lg font-bold leading-tight">意見回饋</h3>
-                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">使用上的問題、建議或想要的功能，都歡迎告訴我們。</p>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">為使用體驗評分，或告訴我們遇到的問題、建議與想要的功能。</p>
                     </div>
                 </div>
                 <button type="button" onclick="closeFeedback()" class="icon-btn w-8 h-8 shrink-0 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800"
@@ -846,7 +846,18 @@
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-            <div class="mt-4">
+            <div class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span id="feedbackRatingLabel" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">使用體驗</span>
+                <div id="feedbackRating" role="radiogroup" aria-labelledby="feedbackRatingLabel" class="star-rating flex items-center">
+                    <button type="button" role="radio" data-rating="1" aria-label="1 星：很差"><i class="fa-solid fa-star"></i></button>
+                    <button type="button" role="radio" data-rating="2" aria-label="2 星：不太好"><i class="fa-solid fa-star"></i></button>
+                    <button type="button" role="radio" data-rating="3" aria-label="3 星：普通"><i class="fa-solid fa-star"></i></button>
+                    <button type="button" role="radio" data-rating="4" aria-label="4 星：不錯"><i class="fa-solid fa-star"></i></button>
+                    <button type="button" role="radio" data-rating="5" aria-label="5 星：非常好"><i class="fa-solid fa-star"></i></button>
+                </div>
+                <span id="feedbackRatingText" class="text-xs text-zinc-400" aria-hidden="true">選填</span>
+            </div>
+            <div class="mt-3">
                 <label for="feedbackInput" class="sr-only">回饋內容</label>
                 <textarea id="feedbackInput" rows="6" maxlength="2000" aria-describedby="feedbackCount feedbackError"
                     class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow resize-y"
@@ -958,7 +969,7 @@
     <script src="/static/app/player.js?v=3"></script>
     <script src="/static/app/auth.js?v=2"></script>
     <script src="/static/app/guide.js?v=1"></script>
-    <script src="/static/app/feedback.js?v=1"></script>
+    <script src="/static/app/feedback.js?v=2"></script>
     <script src="/static/app/main.js?v=7"></script>
 </body>
 
