@@ -95,6 +95,7 @@ DATABRICKS_MODELS=databricks-claude-sonnet-4-5,databricks-gpt-oss-120b
 | `RSLIDE_DB_PATH` | SQLite 檔案路徑 | `data/rslide.db` |
 | `ALLOW_REGISTRATION` | 是否開放在登入頁自行註冊;設為 `false` 時只能由管理員建立帳號 | `true` |
 | `COOKIE_SECURE` | 以 HTTPS 提供服務時設為 `true`,登入 cookie 只會經由 HTTPS 傳送 | `false` |
+| `LLM_USAGE_RETENTION_DAYS` | LLM 使用紀錄保留天數,`0` 為永久保留 | `365` |
 
 管理員可在伺服器上以指令管理帳號:
 
@@ -102,7 +103,19 @@ DATABRICKS_MODELS=databricks-claude-sonnet-4-5,databricks-gpt-oss-120b
 python manage_users.py list                    # 列出帳號與紀錄筆數
 python manage_users.py add <帳號>               # 建立帳號(關閉註冊時使用)
 python manage_users.py reset-password <帳號>    # 重設密碼,該帳號所有裝置需重新登入
+python manage_users.py usage [--days 30]         # 各使用者的 LLM 用量,依 token 由多到少排序
+python manage_users.py usage <帳號> [--days 30]  # 單一使用者按日、模型的用量明細
 ```
+
+### LLM 使用紀錄
+
+生成與單頁重產需要登入,每次呼叫 LLM(包含失敗的呼叫)都會在 SQLite 的 `llm_usage` 資料表記一筆,方便回查各使用者的用量、找出異常大量使用的帳號:
+
+- 記錄內容:帳號、時間、動作(生成 / 重產)、平台與模型、簡報模式與頁數、素材字數、平台回傳的 token 數(輸入 / 輸出 / 合計,部分 Databricks 模型不提供時為空白)、成功或失敗原因、耗時與來源 IP。
+- **不保存素材與 AI 回覆的內容**,素材只記字數與 SHA-256 雜湊,用來找出同一份內容被反覆送出的情況。
+- 刪除帳號後紀錄仍會保留;超過 `LLM_USAGE_RETENTION_DAYS` 天的紀錄會自動刪除。
+- 部署在反向代理之後時,來源 IP 依 uvicorn 的 `--forwarded-allow-ips` 決定是否採用 `X-Forwarded-For`,否則會記成代理的位址。
+- `usage` 指令可留意:token 合計遠高於其他人、失敗次數偏高(反覆重試)、「同素材生成」次數偏高(同一份內容被大量送出)的帳號。
 
 ## 部署到自己的伺服器
 
@@ -118,11 +131,11 @@ uvicorn app:app --host 0.0.0.0 --port 8000
 client_max_body_size 40m;   # 檔案匯入上限 10 MB;匯出 PPTX 與儲存單筆歷史記錄的上限 40 MB
 ```
 
-> **注意**:登入目前只用來區分歷史記錄,生成、匯出等 API 並未要求登入。若服務會對外開放,請在反向代理層加上驗證(Basic Auth、SSO 等)或將 `ALLOW_REGISTRATION` 設為 `false`,避免 API Key 額度被他人使用。
+> **注意**:生成與單頁重產需要登入;匯出與檔案匯入等不會呼叫 LLM 的 API 並未要求登入。若服務會對外開放,請在反向代理層加上驗證(Basic Auth、SSO 等)或將 `ALLOW_REGISTRATION` 設為 `false`,避免 API Key 額度被他人使用。
 
 ### 網路與資料流向(地端部署前請務必了解)
 
-伺服器只保存帳號與歷史記錄(SQLite,見上方「帳號與歷史記錄」),上傳的檔案與匯出的簡報都不保存;目前並非完全離線:
+伺服器只保存帳號、歷史記錄與 LLM 使用紀錄(SQLite,見上方「帳號與歷史記錄」),上傳的檔案與匯出的簡報都不保存;目前並非完全離線:
 
 | 項目 | 說明 |
 |------|------|
@@ -142,8 +155,8 @@ client_max_body_size 40m;   # 檔案匯入上限 10 MB;匯出 PPTX 與儲存單�
 charts.py         圖表資料的 schema、LLM 提示規則與正規化
 app.py            FastAPI 後端(/api/generate、/api/regenerate-slide、/api/extract、/api/export/pptx、/api/models)
 accounts.py       登入 / 註冊與歷史記錄 API(/api/auth/*、/api/history)
-store.py          SQLite 資料存取(帳號、登入 session、歷史記錄)
-manage_users.py   帳號管理指令(列出、建立帳號、重設密碼)
+store.py          SQLite 資料存取(帳號、登入 session、歷史記錄、LLM 使用紀錄)
+manage_users.py   帳號管理指令(列出、建立帳號、重設密碼、查詢 LLM 用量)
 extract.py        上傳檔案的文字抽取(PDF / DOCX / Markdown / TXT)
 exporter.py       將投影片圖片組成 PPTX(/api/export/pptx)
 static/index.html 前端介面(HTML 結構;樣式與程式在 static/app/)

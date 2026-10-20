@@ -138,6 +138,11 @@ function historyError(err) {
     return '歷史記錄同步失敗：' + friendlyError(err);
 }
 
+// 登入逾時：跳出登入視窗，並標記為已處理（呼叫端不再另外顯示錯誤）
+function throwIfSessionExpired(res) {
+    if (res.status === 401) { onSessionExpired(); throw Object.assign(new Error('請先登入'), { status: 401, handled: true }); }
+}
+
 async function historyFetch(method, path = '', body, opts = {}) {
     const res = await fetch('/api/history' + path, {
         method,
@@ -145,7 +150,7 @@ async function historyFetch(method, path = '', body, opts = {}) {
         body: body !== undefined ? JSON.stringify(body) : undefined,
         ...opts
     });
-    if (res.status === 401) { onSessionExpired(); throw Object.assign(new Error('請先登入'), { status: 401, handled: true }); }
+    throwIfSessionExpired(res);
     if (!res.ok) throw await readApiError(res);
     return res.json();
 }

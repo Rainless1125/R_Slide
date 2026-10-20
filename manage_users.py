@@ -3,9 +3,13 @@
     python manage_users.py list
     python manage_users.py add <帳號>
     python manage_users.py reset-password <帳號>
+    python manage_users.py usage [--days 30]            各使用者的 LLM 用量（依 token 由多到少）
+    python manage_users.py usage <帳號> [--days 30]     單一使用者按日、模型的用量明細
 """
 import getpass
 import sys
+import time
+import unicodedata
 
 from dotenv import load_dotenv
 
@@ -22,6 +26,58 @@ def ask_password() -> str:
     if getpass.getpass("再輸入一次：") != pw:
         sys.exit("兩次輸入的密碼不一致")
     return pw
+
+
+def parse_days(args: list[str]) -> tuple[list[str], int]:
+    """取出 --days N（預設 30），回傳其餘參數與天數。"""
+    if "--days" not in args:
+        return args, 30
+    i = args.index("--days")
+    try:
+        days = int(args[i + 1])
+    except (IndexError, ValueError):
+        sys.exit("--days 需為正整數")
+    if days <= 0:
+        sys.exit("--days 需為正整數")
+    return args[:i] + args[i + 2:], days
+
+
+def fmt_time(ms: int) -> str:
+    return time.strftime("%Y-%m-%d %H:%M", time.localtime(ms / 1000))
+
+
+def print_table(headers: list[str], rows: list[list]):
+    # 中文字在終端機佔兩格，以 East Asian Width 計算欄寬才能對齊
+    width = lambda v: sum(2 if unicodedata.east_asian_width(ch) in "WF" else 1 for ch in str(v))
+    widths = [max(width(v) for v in col) for col in zip(headers, *rows)]
+    for row in [headers, *rows]:
+        print("  ".join(str(v) + " " * (w - width(v)) for v, w in zip(row, widths)).rstrip())
+
+
+def show_usage(args: list[str]):
+    args, days = parse_days(args)
+    since = store.now_ms() - days * store.DAY_MS
+    if not args:
+        rows = store.usage_by_user(since)
+        if not rows:
+            print(f"最近 {days} 天沒有 LLM 使用紀錄")
+            return
+        print(f"最近 {days} 天各使用者的 LLM 用量（同素材生成 = 同一份素材被送去生成的最多次數）")
+        print_table(["帳號", "呼叫", "失敗", "生成", "重產", "輸入 tokens", "輸出 tokens", "合計 tokens", "同素材生成", "最後使用"],
+                    [[r["username"], r["calls"], r["errors"], r["generates"], r["regenerates"], f"{r['input_tokens']:,}",
+                      f"{r['output_tokens']:,}", f"{r['total_tokens']:,}", r["max_same_content"] or 0,
+                      fmt_time(r["last_used"])] for r in rows])
+    elif len(args) == 1:
+        rows = store.usage_by_day(args[0], since)
+        if not rows:
+            print(f"{args[0]} 最近 {days} 天沒有 LLM 使用紀錄")
+            return
+        print(f"{args[0]} 最近 {days} 天的 LLM 用量")
+        print_table(["日期", "平台", "模型", "呼叫", "失敗", "輸入 tokens", "輸出 tokens", "合計 tokens"],
+                    [[r["day"], r["provider"], r["model"], r["calls"], r["errors"], f"{r['input_tokens']:,}",
+                      f"{r['output_tokens']:,}", f"{r['total_tokens']:,}"] for r in rows])
+    else:
+        sys.exit(__doc__)
 
 
 def main(argv: list[str]):
@@ -44,6 +100,8 @@ def main(argv: list[str]):
         if not store.set_password(args[0], ask_password()):
             sys.exit("找不到此帳號")
         print("已重設密碼，該帳號在所有裝置上都需重新登入")
+    elif cmd == "usage":
+        show_usage(args)
     else:
         sys.exit(__doc__)
 
