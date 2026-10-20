@@ -12,7 +12,17 @@
 const EXPORT_CDN = {
     tailwind: 'https://cdn.tailwindcss.com/3.4.17',
     fontAwesome: 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
+    fonts: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap',
 };
+
+/* 字體：與 index.html 的 tailwind.config 一致（英數用 Inter，中文用 Noto Sans TC；改字體時兩邊一起改）。
+ * 匯出 HTML 與講者檢視都載入同一組 Google Fonts，投影片字形才會與主畫面相同 */
+const RS_FONT_STACK = ['Inter', '"Noto Sans TC"', '"PingFang TC"', '"Microsoft JhengHei"', 'sans-serif'];
+const RS_FONT_CSS = RS_FONT_STACK.join(',');
+const RS_FONT_LINKS = `<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="${EXPORT_CDN.fonts}">`;
+const RS_TAILWIND_FONT_CONFIG = `if (window.tailwind) tailwind.config = { theme: { extend: { fontFamily: { sans: ${JSON.stringify(RS_FONT_STACK)} } } } };`;
 
 /* 外部資源白名單：只允許這些網域（不含 CDN 以外的圖片 / 字型） */
 const EXPORT_ALLOWED_HOSTS = ['cdn.tailwindcss.com', 'cdnjs.cloudflare.com'];
@@ -172,15 +182,16 @@ const EXPORT_TEMPLATE = `<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{TITLE}}</title>
-<!-- CDN 版本：Tailwind 3.4.17、Font Awesome 6.5.1。離線時投影片樣式可能不完整，播放器本身不受影響。 -->
+<!-- CDN 版本：Tailwind 3.4.17、Font Awesome 6.5.1、Google Fonts（Inter + Noto Sans TC）。離線時投影片樣式與字型可能不完整，播放器本身不受影響。 -->
 <link rel="stylesheet" href="{{FA_CSS}}">
+${RS_FONT_LINKS}
 <script src="{{TAILWIND_JS}}"><\/script>
 <script>
-if (window.tailwind) tailwind.config = { theme: { extend: { fontFamily: { sans: ['"PingFang TC"', '"Microsoft JhengHei"', '"Noto Sans TC"', 'sans-serif'] } } } };
+${RS_TAILWIND_FONT_CONFIG}
 <\/script>
 <style>
 html,body{margin:0}
-body{box-sizing:border-box;min-height:100vh;font-family:"PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif;background:#f4f4f5;color:#18181b;display:flex;flex-direction:column;align-items:center;padding:16px;gap:14px}
+body{box-sizing:border-box;min-height:100vh;font-family:${RS_FONT_CSS};background:#f4f4f5;color:#18181b;display:flex;flex-direction:column;align-items:center;padding:16px;gap:14px}
 @media (prefers-color-scheme:dark){body{background:#09090b;color:#f4f4f5}.bar{background:#18181b!important;border-color:#27272a!important}.bar button:hover{background:#27272a!important}.thumb{background:#18181b!important;border-color:#27272a!important}.thumb.on{border-color:#f4f4f5!important}}
 .ex-title{font-size:18px;margin:4px 0 0;text-align:center}
 #stage{position:relative;width:100%;max-width:min(1024px,max(480px,calc((100vh - 330px)*16/9)))}

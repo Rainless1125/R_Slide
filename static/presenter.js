@@ -75,13 +75,14 @@ const PRESENTER_HTML = `<!DOCTYPE html>
 <title>講者檢視 - R Slide</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+${RS_FONT_LINKS}
 <script src="https://cdn.tailwindcss.com/3.4.17"><\/script>
 <script>
-if (window.tailwind) tailwind.config = { theme: { extend: { fontFamily: { sans: ['"PingFang TC"', '"Microsoft JhengHei"', '"Noto Sans TC"', 'sans-serif'] } } } };
+${RS_TAILWIND_FONT_CONFIG}
 <\/script>
 <style>
 html,body{margin:0;height:100%}
-#rsPresenter{box-sizing:border-box;height:100%;display:flex;flex-direction:column;gap:12px;padding:14px 16px;background:#09090b;color:#f4f4f5;font-family:"PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
+#rsPresenter{box-sizing:border-box;height:100%;display:flex;flex-direction:column;gap:12px;padding:14px 16px;background:#09090b;color:#f4f4f5;font-family:${RS_FONT_CSS}}
 #rsPresenter *{box-sizing:border-box}
 .p-top{flex:none;display:flex;align-items:center;gap:16px;font-size:13px;color:#a1a1aa}
 .p-title{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700;color:#f4f4f5;font-size:15px}
