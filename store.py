@@ -1,4 +1,4 @@
-"""SQLite 儲存：使用者帳號、登入 session、各使用者的簡報歷史記錄與 LLM 使用紀錄。
+"""SQLite 儲存：使用者帳號、登入 session、各使用者的簡報歷史記錄、LLM 使用紀錄與使用者回饋。
 
 資料庫是單一檔案（預設為專案目錄下的 data/rslide.db，可用 RSLIDE_DB_PATH 指定），備份時複製該檔即可。
 每次操作開一個新連線：SQLite 開連線很便宜，也不必處理跨執行緒共用連線的問題。
@@ -74,6 +74,17 @@ CREATE TABLE IF NOT EXISTS llm_usage (
 );
 CREATE INDEX IF NOT EXISTS idx_llm_usage_user_time ON llm_usage(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_llm_usage_time ON llm_usage(created_at);
+-- 使用者從右上角「意見回饋」送出的文字；與 llm_usage 相同，刪除帳號後仍保留，username 為當時的帳號名稱
+CREATE TABLE IF NOT EXISTS feedback (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    username   TEXT NOT NULL,
+    created_at INTEGER NOT NULL,          -- 毫秒
+    content    TEXT NOT NULL,
+    client_ip  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_feedback_user_time ON feedback(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_feedback_time ON feedback(created_at);
 """
 
 
@@ -333,4 +344,39 @@ def usage_by_day(username: str, since_ms: int) -> list[dict]:
             WHERE created_at >= ? AND (user_id IN (SELECT id FROM users WHERE username = ?) OR username = ? COLLATE NOCASE)
             GROUP BY day, provider, model
             ORDER BY day DESC, total_tokens DESC""", (since_ms, username, username)).fetchall()
+    return [dict(r) for r in rows]
+
+
+# ===================== 使用者回饋 =====================
+MAX_FEEDBACK_CHARS = 2000
+FEEDBACK_RATE_LIMIT = 10                # 每位使用者每小時最多送出幾則，避免誤觸連送或灌爆資料庫
+HOUR_MS = 3600 * 1000
+
+
+class FeedbackRateLimited(Exception):
+    pass
+
+
+def add_feedback(user: dict, content: str, client_ip: str | None = None) -> int:
+    """寫入一則回饋；同一使用者最近一小時已達上限時丟出 FeedbackRateLimited。"""
+    now = now_ms()
+    with connect() as conn:
+        recent = conn.execute("SELECT COUNT(*) FROM feedback WHERE user_id = ? AND created_at >= ?",
+                              (user["id"], now - HOUR_MS)).fetchone()[0]
+        if recent >= FEEDBACK_RATE_LIMIT:
+            raise FeedbackRateLimited()
+        cur = conn.execute("INSERT INTO feedback (user_id, username, created_at, content, client_ip) VALUES (?, ?, ?, ?, ?)",
+                           (user["id"], user["username"], now, content, client_ip))
+        return cur.lastrowid
+
+
+def list_feedback(since_ms: int, username: str | None = None) -> list[dict]:
+    """回饋列表，新的在前；指定 username 時只列該帳號（帳號已刪除時以紀錄中的帳號名稱查詢）。"""
+    sql = "SELECT id, username, created_at, content FROM feedback WHERE created_at >= ?"
+    args: list = [since_ms]
+    if username is not None:
+        sql += " AND username = ? COLLATE NOCASE"
+        args.append(username)
+    with connect() as conn:
+        rows = conn.execute(sql + " ORDER BY created_at DESC, id DESC", args).fetchall()
     return [dict(r) for r in rows]

@@ -5,6 +5,7 @@
     python manage_users.py reset-password <帳號>
     python manage_users.py usage [--days 30]            各使用者的 LLM 用量（依 token 由多到少）
     python manage_users.py usage <帳號> [--days 30]     單一使用者按日、模型的用量明細
+    python manage_users.py feedback [帳號] [--days 30]  使用者送出的意見回饋（新的在前）
 """
 import getpass
 import sys
@@ -80,6 +81,21 @@ def show_usage(args: list[str]):
         sys.exit(__doc__)
 
 
+def show_feedback(args: list[str]):
+    args, days = parse_days(args)
+    if len(args) > 1:
+        sys.exit(__doc__)
+    rows = store.list_feedback(store.now_ms() - days * store.DAY_MS, args[0] if args else None)
+    who = f"{args[0]} " if args else ""
+    if not rows:
+        print(f"{who}最近 {days} 天沒有意見回饋")
+        return
+    print(f"{who}最近 {days} 天的意見回饋，共 {len(rows)} 則")
+    for r in rows:
+        print(f"\n[{fmt_time(r['created_at'])}] {r['username']}")
+        print("  " + r["content"].replace("\n", "\n  "))
+
+
 def main(argv: list[str]):
     cmd, args = (argv[0] if argv else ""), argv[1:]
     if cmd == "list":
@@ -102,6 +118,8 @@ def main(argv: list[str]):
         print("已重設密碼，該帳號在所有裝置上都需重新登入")
     elif cmd == "usage":
         show_usage(args)
+    elif cmd == "feedback":
+        show_feedback(args)
     else:
         sys.exit(__doc__)
 
