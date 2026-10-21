@@ -318,12 +318,12 @@ function quotaRow(label, q) {
 
 function renderQuota() {
     const rows = llmQuota ? [['1 小時內', llmQuota.hour], ['24 小時內', llmQuota.day]].filter(([, q]) => q) : [];
-    // 圖示旁顯示兩個區間中較少的剩餘次數：那才是目前真正還能用的次數
+    // 圖示的顏色依兩個區間中較少的剩餘次數：那才是目前真正還能用的次數
     const tight = rows.length ? rows.map(([, q]) => q).reduce((a, b) => (b.remaining < a.remaining ? b : a)) : null;
     const summary = rows.map(([label, q]) => `${label}剩 ${q.remaining} / ${q.limit} 次`).join('，');
     const html = tight ? `
 <button type="button" class="quota-chip" data-state="${quotaState(tight)}" aria-label="用量限制：${summary}" aria-expanded="false" onclick="toggleQuotaPop(this)">
-  <i class="fa-regular fa-clock" aria-hidden="true"></i><span>${tight.remaining ? `剩 ${tight.remaining} 次` : '已達上限'}</span>
+  <i class="fa-regular fa-clock" aria-hidden="true"></i><span>用量限制</span>
 </button>
 <div class="quota-pop" role="tooltip">
   <div class="quota-pop-title"><i class="fa-regular fa-clock text-violet-500" aria-hidden="true"></i>用量限制</div>
