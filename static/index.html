@@ -25,7 +25,7 @@
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/app/app.css?v=12">
+    <link rel="stylesheet" href="/static/app/app.css?v=16">
 </head>
 
 <body
@@ -328,8 +328,7 @@
                     </div>
 
                     <div class="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 pt-4">
-                        <p id="quotaInfo" class="hidden text-xs text-zinc-500 dark:text-zinc-400" aria-live="polite"
-                            title="生成與重產合併計算，失敗的生成也會算一次"></p>
+                        <div id="quotaInfo" class="quota hidden" data-align="right"></div>
                         <button id="btnGenerate" onclick="startGeneration()"
                             class="ripple-btn btn-flow text-white font-semibold px-6 py-2.5 rounded-xl flex items-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 disabled:opacity-70 disabled:cursor-wait disabled:hover:translate-y-0">
                             <span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
@@ -621,7 +620,7 @@
                     placeholder="例如：請改成更商務、重點三點式、減少文字並加上 KPI 資訊卡"></textarea>
             </div>
             <div class="mt-5 flex flex-wrap items-center justify-end gap-2">
-                <p id="regenQuotaInfo" class="hidden mr-auto text-[11px] text-zinc-500 dark:text-zinc-400" aria-live="polite"></p>
+                <div id="regenQuotaInfo" class="quota hidden mr-auto" data-align="left"></div>
                 <button id="regenModalCancelBtn" onclick="closeRegenerateModal()"
                     class="icon-btn h-9 px-4 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-sm font-semibold">
                     取消
@@ -965,7 +964,7 @@
     <script src="/static/icons.js?v=2"></script>
     <script src="/static/app/core.js?v=7"></script>
     <script src="/static/app/input.js?v=4"></script>
-    <script src="/static/app/generate.js?v=9"></script>
+    <script src="/static/app/generate.js?v=14"></script>
     <script src="/static/app/shapes.js?v=2"></script>
     <script src="/static/app/editor.js?v=5"></script>
     <script src="/static/app/media.js?v=4"></script>

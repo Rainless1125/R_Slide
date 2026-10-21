@@ -304,22 +304,94 @@ function fmtQuotaWait(seconds) {
     return m < 60 ? `${m} 分鐘` : `${Math.floor(m / 60)} 小時` + (m % 60 ? ` ${m % 60} 分鐘` : '');
 }
 
-function quotaText(label, q) {
-    if (!q) return '';
-    if (!q.remaining) return `<span class="text-red-500 font-semibold">${label}次數已用完，${fmtQuotaWait(q.reset_in)}後恢復</span>`;
-    return `<span${q.remaining <= 3 ? ' class="text-amber-600 dark:text-amber-400 font-semibold"' : ''}>${label}剩 ${q.remaining} / ${q.limit} 次</span>`;
+// 剩 3 次以內提醒，用完時顯示恢復時間
+function quotaState(q) { return !q.remaining ? 'out' : q.remaining <= 3 ? 'low' : 'ok'; }
+
+function quotaRow(label, q) {
+    const pct = Math.min(100, Math.round(q.used / q.limit * 100));
+    return `<div class="quota-row" data-state="${quotaState(q)}">
+  <div class="quota-row-head"><span>${label}</span><span>已用 <b>${Math.min(q.used, q.limit)} / ${q.limit}</b> 次</span></div>
+  <div class="quota-bar" role="progressbar" aria-label="${label}已用次數" aria-valuemin="0" aria-valuemax="${q.limit}" aria-valuenow="${Math.min(q.used, q.limit)}"><i style="width:${pct}%"></i></div>
+  ${q.remaining ? '' : `<div class="quota-reset">已達上限，${fmtQuotaWait(q.reset_in)}後恢復</div>`}
+</div>`;
 }
 
 function renderQuota() {
-    const html = llmQuota ? [quotaText('1 小時內', llmQuota.hour), quotaText('24 小時內', llmQuota.day)]
-        .filter(Boolean).join('<span class="mx-1.5 text-zinc-300 dark:text-zinc-600" aria-hidden="true">·</span>') : '';
+    const rows = llmQuota ? [['1 小時內', llmQuota.hour], ['24 小時內', llmQuota.day]].filter(([, q]) => q) : [];
+    // 圖示旁顯示兩個區間中較少的剩餘次數：那才是目前真正還能用的次數
+    const tight = rows.length ? rows.map(([, q]) => q).reduce((a, b) => (b.remaining < a.remaining ? b : a)) : null;
+    const summary = rows.map(([label, q]) => `${label}剩 ${q.remaining} / ${q.limit} 次`).join('，');
+    const html = tight ? `
+<button type="button" class="quota-chip" data-state="${quotaState(tight)}" aria-label="用量限制：${summary}" aria-expanded="false" onclick="toggleQuotaPop(this)">
+  <i class="fa-regular fa-clock" aria-hidden="true"></i><span>${tight.remaining ? `剩 ${tight.remaining} 次` : '已達上限'}</span>
+</button>
+<div class="quota-pop" role="tooltip">
+  <div class="quota-pop-title"><i class="fa-regular fa-clock text-violet-500" aria-hidden="true"></i>用量限制</div>
+  ${rows.map(([label, q]) => quotaRow(label, q)).join('')}
+  <p class="quota-note">生成與重產合併計算，失敗的生成也會算一次</p>
+</div>` : '';
     ['quotaInfo', 'regenQuotaInfo'].forEach(id => {
         const el = document.getElementById(id);
+        const open = el.classList.contains('open');              // 更新數字時保留觸控開啟的狀態
         el.innerHTML = html;
         el.classList.toggle('hidden', !html);
+        el.classList.toggle('open', open && !!html);
+        el.querySelector('.quota-chip')?.setAttribute('aria-expanded', String(open && !!html));
     });
 }
 
+// 觸控裝置沒有 hover：點一下圖示開關浮框，點其他地方或按 Esc 關閉
+function toggleQuotaPop(btn) {
+    const wrap = btn.closest('.quota');
+    const open = !wrap.classList.contains('open');
+    closeQuotaPops();
+    placeQuotaPop(wrap);
+    wrap.classList.remove('dismissed');
+    wrap.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', String(open));
+}
+function closeQuotaPops() {
+    document.querySelectorAll('.quota.open').forEach(w => {
+        w.classList.remove('open');
+        w.querySelector('.quota-chip')?.setAttribute('aria-expanded', 'false');
+    });
+}
+// Esc 也要收起滑鼠 hover 或鍵盤聚焦顯示的浮框：標記 dismissed，滑鼠再次移入或焦點從外面移進來時恢復
+function dismissQuotaPops() {
+    closeQuotaPops();
+    document.querySelectorAll('.quota').forEach(w => {
+        if (w.matches(':hover') || w.contains(document.activeElement)) w.classList.add('dismissed');
+    });
+}
+['quotaInfo', 'regenQuotaInfo'].forEach(id => {
+    const w = document.getElementById(id);
+    w.addEventListener('mouseenter', () => w.classList.remove('dismissed'));
+    w.addEventListener('focusin', e => { if (!w.contains(e.relatedTarget)) w.classList.remove('dismissed'); });
+});
+// 浮框預設對齊圖示的左緣或右緣（data-align），超出視窗時往內推，手機上圖示不在最右邊也不會被切掉；
+// 預設往上開，上方空間被固定的頂部標題列擋住時改往下開
+function placeQuotaPop(wrap) {
+    const pop = wrap.querySelector('.quota-pop');
+    if (!pop) return;
+    pop.style.left = pop.style.right = '';
+    const r = wrap.getBoundingClientRect(), w = pop.offsetWidth, margin = 16, vw = document.documentElement.clientWidth;
+    const header = document.getElementById('topHeader').getBoundingClientRect();
+    const top = Math.max(0, header.bottom);
+    wrap.classList.toggle('below', r.top - top < pop.offsetHeight + margin && window.innerHeight - r.bottom > r.top - top);
+    if (wrap.dataset.align === 'right') {
+        const shift = Math.max(0, margin - (r.right - w));          // 浮框左緣超出視窗的距離
+        if (shift) pop.style.right = -shift + 'px';
+    } else {
+        const shift = Math.max(0, r.left + w - (vw - margin));
+        if (shift) pop.style.left = -shift + 'px';
+    }
+}
+['mouseover', 'focusin'].forEach(type => document.addEventListener(type, e => {
+    const wrap = e.target.closest?.('.quota');
+    if (wrap) placeQuotaPop(wrap);
+}));
+document.addEventListener('click', e => { if (!e.target.closest('.quota')) closeQuotaPops(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') dismissQuotaPops(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshQuota(); });
 
 function renderReviewSection(quiet = false) {
