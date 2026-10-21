@@ -19,6 +19,7 @@ from starlette.datastructures import UploadFile
 
 import store
 from accounts import current_user, router as accounts_router
+from admin import router as admin_router
 from charts import CHART_RULES, MAX_CHARTS_PER_SLIDE, ChartSpec, normalize_charts
 from exporter import ExportError, build_pptx
 from extract import MAX_UPLOAD_BYTES, ExtractError, extract_text
@@ -593,6 +594,7 @@ def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict =
             raise HTTPException(status_code=500, detail=str(e))
 
 app.include_router(accounts_router)
+app.include_router(admin_router)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/favicon.ico", include_in_schema=False)
@@ -602,6 +604,10 @@ async def favicon():
 @app.get("/")
 async def root():
     return FileResponse(STATIC_DIR / "index.html")
+
+@app.get("/admin", include_in_schema=False)
+async def admin_page():
+    return FileResponse(STATIC_DIR / "admin.html")
 
 if __name__ == "__main__":
     import uvicorn
