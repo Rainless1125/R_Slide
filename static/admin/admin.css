@@ -7,14 +7,20 @@
 
 .admin-badge {
     display: inline-block;
-    margin-left: .25rem;
-    padding: .05rem .5rem;
-    border-radius: 9999px;
+    margin-left: .35rem;
+    padding: 0 .45rem;
+    border: 1px solid #e4e4e7;
+    border-radius: .375rem;
     font-size: .7rem;
-    font-weight: 700;
+    font-weight: 600;
+    line-height: 1.25rem;
     vertical-align: middle;
-    color: #fff;
-    background: linear-gradient(90deg, #3b82f6, #a855f7, #ec4899);
+    color: #71717a;
+}
+
+.dark .admin-badge {
+    border-color: #3f3f46;
+    color: #a1a1aa;
 }
 
 /* ---------- 分頁 ---------- */
