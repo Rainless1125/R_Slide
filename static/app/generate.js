@@ -270,9 +270,129 @@ async function startGeneration() {
         showToast('版面生成完成，已存入歷史記錄', 'success', 2200);
     } catch (err) {
         setLoading(false);
-        if (!err.handled) showToast(friendlyError(err), 'error', 8000, { label: '重試', onClick: startGeneration });
+        if (!err.handled) showToast(friendlyError(err), 'error', 8000, retryAction(err, startGeneration));
+    }
+    refreshQuota();                // 成功或失敗都算次數
+}
+
+/* ===================== 剩餘次數 =====================
+ * 伺服器限制每個帳號 1 小時內與 24 小時內的生成 / 重產次數（兩者合併計算，失敗的呼叫也算；見 store.begin_llm_call），
+ * 剩餘次數顯示在生成按鈕旁與重產視窗。上限設為 0（不限制）的區間伺服器回傳 null，不顯示 */
+let llmQuota = null;
+let quotaTimer = null;
+
+async function refreshQuota() {
+    clearTimeout(quotaTimer);
+    if (!currentUser) { llmQuota = null; renderQuota(); return; }
+    try {
+        const res = await fetch('/api/quota');
+        llmQuota = res.ok ? await res.json() : null;
+    } catch (_) { llmQuota = null; }
+    renderQuota();
+    // 用完時到恢復的時間點（最多每分鐘）再查一次，倒數與按鈕旁的文字才會跟著更新
+    const waits = ['hour', 'day'].map(k => llmQuota?.[k]?.reset_in).filter(Boolean);
+    if (waits.length) quotaTimer = setTimeout(refreshQuota, Math.min(60, Math.max(...waits) + 1) * 1000);
+}
+
+// 次數已達上限（伺服器的 429 訊息以「本帳號」開頭）時重試一定也會被擋，錯誤提示不放「重試」按鈕
+function retryAction(err, onClick) {
+    return err?.status === 429 && /^本帳號/.test(err.message || '') ? null : { label: '重試', onClick };
+}
+
+function fmtQuotaWait(seconds) {
+    const m = Math.ceil(seconds / 60);
+    return m < 60 ? `${m} 分鐘` : `${Math.floor(m / 60)} 小時` + (m % 60 ? ` ${m % 60} 分鐘` : '');
+}
+
+// 剩 3 次以內提醒，用完時顯示恢復時間
+function quotaState(q) { return !q.remaining ? 'out' : q.remaining <= 3 ? 'low' : 'ok'; }
+
+function quotaRow(label, q) {
+    const pct = Math.min(100, Math.round(q.used / q.limit * 100));
+    return `<div class="quota-row" data-state="${quotaState(q)}">
+  <div class="quota-row-head"><span>${label}</span><span>已用 <b>${Math.min(q.used, q.limit)} / ${q.limit}</b> 次</span></div>
+  <div class="quota-bar" role="progressbar" aria-label="${label}已用次數" aria-valuemin="0" aria-valuemax="${q.limit}" aria-valuenow="${Math.min(q.used, q.limit)}"><i style="width:${pct}%"></i></div>
+  ${q.remaining ? '' : `<div class="quota-reset">已達上限，${fmtQuotaWait(q.reset_in)}後恢復</div>`}
+</div>`;
+}
+
+function renderQuota() {
+    const rows = llmQuota ? [['1 小時內', llmQuota.hour], ['24 小時內', llmQuota.day]].filter(([, q]) => q) : [];
+    // 圖示的顏色依兩個區間中較少的剩餘次數：那才是目前真正還能用的次數
+    const tight = rows.length ? rows.map(([, q]) => q).reduce((a, b) => (b.remaining < a.remaining ? b : a)) : null;
+    const summary = rows.map(([label, q]) => `${label}剩 ${q.remaining} / ${q.limit} 次`).join('，');
+    const html = tight ? `
+<button type="button" class="quota-chip" data-state="${quotaState(tight)}" aria-label="用量限制：${summary}" aria-expanded="false" onclick="toggleQuotaPop(this)">
+  <i class="fa-regular fa-clock" aria-hidden="true"></i><span>用量限制</span>
+</button>
+<div class="quota-pop" role="tooltip">
+  <div class="quota-pop-title"><i class="fa-regular fa-clock text-violet-500" aria-hidden="true"></i>用量限制</div>
+  ${rows.map(([label, q]) => quotaRow(label, q)).join('')}
+  <p class="quota-note">生成與重產合併計算，失敗的生成也會算一次</p>
+</div>` : '';
+    ['quotaInfo', 'regenQuotaInfo'].forEach(id => {
+        const el = document.getElementById(id);
+        const open = el.classList.contains('open');              // 更新數字時保留觸控開啟的狀態
+        el.innerHTML = html;
+        el.classList.toggle('hidden', !html);
+        el.classList.toggle('open', open && !!html);
+        el.querySelector('.quota-chip')?.setAttribute('aria-expanded', String(open && !!html));
+    });
+}
+
+// 觸控裝置沒有 hover：點一下圖示開關浮框，點其他地方或按 Esc 關閉
+function toggleQuotaPop(btn) {
+    const wrap = btn.closest('.quota');
+    const open = !wrap.classList.contains('open');
+    closeQuotaPops();
+    placeQuotaPop(wrap);
+    wrap.classList.remove('dismissed');
+    wrap.classList.toggle('open', open);
+    btn.setAttribute('aria-expanded', String(open));
+}
+function closeQuotaPops() {
+    document.querySelectorAll('.quota.open').forEach(w => {
+        w.classList.remove('open');
+        w.querySelector('.quota-chip')?.setAttribute('aria-expanded', 'false');
+    });
+}
+// Esc 也要收起滑鼠 hover 或鍵盤聚焦顯示的浮框：標記 dismissed，滑鼠再次移入或焦點從外面移進來時恢復
+function dismissQuotaPops() {
+    closeQuotaPops();
+    document.querySelectorAll('.quota').forEach(w => {
+        if (w.matches(':hover') || w.contains(document.activeElement)) w.classList.add('dismissed');
+    });
+}
+['quotaInfo', 'regenQuotaInfo'].forEach(id => {
+    const w = document.getElementById(id);
+    w.addEventListener('mouseenter', () => w.classList.remove('dismissed'));
+    w.addEventListener('focusin', e => { if (!w.contains(e.relatedTarget)) w.classList.remove('dismissed'); });
+});
+// 浮框預設對齊圖示的左緣或右緣（data-align），超出視窗時往內推，手機上圖示不在最右邊也不會被切掉；
+// 預設往上開，上方空間被固定的頂部標題列擋住時改往下開
+function placeQuotaPop(wrap) {
+    const pop = wrap.querySelector('.quota-pop');
+    if (!pop) return;
+    pop.style.left = pop.style.right = '';
+    const r = wrap.getBoundingClientRect(), w = pop.offsetWidth, margin = 16, vw = document.documentElement.clientWidth;
+    const header = document.getElementById('topHeader').getBoundingClientRect();
+    const top = Math.max(0, header.bottom);
+    wrap.classList.toggle('below', r.top - top < pop.offsetHeight + margin && window.innerHeight - r.bottom > r.top - top);
+    if (wrap.dataset.align === 'right') {
+        const shift = Math.max(0, margin - (r.right - w));          // 浮框左緣超出視窗的距離
+        if (shift) pop.style.right = -shift + 'px';
+    } else {
+        const shift = Math.max(0, r.left + w - (vw - margin));
+        if (shift) pop.style.left = -shift + 'px';
     }
 }
+['mouseover', 'focusin'].forEach(type => document.addEventListener(type, e => {
+    const wrap = e.target.closest?.('.quota');
+    if (wrap) placeQuotaPop(wrap);
+}));
+document.addEventListener('click', e => { if (!e.target.closest('.quota')) closeQuotaPops(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') dismissQuotaPops(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshQuota(); });
 
 function renderReviewSection(quiet = false) {
     const review = document.getElementById('sectionReview');
@@ -425,6 +545,7 @@ function openRegenerateModal(idx) {
     document.querySelectorAll('input[name="regenDeckMode"]').forEach(r => { r.checked = r.value === mode; });
     modal.classList.remove('hidden');
     setTimeout(() => ta.focus(), 0);
+    refreshQuota();
 }
 
 function closeRegenerateModal(force = false) {
@@ -537,7 +658,7 @@ async function regenerateSingleSlide(idx, customPrompt = '', deckMode) {
         if (modalOpen) closeRegenerateModal(true);
         showToast(`第 ${at + 1} 頁已重產完成`, 'success', 2200);
     } catch (err) {
-        if (!err.handled) showToast(friendlyError(err), 'error', 8000, { label: '重試', onClick: () => regenerateSingleSlide(idx, customPrompt, mode) });
+        if (!err.handled) showToast(friendlyError(err), 'error', 8000, retryAction(err, () => regenerateSingleSlide(idx, customPrompt, mode)));
     } finally {
         setReviewRegenerateState(idx, false);
         setCurrentRegenerateState(false);
@@ -548,5 +669,6 @@ async function regenerateSingleSlide(idx, customPrompt = '', deckMode) {
         modalCancelBtn.disabled = false;
         modalConfirmIcon.className = 'fa-solid fa-arrows-rotate text-[11px]';
         modalConfirmLabel.textContent = '確認重產';
+        refreshQuota();
     }
 }

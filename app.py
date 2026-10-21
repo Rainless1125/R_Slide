@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
@@ -206,8 +206,20 @@ def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
 @contextmanager
 def llm_usage_log(request: Request, user: dict, action: str, req):
     """記錄一次 LLM 呼叫（成功或失敗都記）；區塊內把 usage 傳給 call_llm 以填入模型與 token 數。
-    紀錄寫入失敗只記 log，不影響使用者的生成結果。"""
+    進入區塊前先檢查該帳號的次數上限並登記（見 store.begin_llm_call），超過上限時回 429、不呼叫 LLM。
+    結束時的紀錄更新失敗只記 log，不影響使用者的生成結果。"""
     usage = {"provider": (req.provider or "gemini").lower(), "model": req.model}
+    base = {
+        "user_id": user["id"], "username": user["username"], "action": action,
+        "deck_mode": req.deck_mode, "num_pages": req.num_pages, "input_chars": len(req.content),
+        "content_hash": hashlib.sha256(req.content.encode()).hexdigest(),
+        # 部署於反向代理之後時，uvicorn 的 --forwarded-allow-ips 決定是否採用 X-Forwarded-For
+        "client_ip": request.client.host if request.client else None,
+    }
+    try:
+        usage_id = store.begin_llm_call({**base, **usage})
+    except store.LlmRateLimited as e:
+        raise HTTPException(status_code=429, detail=str(e), headers={"Retry-After": str(e.retry_after)})
     status, http_status, error = "ok", 200, None
     start = time.monotonic()
     try:
@@ -220,14 +232,9 @@ def llm_usage_log(request: Request, user: dict, action: str, req):
         raise
     finally:
         try:
-            store.log_llm_usage({
-                **usage, "user_id": user["id"], "username": user["username"], "action": action,
-                "deck_mode": req.deck_mode, "num_pages": req.num_pages, "input_chars": len(req.content),
-                "content_hash": hashlib.sha256(req.content.encode()).hexdigest(),
-                "status": status, "http_status": http_status, "error": error[:200] if error else None,
-                "latency_ms": int((time.monotonic() - start) * 1000),
-                # 部署於反向代理之後時，uvicorn 的 --forwarded-allow-ips 決定是否採用 X-Forwarded-For
-                "client_ip": request.client.host if request.client else None,
+            store.finish_llm_call(usage_id, {
+                **base, **usage, "status": status, "http_status": http_status,
+                "error": error[:200] if error else None, "latency_ms": int((time.monotonic() - start) * 1000),
             })
         except Exception:
             logger.exception("寫入 LLM 使用紀錄失敗")
@@ -263,6 +270,18 @@ class AdaptivePresentation(BaseModel):
 
 MAX_CONTENT_CHARS = 50_000
 MAX_PAGES = 20
+# 生成與重產的欄位上限：送進 LLM 的提示詞都由這些欄位組成，避免超大請求消耗大量 token（前端輸入框也有相同上限）
+MAX_LLM_BODY_BYTES = 2 * 1024 * 1024          # 重產會送回整份簡報（圖片已換成 rs-img 代號），正常遠小於此
+MAX_AUDIENCE_CHARS = 200
+MAX_STYLE_CHARS = 1000                        # 自訂配色組出的風格描述約 300 字
+MAX_TITLE_CHARS = 200
+MAX_CUSTOM_PROMPT_CHARS = 2000
+MAX_MODEL_CHARS = 100
+MAX_REGEN_SLIDES = 60                         # 與 PPTX 匯出的頁數上限相同
+MAX_SLIDE_META_CHARS = 500                    # 每頁的標題與版型概念（組成整份簡報大綱）
+MAX_SLIDE_HTML_CHARS = 50_000
+MAX_SLIDE_NOTES_CHARS = 5000
+MAX_SLIDE_CHARTS_CHARS = 20_000
 
 # 投影片固定以 1024×576 px 渲染（static/index.html 與 export.js 的 .slide-scaler），超出部分會被裁掉
 SLIDE_LAYOUT_RULES = """
@@ -327,6 +346,21 @@ DECK_MODE_LABELS = {"speaker": "簡易模式（演講型 / Speaker Deck）", "do
 DeckMode = Literal["speaker", "document"]
 
 
+def check_field_lengths(req):
+    """欄位超過上限時回 400（訊息直接顯示給使用者）；在登記呼叫次數之前檢查，格式不符的請求不算次數。"""
+    if not req.content.strip():
+        raise HTTPException(status_code=400, detail="請提供輸入內容")
+    limits = [("內容", req.content, MAX_CONTENT_CHARS), ("目標受眾", req.target_audience, MAX_AUDIENCE_CHARS),
+              ("視覺風格", req.style_preference, MAX_STYLE_CHARS), ("平台", req.provider, MAX_MODEL_CHARS),
+              ("模型名稱", req.model, MAX_MODEL_CHARS)]
+    if isinstance(req, RegenerateSlideRequest):
+        limits += [("簡報標題", req.presentation_title, MAX_TITLE_CHARS),
+                   ("重產提示詞", req.custom_prompt, MAX_CUSTOM_PROMPT_CHARS)]
+    for label, value, limit in limits:
+        if len(value) > limit:
+            raise HTTPException(status_code=400, detail=f"{label}過長（上限 {limit:,} 字）")
+
+
 class GenerateRequest(BaseModel):
     content: str
     target_audience: str = "商務主管 / 技術決策者"
@@ -350,6 +384,20 @@ class RegenerateSlideRequest(BaseModel):
     model: str = ""
 
 # 2. API 端點
+LLM_PATHS = {"/api/generate", "/api/regenerate-slide"}
+
+
+@app.middleware("http")
+async def limit_llm_body(request: Request, call_next):
+    """生成與重產的請求在解析 JSON 之前先以 Content-Length 擋下過大的請求（其他 API 各自檢查）。"""
+    if request.method == "POST" and request.url.path in LLM_PATHS:
+        length = request.headers.get("content-length")
+        if not length or not length.isdigit():
+            return JSONResponse({"detail": "缺少 Content-Length"}, status_code=411)
+        if int(length) > MAX_LLM_BODY_BYTES:
+            return JSONResponse({"detail": "請求內容過大，請精簡素材或投影片內容後再試"}, status_code=413)
+    return await call_next(request)
+
 @app.get("/api/models")
 async def list_models():
     return {
@@ -357,13 +405,15 @@ async def list_models():
         for provider, models in MODEL_CATALOG.items()
     }
 
+@app.get("/api/quota")
+def llm_quota(user: dict = Depends(current_user)):
+    """目前帳號的生成 / 重產剩餘次數；hour、day 為 null 表示該區間不限制。"""
+    return store.llm_quota(user["id"])
+
 @app.post("/api/generate")
 def generate_slides(req: GenerateRequest, request: Request, user: dict = Depends(current_user)):
-    if not req.content.strip():
-        raise HTTPException(status_code=400, detail="請提供輸入內容")
-    if len(req.content) > MAX_CONTENT_CHARS:
-        raise HTTPException(status_code=400, detail=f"內容過長（上限 {MAX_CONTENT_CHARS} 字）")
-    
+    check_field_lengths(req)
+
     system_instruction = """
     你是一位榮獲世界設計大獎的簡報架構與 UI 設計師。
     你的任務是將使用者提供的原始內容，規劃為多頁「版面各異、針對內容最適化」的現代簡報。
@@ -462,16 +512,23 @@ async def export_pptx(request: Request):
 
 @app.post("/api/regenerate-slide")
 def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict = Depends(current_user)):
-    if not req.content.strip():
-        raise HTTPException(status_code=400, detail="請提供輸入內容")
-    if len(req.content) > MAX_CONTENT_CHARS:
-        raise HTTPException(status_code=400, detail=f"內容過長（上限 {MAX_CONTENT_CHARS} 字）")
+    check_field_lengths(req)
     if not req.slides:
         raise HTTPException(status_code=400, detail="缺少原始投影片資料")
+    if len(req.slides) > MAX_REGEN_SLIDES:
+        raise HTTPException(status_code=400, detail=f"投影片超過 {MAX_REGEN_SLIDES} 頁，無法重產")
     if req.slide_index < 0 or req.slide_index >= len(req.slides):
         raise HTTPException(status_code=400, detail="slide_index 超出範圍")
+    if any(len(s.slide_title) > MAX_SLIDE_META_CHARS or len(s.layout_concept) > MAX_SLIDE_META_CHARS for s in req.slides):
+        raise HTTPException(status_code=400, detail=f"投影片標題或版型說明過長（上限 {MAX_SLIDE_META_CHARS} 字）")
 
     target_slide = req.slides[req.slide_index]
+    if len(target_slide.html_content) > MAX_SLIDE_HTML_CHARS:
+        raise HTTPException(status_code=400, detail="此頁內容過多，無法重產；請先刪減此頁的元素後再試")
+    if len(target_slide.speaker_notes) > MAX_SLIDE_NOTES_CHARS:
+        raise HTTPException(status_code=400, detail=f"此頁講者備註過長（上限 {MAX_SLIDE_NOTES_CHARS:,} 字）")
+    if len(json.dumps(target_slide.charts, ensure_ascii=False)) > MAX_SLIDE_CHARTS_CHARS:
+        raise HTTPException(status_code=400, detail="此頁圖表資料過多，無法重產")
     deck_outline = "\n".join(
         f"- 第 {s.page_number} 頁｜{s.slide_title}｜{s.layout_concept}"
         for s in req.slides

@@ -65,9 +65,10 @@ def show_usage(args: list[str]):
         if not rows:
             print(f"最近 {days} 天沒有 LLM 使用紀錄")
             return
-        print(f"最近 {days} 天各使用者的 LLM 用量（同素材生成 = 同一份素材被送去生成的最多次數）")
-        print_table(["帳號", "呼叫", "失敗", "生成", "重產", "輸入 tokens", "輸出 tokens", "合計 tokens", "同素材生成", "最後使用"],
-                    [[r["username"], r["calls"], r["errors"], r["generates"], r["regenerates"], f"{r['input_tokens']:,}",
+        print(f"最近 {days} 天各使用者的 LLM 用量（限流 = 超過次數上限被擋下、未呼叫 LLM 的次數；"
+              "同素材生成 = 同一份素材被送去生成的最多次數）")
+        print_table(["帳號", "呼叫", "失敗", "限流", "生成", "重產", "輸入 tokens", "輸出 tokens", "合計 tokens", "同素材生成", "最後使用"],
+                    [[r["username"], r["calls"], r["errors"], r["rate_limited"], r["generates"], r["regenerates"], f"{r['input_tokens']:,}",
                       f"{r['output_tokens']:,}", f"{r['total_tokens']:,}", r["max_same_content"] or 0,
                       fmt_time(r["last_used"])] for r in rows])
     elif len(args) == 1:

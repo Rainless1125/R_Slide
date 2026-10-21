@@ -100,6 +100,8 @@ function friendlyError(err) {
     const has = re => re.test(raw);
     let msg;
     if (err?.name === 'TypeError' && has(/fetch|network/i)) msg = '無法連線到伺服器，請確認網路或服務是否仍在執行。';
+    // 伺服器自己的次數上限與請求大小限制（訊息已說明原因與等待時間），不要誤判成 LLM 平台的額度問題
+    else if ((status === 429 || status === 413) && has(/^本帳號|請求內容過大/)) msg = raw;
     else if (status === 413) msg = '檔案過大，超過伺服器允許的上傳大小。';
     else if (has(/未設定\s*(GEMINI|OPENAI)_API_KEY/i)) msg = '尚未設定此平台的 API Key，請改選其他平台，或到 .env 補上金鑰。';
     else if (status === 401 || status === 403 || has(/api[_ ]?key.*(invalid|not valid|expired)|incorrect api key|unauthorized|permission[_ ]denied|UNAUTHENTICATED/i)) msg = 'API Key 無效或沒有權限，請檢查 .env 內的金鑰。';
