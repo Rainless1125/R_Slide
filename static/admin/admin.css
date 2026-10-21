@@ -1,0 +1,267 @@
+/* R Slide 後台樣式：背景光暈、卡片陰影與 toast 沿用 static/app/app.css */
+#adminMain,
+#loginView {
+    position: relative;
+    z-index: 1;
+}
+
+.admin-badge {
+    display: inline-block;
+    margin-left: .25rem;
+    padding: .05rem .5rem;
+    border-radius: 9999px;
+    font-size: .7rem;
+    font-weight: 700;
+    vertical-align: middle;
+    color: #fff;
+    background: linear-gradient(90deg, #3b82f6, #a855f7, #ec4899);
+}
+
+/* ---------- 分頁 ---------- */
+.admin-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    height: 2.25rem;
+    padding: 0 .9rem;
+    border-radius: 9999px;
+    font-size: .8rem;
+    font-weight: 600;
+    color: #52525b;
+    transition: background-color .2s, color .2s;
+}
+
+.admin-tab:hover {
+    background: #f4f4f5;
+}
+
+.admin-tab[aria-selected="true"] {
+    background: #000;
+    color: #fff;
+}
+
+.dark .admin-tab {
+    color: #d4d4d8;
+}
+
+.dark .admin-tab:hover {
+    background: #27272a;
+}
+
+.dark .admin-tab[aria-selected="true"] {
+    background: #fff;
+    color: #000;
+}
+
+/* ---------- 卡片與表單 ---------- */
+.admin-card {
+    border-radius: 1rem;
+    border: 1px solid #e4e4e7;
+    background: rgba(255, 255, 255, .9);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 12px 40px -12px rgba(88, 28, 135, .18);
+}
+
+.dark .admin-card {
+    border-color: #27272a;
+    background: rgba(24, 24, 27, .9);
+    box-shadow: 0 0 0 1px rgba(168, 85, 247, .12), 0 20px 50px -20px rgba(168, 85, 247, .35);
+}
+
+.admin-input {
+    width: 100%;
+    height: 2.5rem;
+    padding: 0 .75rem;
+    border-radius: .5rem;
+    border: 1px solid #e4e4e7;
+    background: #fafafa;
+    font-size: .875rem;
+    transition: box-shadow .2s, border-color .2s;
+}
+
+.dark .admin-input {
+    border-color: #27272a;
+    background: #09090b;
+    color: #f4f4f5;
+}
+
+.admin-input:focus {
+    outline: none;
+    border-color: #a855f7;
+    box-shadow: 0 0 0 3px rgba(168, 85, 247, .3);
+}
+
+.admin-btn-primary,
+.admin-btn-ghost,
+.admin-btn-danger {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    height: 2.5rem;
+    padding: 0 1rem;
+    border-radius: .5rem;
+    font-size: .85rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background-color .2s, color .2s, transform .15s;
+}
+
+.admin-btn-primary {
+    background: #000;
+    color: #fff;
+}
+
+.admin-btn-primary:hover {
+    background: #27272a;
+}
+
+.dark .admin-btn-primary {
+    background: #fff;
+    color: #000;
+}
+
+.dark .admin-btn-primary:hover {
+    background: #e4e4e7;
+}
+
+.admin-btn-primary.danger {
+    background: #dc2626;
+    color: #fff;
+}
+
+.admin-btn-primary.danger:hover {
+    background: #b91c1c;
+}
+
+.admin-btn-primary:disabled {
+    opacity: .5;
+}
+
+.admin-btn-ghost {
+    color: #52525b;
+    border: 1px solid #e4e4e7;
+    background: rgba(255, 255, 255, .8);
+}
+
+.admin-btn-ghost:hover {
+    background: #f4f4f5;
+}
+
+.dark .admin-btn-ghost {
+    color: #d4d4d8;
+    border-color: #27272a;
+    background: rgba(24, 24, 27, .8);
+}
+
+.dark .admin-btn-ghost:hover {
+    background: #27272a;
+}
+
+.admin-btn-sm {
+    height: 1.9rem;
+    padding: 0 .6rem;
+    font-size: .75rem;
+}
+
+.admin-btn-ghost.danger:hover {
+    color: #dc2626;
+    border-color: #fca5a5;
+}
+
+/* ---------- 表格 ---------- */
+.admin-table {
+    width: 100%;
+    font-size: .8rem;
+    border-collapse: collapse;
+}
+
+.admin-table th {
+    padding: .6rem 1rem;
+    text-align: left;
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: #a1a1aa;
+    background: rgba(244, 244, 245, .6);
+}
+
+.dark .admin-table th {
+    background: rgba(39, 39, 42, .4);
+}
+
+.admin-table td {
+    padding: .65rem 1rem;
+    border-top: 1px solid #f4f4f5;
+    white-space: nowrap;
+}
+
+.dark .admin-table td {
+    border-top-color: #27272a;
+}
+
+.admin-table .num,
+.admin-table .text-right {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.admin-table tr.clickable {
+    cursor: pointer;
+}
+
+.admin-table tr.clickable:hover td {
+    background: rgba(168, 85, 247, .06);
+}
+
+.admin-table tr.detail td {
+    padding: 0;
+    background: rgba(244, 244, 245, .5);
+}
+
+.dark .admin-table tr.detail td {
+    background: rgba(9, 9, 11, .5);
+}
+
+.admin-table .empty {
+    padding: 2.5rem 1rem;
+    text-align: center;
+    color: #a1a1aa;
+}
+
+/* ---------- 總覽數字 ---------- */
+.stat-tile {
+    padding: 1.1rem 1.2rem;
+}
+
+.stat-tile .label {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: .75rem;
+    font-weight: 600;
+    color: #71717a;
+}
+
+.dark .stat-tile .label {
+    color: #a1a1aa;
+}
+
+.stat-tile .value {
+    margin-top: .4rem;
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums;
+}
+
+.stat-tile .sub {
+    margin-top: .15rem;
+    font-size: .7rem;
+    color: #a1a1aa;
+}
+
+.stars {
+    color: #f59e0b;
+    letter-spacing: .05em;
+}

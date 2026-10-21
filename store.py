@@ -97,6 +97,12 @@ CREATE TABLE IF NOT EXISTS login_lockouts (
     ip           TEXT PRIMARY KEY,
     locked_until INTEGER NOT NULL         -- 毫秒
 );
+-- 後台管理者的登入 session（帳號密碼設定於 .env，見 admin.py）；cred_mac 用來在 .env 改密碼後讓舊 session 失效
+CREATE TABLE IF NOT EXISTS admin_sessions (
+    token_hash TEXT PRIMARY KEY,
+    cred_mac   TEXT NOT NULL,
+    expires_at INTEGER NOT NULL           -- 秒
+);
 """
 
 
@@ -570,3 +576,78 @@ def list_feedback(since_ms: int, username: str | None = None) -> list[dict]:
     with connect() as conn:
         rows = conn.execute(sql + " ORDER BY created_at DESC, id DESC", args).fetchall()
     return [dict(r) for r in rows]
+
+
+# ===================== 後台管理 =====================
+def list_users() -> list[dict]:
+    """後台帳號列表：歷史記錄筆數與最後一次呼叫 LLM 的時間。"""
+    with connect() as conn:
+        rows = conn.execute("""
+            SELECT u.id, u.username, u.created_at,
+                   (SELECT COUNT(*) FROM history h WHERE h.user_id = u.id) AS history_count,
+                   (SELECT MAX(created_at) FROM llm_usage l WHERE l.user_id = u.id) AS last_used
+            FROM users u ORDER BY u.username""").fetchall()
+    return [dict(r) for r in rows]
+
+
+def delete_user(username: str) -> bool:
+    """刪除帳號（歷史記錄與登入 session 一併刪除）；LLM 使用紀錄與意見回饋保留供稽核。"""
+    with connect() as conn:
+        cur = conn.execute("DELETE FROM users WHERE username = ?", (username,))
+        return cur.rowcount > 0
+
+
+def admin_overview(since_ms: int) -> dict:
+    """後台總覽的統計數字；llm_* 與 feedback_* 只計 since_ms 之後的紀錄。"""
+    with connect() as conn:
+        one = lambda sql, *args: conn.execute(sql, args).fetchone()
+        llm = one("SELECT SUM(status != 'rate_limited') AS calls, SUM(status = 'error') AS errors, "
+                  "SUM(status = 'rate_limited') AS rate_limited, COALESCE(SUM(total_tokens), 0) AS total_tokens, "
+                  "COUNT(DISTINCT CASE WHEN status != 'rate_limited' THEN user_id END) AS active_users "
+                  "FROM llm_usage WHERE created_at >= ?", since_ms)
+        fb = one("SELECT COUNT(*) AS n, AVG(rating) AS avg_rating, COUNT(rating) AS rated "
+                 "FROM feedback WHERE created_at >= ?", since_ms)
+        return {
+            "users": one("SELECT COUNT(*) FROM users")[0],
+            "history": one("SELECT COUNT(*) FROM history")[0],
+            "llm_calls": llm["calls"] or 0, "llm_errors": llm["errors"] or 0,
+            "llm_rate_limited": llm["rate_limited"] or 0, "llm_total_tokens": llm["total_tokens"],
+            "active_users": llm["active_users"] or 0,
+            "feedback": fb["n"], "feedback_rated": fb["rated"],
+            "feedback_avg_rating": round(fb["avg_rating"], 2) if fb["avg_rating"] is not None else None,
+            "lockouts": one("SELECT COUNT(*) FROM login_lockouts WHERE locked_until > ?", now_ms())[0],
+        }
+
+
+ADMIN_SESSION_TTL_SECONDS = 8 * 3600
+
+
+def _admin_cred_mac(token: str, credentials: str) -> str:
+    # 以 session token 為金鑰：資料庫外流時沒有 token，無法拿 cred_mac 離線猜測管理者密碼
+    return hmac.new(token.encode(), credentials.encode(), hashlib.sha256).hexdigest()
+
+
+def create_admin_session(credentials: str) -> str:
+    token = secrets.token_urlsafe(32)
+    now = int(time.time())
+    with connect() as conn:
+        conn.execute("DELETE FROM admin_sessions WHERE expires_at < ?", (now,))
+        conn.execute("INSERT INTO admin_sessions (token_hash, cred_mac, expires_at) VALUES (?, ?, ?)",
+                     (_token_hash(token), _admin_cred_mac(token, credentials), now + ADMIN_SESSION_TTL_SECONDS))
+    return token
+
+
+def admin_session_valid(token: str | None, credentials: str) -> bool:
+    """token 未過期，且建立時的管理者帳號密碼與目前 .env 的設定相同。"""
+    if not token:
+        return False
+    with connect() as conn:
+        row = conn.execute("SELECT cred_mac FROM admin_sessions WHERE token_hash = ? AND expires_at >= ?",
+                           (_token_hash(token), int(time.time()))).fetchone()
+    return row is not None and hmac.compare_digest(row["cred_mac"], _admin_cred_mac(token, credentials))
+
+
+def delete_admin_session(token: str | None):
+    if token:
+        with connect() as conn:
+            conn.execute("DELETE FROM admin_sessions WHERE token_hash = ?", (_token_hash(token),))

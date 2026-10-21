@@ -24,6 +24,7 @@
 - **帳號與歷史記錄**:以帳號密碼登入,每位使用者的簡報歷史記錄分開存放於伺服器的 SQLite 檔案,換電腦或瀏覽器也能接續使用。
 - **使用教學**:右上角深色 / 淺色模式切換旁的「?」可開啟使用教學,依章節說明輸入、審查、播放、編輯、匯出與快捷鍵。
 - **意見回饋**:使用教學旁的對話框圖示可為使用體驗評 1~5 星並輸入一段意見文字(兩者至少擇一,文字上限 2,000 字,`Ctrl` / `⌘` + `Enter` 送出),存於伺服器的 `feedback` 資料表,管理者以 `manage_users.py feedback` 查看;每個帳號每小時最多送出 10 則。
+- **後台管理頁面**:開啟 `/admin`,以 `.env` 設定的管理者帳號密碼登入,即可在網頁上查看總覽、建立 / 刪除帳號、重設密碼、查詢各使用者的 LLM 用量、瀏覽意見回饋與解除 IP 鎖定,不必再到伺服器上執行 `manage_users.py`。
 - **輕量部署**:後端為單一 FastAPI 服務,前端為靜態檔案;資料庫為內建的 SQLite,不需另外架設資料庫伺服器。
 
 > **編輯模式的限制**:LLM 生成的版面目前**只能修改文字與樣式**(字級、粗細、對齊、顏色、圓角),以及調整同層順序、複製或刪除元素,**無法自由拖曳移動或縮放**;LLM 產生的圖表也只能修改數據,位置與大小固定。若需要自由擺放,請使用編輯模式的「插入文字」「插入圖片」「插入圖表」「插入圖示」「插入圖案」,自行插入的內容可以拖曳移動、拉角落調整大小。
@@ -104,7 +105,35 @@ DATABRICKS_MODELS=databricks-claude-sonnet-4-5,databricks-gpt-oss-120b
 | `LLM_RATE_LIMIT_PER_DAY` | 每個帳號 24 小時內最多可生成 / 重產幾次,`0` 為不限制 | `100` |
 | `LLM_MAX_CONCURRENT` | 每個帳號同時最多進行幾個生成 / 重產,`0` 為不限制 | `2` |
 
-管理員可在伺服器上以指令管理帳號:
+### 後台管理頁面
+
+在 `.env` 設定管理者帳號密碼並重新啟動服務後,開啟 <http://127.0.0.1:8000/admin> 登入:
+
+```env
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=<至少 8 個字元,需包含英文字母與數字>
+```
+
+| 分頁 | 功能 |
+|------|------|
+| 總覽 | 帳號數、歷史記錄筆數、LLM 呼叫次數與 token 合計、意見回饋與平均評分、目前被鎖定的 IP 數 |
+| 帳號 | 建立帳號、重設密碼(該帳號所有裝置需重新登入)、刪除帳號(歷史記錄一併刪除,LLM 使用紀錄與意見回饋保留) |
+| LLM 用量 | 各使用者的用量,點選一列展開按日、模型的明細(同 `manage_users.py usage`) |
+| 意見回饋 | 評分與意見文字,可只看某個帳號(同 `manage_users.py feedback`) |
+| IP 鎖定 | 目前被鎖定的 IP,可提前解除(同 `manage_users.py lockouts` / `unlock`) |
+
+- 兩項都沒設定、或密碼不符合規則時後台不會啟用,`/admin` 只會顯示設定說明。
+- 管理者不是一般帳號:無法用它登入主畫面,一般使用者也無法登入後台。
+- 後台登入與一般登入共用同一套 IP 失敗鎖定(30 分鐘內失敗 5 次即鎖定 30 分鐘)。
+- 後台登入狀態為 HttpOnly、SameSite=Strict 的 cookie,有效 8 小時;修改 `.env` 的帳號或密碼並重新啟動後,已登入的後台 session 立即失效。
+- 服務對外開放時,建議在反向代理層另外限制 `/admin` 與 `/api/admin/` 只允許內網存取。
+
+| 變數 | 說明 | 預設 |
+|------|------|------|
+| `ADMIN_USERNAME` | 後台管理者帳號 | 未設定(不啟用後台) |
+| `ADMIN_PASSWORD` | 後台管理者密碼,8~128 個字元且至少包含一個英文字母與一個數字 | 未設定(不啟用後台) |
+
+管理員也可在伺服器上以指令管理帳號:
 
 ```bash
 python manage_users.py list                    # 列出帳號與紀錄筆數
@@ -167,11 +196,13 @@ client_max_body_size 40m;   # 檔案匯入上限 10 MB;匯出 PPTX 與儲存單�
 charts.py         圖表資料的 schema、LLM 提示規則與正規化
 app.py            FastAPI 後端(/api/generate、/api/regenerate-slide、/api/extract、/api/export/pptx、/api/models)
 accounts.py       登入 / 註冊、歷史記錄與意見回饋 API(/api/auth/*、/api/history、/api/feedback)
-store.py          SQLite 資料存取(帳號、登入 session、登入失敗鎖定、歷史記錄、LLM 使用紀錄、意見回饋)
+admin.py          後台管理 API(/api/admin/*),管理者帳號密碼來自 .env
+store.py          SQLite 資料存取(帳號、登入 session、後台 session、登入失敗鎖定、歷史記錄、LLM 使用紀錄、意見回饋)
 manage_users.py   帳號管理指令(列出、建立帳號、重設密碼、解除 IP 鎖定、查詢 LLM 用量與意見回饋)
 extract.py        上傳檔案的文字抽取(PDF / DOCX / Markdown / TXT)
 exporter.py       將投影片圖片組成 PPTX(/api/export/pptx)
 static/index.html 前端介面(HTML 結構;樣式與程式在 static/app/)
+static/admin.html 後台管理頁面(/admin;樣式與程式在 static/admin/)
 static/app/       主畫面的樣式與程式,依功能分檔,以一般 <script> 依序載入、共用全域:
   app.css         主畫面樣式
   core.js         主題、全域狀態、小工具、錯誤訊息、歷史記錄、側邊欄
