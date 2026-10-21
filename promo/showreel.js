@@ -99,8 +99,6 @@ function init() {
   document.querySelectorAll('.ttl, .wordmark').forEach(splitChars);
   $('styleSlide').innerHTML = GATES;
   $('regenOld').innerHTML = GATES;
-  $('lgGem').setAttribute('d', LOGO_GEMINI);
-  $('lgOai').setAttribute('d', LOGO_OPENAI);
 
   // 講者檢視的縮圖：沿用其他場景的投影片
   const mk = (src, cls, scale) => {
@@ -138,7 +136,7 @@ function init() {
 
   const wm = $('outWord').getBoundingClientRect().width;
   const gx = 960 - (170 + 64 + wm) / 2;
-  G.outLogo = [gx, 340]; G.outWord = [gx + 170 + 64, 342];
+  G.outLogo = [gx, 360]; G.outWord = [gx + 170 + 64, 362];
   const iw = $('introWord').getBoundingClientRect().width;
   const ix = 960 - (170 + 64 + iw) / 2;
   G.introLogoEnd = ix; G.introWord = [ix + 170 + 64, 456];
@@ -381,10 +379,6 @@ UPD.s5 = (lt) => {
   hl.style.transform = `translateY(${hy}px)`;
   hl.style.opacity = prog(lt, 0.4, 0.6);
   items.forEach((li, i) => li.classList.toggle('on', i === STY[cur][2]));
-  // 模型
-  fadeUp($('models'), lt, 0.35, 0.4, 14);
-  const m = lt < 1.25 ? 0 : lt < 2.05 ? 1 : 2;
-  [0, 1, 2].forEach(i => $('m' + i).classList.toggle('on', i === m && lt > 0.5));
 };
 
 /* ---------- 06 REGENERATE ---------- */
@@ -476,8 +470,7 @@ UPD.outro = (lt) => {
   const line = $('outLine');
   line.style.transform = `scaleX(${lk})`; line.style.opacity = lk;
   fadeUp($('outTag'), lt, 0.6, 0.4, 20);
-  $('chips').querySelectorAll('span').forEach((s, i) => fadeUp(s, lt, 0.8 + i * 0.05, 0.35, 14));
-  fadeUp($('outUrl'), lt, 1.25, 0.4, 10);
+  fadeUp($('outUrl'), lt, 0.9, 0.4, 10);
 };
 
 /* ---------- 主 render ---------- */

@@ -42,8 +42,8 @@ body { font-family: "Inter", "Noto Sans TC", sans-serif; color: #fff; -webkit-fo
 .ttl .hl .ch { -webkit-background-clip: text; background-clip: text; color: transparent; }
 .sub { position: absolute; left: 122px; top: 268px; font-size: 26px; font-weight: 500; color: rgba(255,255,255,.55); letter-spacing: .03em; }
 
-.logo { position: absolute; width: 170px; height: 170px; border-radius: 38px; background: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 30px 80px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.4); }
-.logo span { font-family: "Inter"; font-weight: 900; font-size: 128px; color: #000; line-height: 1; margin-top: -6px; }
+.logo { position: absolute; width: 170px; height: 170px; border-radius: 34px; background: linear-gradient(135deg, #3b82f6, #a855f7 50%, #ec4899); display: flex; align-items: center; justify-content: center; box-shadow: 0 30px 80px -10px rgba(168,85,247,.55), inset 0 1px 0 rgba(255,255,255,.25); }
+.logo span { font-family: "Inter"; font-weight: 900; font-size: 116px; color: #fff; line-height: 1; margin-top: -4px; }
 .wordmark { position: absolute; font-family: "Inter"; font-weight: 900; font-size: 168px; letter-spacing: -.035em; color: #fff; white-space: nowrap; line-height: 1; }
 .wordmark .ch { display: inline-block; white-space: pre; }
 
@@ -179,18 +179,13 @@ body { font-family: "Inter", "Noto Sans TC", sans-serif; color: #fff; -webkit-fo
 .keys span { margin-left: 26px; color: rgba(196,181,253,.8); }
 
 /* ---------- 05 STYLES ---------- */
-.models { position: absolute; left: 122px; top: 280px; display: flex; align-items: center; gap: 12px; }
-.models span { display: flex; align-items: center; gap: 12px; padding: 10px 20px; border-radius: 14px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); font-size: 21px; font-weight: 700; color: rgba(255,255,255,.55); }
-.models span svg { width: 26px; height: 26px; } .models span i { font-size: 22px; }
-.models span.on { color: #fff; border-color: rgba(192,132,252,.85); background: rgba(139,92,246,.22); box-shadow: 0 0 30px rgba(168,85,247,.35); }
-.models em { font-style: normal; font-size: 14px; letter-spacing: .3em; color: rgba(255,255,255,.35); margin-left: 12px; }
 .styles { position: absolute; left: 120px; top: 380px; width: 330px; list-style: none; }
 .styles li { position: relative; z-index: 2; height: 52px; display: flex; align-items: center; gap: 8px; padding-left: 20px; font-size: 21px; font-weight: 600; color: rgba(255,255,255,.55); }
 .styles li i { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(255,255,255,.25); } .styles li i + i { margin-left: -14px; margin-right: 12px; }
 .styles li.on { color: #fff; }
 .sty-hl { position: absolute; z-index: 1; left: 0; top: 0; width: 330px; height: 52px; border-radius: 12px; background: rgba(139,92,246,.25); border: 1px solid rgba(192,132,252,.7); }
-#styleSlide { left: 620px; top: 380px; width: 1080px; height: 607px; }
-.sweep { position: absolute; left: 620px; top: 380px; width: 1080px; height: 607px; border-radius: 20px; pointer-events: none;
+#styleSlide { left: 620px; top: 340px; width: 1080px; height: 607px; }
+.sweep { position: absolute; left: 620px; top: 340px; width: 1080px; height: 607px; border-radius: 20px; pointer-events: none;
   background: linear-gradient(100deg, transparent 35%, rgba(255,255,255,.55) 50%, transparent 65%); background-size: 300% 100%; opacity: 0; mix-blend-mode: overlay; }
 
 /* 「三道門檻」投影片 + 主題 */
@@ -271,10 +266,8 @@ body { font-family: "Inter", "Noto Sans TC", sans-serif; color: #fff; -webkit-fo
 #outLogo { left: 0; top: 0; }
 #outWord { left: 0; top: 0; }
 .out-line { position: absolute; left: 610px; top: 560px; width: 700px; height: 3px; background: linear-gradient(90deg, #3b82f6, #a855f7, #ec4899); transform-origin: center; box-shadow: 0 0 18px rgba(168,85,247,.7); }
-.out-tag { position: absolute; left: 0; right: 0; top: 592px; text-align: center; font-size: 42px; font-weight: 900; letter-spacing: .06em; color: #f4f4f5; }
-.chips { position: absolute; left: 160px; right: 160px; top: 690px; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
-.chips span { display: inline-flex; align-items: center; height: 50px; line-height: 1; padding: 0 20px; border-radius: 999px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); font-size: 20px; font-weight: 700; color: rgba(255,255,255,.8); }
-.url { position: absolute; left: 0; right: 0; top: 820px; text-align: center; font-size: 19px; letter-spacing: .4em; color: rgba(255,255,255,.4); }
+.out-tag { position: absolute; left: 0; right: 0; top: 600px; text-align: center; font-size: 42px; font-weight: 900; letter-spacing: .06em; color: #f4f4f5; }
+.url { position: absolute; left: 0; right: 0; top: 700px; text-align: center; font-size: 19px; letter-spacing: .4em; color: rgba(255,255,255,.4); }
 
 /* ---------- 游標 ---------- */
 #cursor { position: absolute; left: 0; top: 0; width: 40px; height: 40px; z-index: 60; opacity: 0; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); }
