@@ -486,18 +486,100 @@ function showSnapGuides(g) {
         + g.y.map(y => `<span class="sg-h" style="top:${r.top + y * s}px;left:${r.left}px;width:${r.width}px"></span>`).join('');
 }
 
+/* ----- AI 版面元素：原地偏移（拖曳移動） ----- */
+// AI 的版面以 flex / grid 排列，元素沒有座標；移動時不改變排版，只在元素加上 CSS translate 位移：
+// 旁邊的元素不會補位，從外層繼承的字色、字級也不變。translate 與 Tailwind 的 transform class 各自獨立、可疊加。
+// 只支援移動，不支援縮放；最外層的版面容器不能移動。
+function getOffset(el) {
+    const m = (el.style.translate || '').match(/^(-?[\d.]+)px(?:\s+(-?[\d.]+)px)?$/);
+    return m ? [parseFloat(m[1]), parseFloat(m[2] || 0)] : [0, 0];
+}
+function setOffset(el, x, y) {
+    x = Math.round(x); y = Math.round(y);
+    if (x || y) el.style.translate = `${x}px ${y}px`;
+    else el.style.removeProperty('translate');
+    if (!el.getAttribute('style')) el.removeAttribute('style');
+}
+function canOffset(el) {
+    const scaler = getScaler();
+    if (!editMode || !el || !el.isConnected || !scaler || !scaler.contains(el) || el === scaler || isRootBlock(el)) return false;
+    if (el.closest('[data-rs-float]') || el.parentElement.closest('svg')) return false;   // 浮動物件有自己的拖曳；SVG 內部以整個圖形為單位
+    return !el.style.translate || getOffset(el).some(Boolean);   // AI 自己寫了非 px 的 translate 就不動
+}
+// 元素目前在投影片座標（1024×576）中的外框（含已套用的位移）
+function slideRectOf(el) {
+    const sr = getScaler().getBoundingClientRect(), r = el.getBoundingClientRect(), s = slideScale();
+    return { x: (r.left - sr.left) / s, y: (r.top - sr.top) / s, w: r.width / s, h: r.height / s };
+}
+
+let offsetDrag = null;
+// 先單擊選取元素，再按住拖曳；按在已選取元素的子元素上也是拖曳整個已選取元素
+slideCanvasEl.addEventListener('pointerdown', e => {
+    const el = selectedEl;
+    if (!editMode || editingEl || e.button !== 0 || !canOffset(el) || !el.contains(e.target)) return;
+    e.preventDefault();                       // 避免拖曳時反白文字
+    const [ox, oy] = getOffset(el);
+    offsetDrag = { el, sx: e.clientX, sy: e.clientY, ox, oy, r: slideRectOf(el), s: slideScale(), moved: false, snap: collectSnapTargets(el) };
+    window.addEventListener('pointermove', onOffsetDragMove);
+    window.addEventListener('pointerup', endOffsetDrag, { once: true });
+    window.addEventListener('pointercancel', endOffsetDrag, { once: true });
+});
+function onOffsetDragMove(e) {
+    const d = offsetDrag;
+    if (!d) return;
+    const dx = (e.clientX - d.sx) / d.s, dy = (e.clientY - d.sy) / d.s;
+    if (!d.moved && Math.abs(dx) + Math.abs(dy) < 2) return;   // 沒有真的拖動時保留單擊選取子元素、雙擊編輯文字
+    d.moved = true;
+    const { x, y, w, h } = d.r;
+    let nx = x + dx, ny = y + dy;
+    const guides = { x: [], y: [] };
+    if (!e.altKey) {
+        const sx = snapAxis([nx, nx + w / 2, nx + w], d.snap.x, SNAP_PX / d.s);
+        const sy = snapAxis([ny, ny + h / 2, ny + h], d.snap.y, SNAP_PX / d.s);
+        nx += sx.delta; ny += sy.delta;
+        guides.x = sx.lines; guides.y = sy.lines;
+    }
+    [nx, ny] = clampFloatPos(nx, ny, w, h);
+    setOffset(d.el, d.ox + nx - x, d.oy + ny - y);
+    showSnapGuides(guides);
+    positionToolbar();
+}
+function endOffsetDrag() {
+    window.removeEventListener('pointermove', onOffsetDragMove);
+    window.removeEventListener('pointerup', endOffsetDrag);
+    window.removeEventListener('pointercancel', endOffsetDrag);
+    showSnapGuides(null);
+    const d = offsetDrag;
+    offsetDrag = null;
+    if (!d || !d.moved) return;
+    suppressNextClick = true;
+    setTimeout(() => { suppressNextClick = false; }, 0);
+    commitSlideEdit();
+    refreshToolbar();
+}
+
 /* ----- 方向鍵微調位置 ----- */
 // 每按一次移動 1px（Shift：10px）；連續按鍵（間隔 800ms 內、同一個物件）合併成一個撤銷步驟
 let nudgeState = null;
 function nudgeSelected(dx, dy) {
     const el = selectedEl;
-    if (!editMode || !isFloat(el) || !el.isConnected) return false;
+    const float = isFloat(el);
+    if (!editMode || !el || !el.isConnected || (!float && !canOffset(el))) return false;
     stopTextEdit();
-    const r = floatRect(el);
-    const [nx, ny] = clampFloatPos(r.x + dx, r.y + dy, r.w, r.h);
-    if (Math.round(nx) === r.x && Math.round(ny) === r.y) return true;   // 已到邊界
-    el.style.left = Math.round(nx) + 'px';
-    el.style.top = Math.round(ny) + 'px';
+    if (float) {
+        const r = floatRect(el);
+        const [nx, ny] = clampFloatPos(r.x + dx, r.y + dy, r.w, r.h);
+        if (Math.round(nx) === r.x && Math.round(ny) === r.y) return true;   // 已到邊界
+        el.style.left = Math.round(nx) + 'px';
+        el.style.top = Math.round(ny) + 'px';
+    } else {
+        const r = slideRectOf(el);
+        const [nx, ny] = clampFloatPos(r.x + dx, r.y + dy, r.w, r.h);
+        const mx = Math.round(nx - r.x), my = Math.round(ny - r.y);
+        if (!mx && !my) return true;
+        const [ox, oy] = getOffset(el);
+        setOffset(el, ox + mx, oy + my);
+    }
     const merge = nudgeState && nudgeState.el === el && Date.now() - nudgeState.at < 800 && undoStack[undoStack.length - 1] === nudgeState.snap;
     commitSlideEdit(!merge);
     nudgeState = { el, at: Date.now(), snap: merge ? nudgeState.snap : undoStack[undoStack.length - 1] };

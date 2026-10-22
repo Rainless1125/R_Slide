@@ -933,6 +933,17 @@ body.sb-open #sidebar {
     outline-offset: -3px;
 }
 
+/* 選取的 AI 版面元素可拖曳移動（最外層容器除外） */
+#slideCanvas.editing .slide-scaler [data-rs-sel],
+#slideCanvas.editing .slide-scaler [data-rs-sel] * {
+    cursor: move;
+}
+
+#slideCanvas.editing .slide-scaler>[data-rs-sel],
+#slideCanvas.editing .slide-scaler>[data-rs-sel] * {
+    cursor: default;
+}
+
 #slideCanvas.editing [contenteditable] {
     cursor: text !important;
     outline-style: solid !important;

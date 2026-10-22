@@ -51,7 +51,7 @@ document.addEventListener('keydown', (e) => {
         const step = e.shiftKey ? 10 : 1;
         if (!nudgeSelected(nudge[0] * step, nudge[1] * step) && !nudgeHintShown) {
             nudgeHintShown = true;
-            showToast('AI 產生的版面元素位置固定；方向鍵可微調自行插入的文字、圖片、圖表、圖示與圖案（Esc 取消選取後可換頁）', 'info', 4000);
+            showToast('最外層的版面容器無法移動，請選取其中的元素（Esc 取消選取後可換頁）', 'info', 4000);
         }
         return;
     }
