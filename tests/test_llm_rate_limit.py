@@ -61,7 +61,7 @@ def test_hourly_limit_counts_generate_and_regenerate(llm):
         assert res.status_code == 200
     res = generate(c)
     assert res.status_code == 429
-    assert res.json()["detail"].startswith("本帳號每小時最多可生成 / 重產 20 次")
+    assert res.json()["detail"].startswith("本帳號每小時最多可使用 AI 生成 20 次")
     assert 3590 < int(res.headers["Retry-After"]) <= 3600
     assert c.post("/api/regenerate-slide", json=REGEN).status_code == 429
     assert llm["calls"] == 20                                   # 被擋下的請求不會呼叫 LLM
@@ -94,7 +94,7 @@ def test_daily_limit(llm):
         store.log_llm_usage({"user_id": user["id"], "username": "alice", "action": "generate", "provider": "gemini",
                              "model": "m", "input_chars": 1, "status": "ok", "created_at": now - 2 * store.HOUR_MS - i * 700_000})
     res = generate(c)
-    assert res.status_code == 429 and res.json()["detail"].startswith("本帳號每 24 小時最多可生成 / 重產 100 次")
+    assert res.status_code == 429 and res.json()["detail"].startswith("本帳號每 24 小時最多可使用 AI 生成 100 次")
     assert "小時" in res.json()["detail"].split("請於")[1]       # 需等待超過 1 小時，以小時 + 分鐘顯示
     assert llm["calls"] == 0
 
