@@ -1753,3 +1753,118 @@ body.sb-open #sidebar {
 @media (prefers-reduced-motion: reduce) {
     .quota-pop, .quota-bar i, .quota-chip { transition: none; }
 }
+
+/* ---------- 單頁版本：審查卡片的「舊版本」按鈕與比較視窗（versions.js） ---------- */
+.rv-versions {
+    position: absolute;
+    top: 1.25rem;
+    right: 1.25rem;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    padding: .25rem .625rem;
+    border-radius: 9999px;
+    font-size: .6875rem;
+    font-weight: 600;
+    color: #fff;
+    background: rgb(24 24 27 / .78);
+    backdrop-filter: blur(4px);
+    box-shadow: 0 1px 3px rgb(0 0 0 / .2);
+    transition: background-color .2s, transform .2s;
+}
+
+.rv-versions:hover {
+    background: rgb(109 40 217 / .92);
+    transform: translateY(-1px);
+}
+
+.rv-versions:focus-visible {
+    outline: 2px solid rgb(139 92 246);
+    outline-offset: 2px;
+}
+
+.version-thumb {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    border-radius: .75rem;
+    border: 1px solid rgb(228 228 231);
+    background: #fff;
+}
+
+.dark .version-thumb {
+    border-color: rgb(39 39 42);
+}
+
+.version-thumb .slide-scaler {
+    pointer-events: none;
+    user-select: none;
+}
+
+.version-meta {
+    margin-top: .5rem;
+    display: flex;
+    flex-direction: column;
+    gap: .125rem;
+    font-size: .75rem;
+    color: rgb(113 113 122);
+}
+
+.version-meta b {
+    font-size: .875rem;
+    color: rgb(24 24 27);
+}
+
+.dark .version-meta b {
+    color: rgb(244 244 245);
+}
+
+.version-tag,
+.version-tab {
+    font-size: .75rem;
+    font-weight: 600;
+    padding: .25rem .75rem;
+    border-radius: 9999px;
+}
+
+.version-tag.current {
+    color: rgb(4 120 87);
+    background: rgb(209 250 229);
+}
+
+.dark .version-tag.current {
+    color: rgb(167 243 208);
+    background: rgb(16 185 129 / .2);
+}
+
+.version-tab {
+    color: rgb(113 113 122);
+    border: 1px solid rgb(228 228 231);
+    transition: background-color .2s, color .2s, border-color .2s;
+}
+
+.dark .version-tab {
+    border-color: rgb(63 63 70);
+}
+
+.version-tab:hover {
+    color: rgb(24 24 27);
+}
+
+.dark .version-tab:hover {
+    color: #fff;
+}
+
+.version-tab[aria-selected="true"] {
+    color: rgb(109 40 217);
+    border-color: rgb(139 92 246);
+    background: rgb(245 243 255);
+}
+
+.dark .version-tab[aria-selected="true"] {
+    color: rgb(221 214 254);
+    border-color: rgb(167 139 250);
+    background: rgb(139 92 246 / .15);
+}

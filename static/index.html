@@ -25,7 +25,7 @@
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/app/app.css?v=16">
+    <link rel="stylesheet" href="/static/app/app.css?v=17">
 </head>
 
 <body
@@ -487,6 +487,11 @@
                         <i class="fa-solid fa-shapes text-[11px]"></i><span class="hidden xl:inline">圖案</span>
                     </button>
                     <input id="slideImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" class="hidden">
+                    <button id="versionCurrentBtn" onclick="openVersionModal(currentSlideIdx)"
+                        class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
+                        aria-label="比較或還原此頁的舊版本">
+                        <i class="fa-solid fa-clock-rotate-left text-[11px]"></i><span class="hidden sm:inline">舊版本</span>
+                    </button>
                     <button id="regenCurrentBtn" onclick="regenerateCurrentSlide()"
                         class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
                         aria-label="重產此頁">
@@ -634,6 +639,42 @@
         </div>
     </div>
 
+    <!-- 單頁版本比較 Modal（versions.js）：左邊目前版本、右邊選取的舊版，可改用舊版 -->
+    <div id="versionModal" role="dialog" aria-modal="true" aria-labelledby="versionModalTitle"
+        class="hidden fixed inset-0 z-[90] bg-black/45 backdrop-blur-sm p-4 flex items-center justify-center">
+        <div class="w-full max-w-5xl max-h-full overflow-y-auto rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-5 sm:p-6">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <h3 id="versionModalTitle" class="text-base sm:text-lg font-bold">此頁的版本</h3>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">重產前的版本會自動保留（最多 3 個）；改用舊版後，目前的版本也會留在版本記錄中。</p>
+                </div>
+                <button onclick="closeVersionModal()" class="icon-btn w-8 h-8 shrink-0 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="關閉版本視窗">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                    <div class="h-8 mb-2 flex items-center"><span class="version-tag current">目前版本</span></div>
+                    <div id="versionCurrent" class="version-thumb"></div>
+                    <div id="versionCurrentMeta" class="version-meta"></div>
+                </div>
+                <div>
+                    <div id="versionTabs" role="tablist" aria-label="舊版本" class="h-8 mb-2 flex items-center gap-1.5"></div>
+                    <div id="versionOld" class="version-thumb"></div>
+                    <div id="versionOldMeta" class="version-meta"></div>
+                </div>
+            </div>
+            <div class="mt-5 flex flex-wrap items-center justify-end gap-2">
+                <button onclick="closeVersionModal()"
+                    class="icon-btn h-9 px-4 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-sm font-semibold">保留目前版本</button>
+                <button id="versionUseBtn" onclick="useSelectedVersion()"
+                    class="icon-btn h-9 px-4 rounded-full bg-black text-white dark:bg-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 text-sm font-semibold flex items-center gap-2">
+                    <i class="fa-solid fa-clock-rotate-left text-[11px]"></i><span>改用這個版本</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- 插入圖示面板（static/icons.js 的清單，由 media.js 建立格狀按鈕） -->
     <div id="iconPicker" role="dialog" aria-label="插入圖示"
         class="hidden fixed z-[80] flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl">
@@ -728,6 +769,7 @@
                             <li><b>新增空白頁</b>：每張卡片的「+」可在該頁後新增空白頁，最後一格可新增到最後；空白頁沿用參考頁的背景與文字顏色。</li>
                             <li><b>重產此頁</b>：對某頁不滿意時，可輸入提示詞（例如「重點三點式、加上 KPI 資訊卡」）單獨重新生成，其他頁面維持不變。</li>
                             <li><b>切換模式重產</b>：重產視窗可改用另一種簡報模式，之後這份簡報的重產都會沿用。</li>
+                            <li><b>還原舊版</b>：重產前的版本會自動保留（每頁最多 3 個，跟著簡報存入歷史記錄）。點縮圖右上角的「舊版本」或播放器的「舊版本」按鈕，可與目前版本並排比較（左右鍵切換），按「改用這個版本」還原；目前的版本也會留在記錄中，可以再換回來。</li>
                         </ul>
                         <div class="guide-tip"><i class="fa-regular fa-lightbulb"></i><span>想放自己的圖片時，可先在重產提示詞中說明「右半邊留白，之後放產品照片」，再到編輯模式插入圖片並拖曳到留白處。</span></div>
                     </section>
@@ -962,17 +1004,18 @@
     <script src="/static/export.js?v=8"></script>
     <script src="/static/presenter.js?v=4"></script>
     <script src="/static/icons.js?v=2"></script>
-    <script src="/static/app/core.js?v=7"></script>
+    <script src="/static/app/core.js?v=8"></script>
     <script src="/static/app/input.js?v=4"></script>
-    <script src="/static/app/generate.js?v=15"></script>
+    <script src="/static/app/generate.js?v=16"></script>
     <script src="/static/app/shapes.js?v=2"></script>
     <script src="/static/app/editor.js?v=5"></script>
-    <script src="/static/app/media.js?v=4"></script>
-    <script src="/static/app/player.js?v=3"></script>
+    <script src="/static/app/media.js?v=5"></script>
+    <script src="/static/app/player.js?v=4"></script>
+    <script src="/static/app/versions.js?v=1"></script>
     <script src="/static/app/auth.js?v=3"></script>
     <script src="/static/app/guide.js?v=1"></script>
     <script src="/static/app/feedback.js?v=2"></script>
-    <script src="/static/app/main.js?v=7"></script>
+    <script src="/static/app/main.js?v=8"></script>
 </body>
 
 </html>

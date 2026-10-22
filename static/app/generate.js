@@ -407,11 +407,13 @@ function renderReviewSection(quiet = false) {
 
     currentPresentationData.slides.forEach((slide, idx) => {
         const card = document.createElement('div');
-        card.className = "rv-card spot p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 rounded-xl flex flex-col gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-600";
+        card.className = "rv-card relative spot p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 rounded-xl flex flex-col gap-3 transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-600";
         card.innerHTML = `
   <div class="rv-thumb" role="button" tabindex="0" onclick="previewSingleSlide(${idx})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();previewSingleSlide(${idx})}" aria-label="預覽第 ${idx + 1} 頁：${esc(slide.slide_title)}" title="點擊放大預覽">
     <div class="slide-scaler">${slide.html_content}</div>
   </div>
+  ${slideVersions(slide).length ? `<button type="button" class="rv-versions" onclick="openVersionModal(${idx})" title="比較或還原此頁的舊版本"
+    aria-label="第 ${idx + 1} 頁有 ${slideVersions(slide).length} 個舊版本，點擊比較或還原"><i class="fa-solid fa-clock-rotate-left"></i><span>舊版本 ${slideVersions(slide).length}</span></button>` : ''}
   <div class="relative min-w-0 px-1">
     <div class="flex items-center gap-2 mb-1">
       <span class="drag-handle text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 px-0.5" draggable="true" title="拖曳調整頁序" aria-hidden="true"
@@ -639,8 +641,7 @@ async function regenerateSingleSlide(idx, customPrompt = '', deckMode) {
         }
         pushUndoSnapshot();
         deck.slides[at] = {
-            ...targetSlide,
-            ...newSlide,
+            ...slideWithNewVersion(targetSlide, newSlide, customPrompt ? `重產：${customPrompt}` : '重產：AI 自動優化'),
             page_number: targetSlide.page_number || at + 1
         };
 
@@ -656,7 +657,14 @@ async function regenerateSingleSlide(idx, customPrompt = '', deckMode) {
         }
         if (inReview) renderReviewSection(true);
         if (modalOpen) closeRegenerateModal(true);
-        showToast(`第 ${at + 1} 頁已重產完成`, 'success', 2200);
+        // 之後可能調整過頁序或編輯過此頁（頁面物件會換新），以版本記錄找回這一頁
+        const versions = deck.slides[at].versions;
+        showToast(`第 ${at + 1} 頁已重產完成，舊版已保留`, 'success', 6000, {
+            label: '比較舊版', onClick: () => {
+                const i = currentPresentationData === deck ? deck.slides.findIndex(s => s.versions === versions) : -1;
+                if (i >= 0) openVersionModal(i);
+            }
+        });
     } catch (err) {
         if (!err.handled) showToast(friendlyError(err), 'error', 8000, retryAction(err, () => regenerateSingleSlide(idx, customPrompt, mode)));
     } finally {

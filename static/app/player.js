@@ -40,7 +40,7 @@ function duplicateSlide(idx) {
     if (idx < 0 || idx >= slides.length) return;
     pushUndoSnapshot();
     const keep = slides[currentSlideIdx];
-    slides.splice(idx + 1, 0, JSON.parse(JSON.stringify(slides[idx])));
+    slides.splice(idx + 1, 0, JSON.parse(JSON.stringify(withoutVersions(slides[idx]))));
     finishSlideOps(keep);
     showToast(`已複製第 ${idx + 1} 頁`, 'success', 1800);
 }
@@ -149,6 +149,7 @@ function renderSlide(index, mode) {
     updateThumbnails();
     renderNotes();
     updatePresenter();
+    updateVersionButton();
 }
 
 function prevSlide() { if (currentSlideIdx > 0) renderSlide(currentSlideIdx - 1); }
