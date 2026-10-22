@@ -29,9 +29,18 @@ function goStep(n) {
 }
 
 /* ===================== 生成 ===================== */
-// 骨架屏：卡片結構與「版面審查」一致（縮圖 + 標題 + 版型 + 兩顆按鈕 + 操作列）
-function buildSkeletonCards() {
-    const n = parseInt(document.getElementById('numPages').value) || 6; // 0 = 由 AI 決定
+// 骨架屏：卡片結構與「版面審查」一致（縮圖 + 標題 + 版型 + 兩顆按鈕 + 操作列）；產生大綱時改為大綱列表的樣子
+function buildSkeletonCards(kind = 'deck', pages) {
+    const n = pages || parseInt(document.getElementById('numPages').value) || 6; // 0 = 由 AI 決定
+    if (kind === 'outline') {
+        const row = `
+  <div class="sm:col-span-2 xl:col-span-3 p-4 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 rounded-xl flex gap-4">
+    <div class="skeleton h-8 w-8 rounded-lg shrink-0"></div>
+    <div class="flex-1 space-y-2"><div class="skeleton h-5 w-1/2"></div><div class="skeleton h-3 w-5/6"></div><div class="skeleton h-3 w-2/3"></div></div>
+  </div>`;
+        document.getElementById('skeletonGrid').innerHTML = row.repeat(Math.min(Math.max(n, 1), 5));
+        return;
+    }
     const card = `
   <div class="p-3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 rounded-xl flex flex-col gap-3">
     <div class="skeleton w-full rounded-xl" style="aspect-ratio:16/9"></div>
@@ -45,28 +54,33 @@ function buildSkeletonCards() {
     document.getElementById('skeletonGrid').innerHTML = card.repeat(Math.min(Math.max(n, 1), 6));
 }
 const LOADING_MSGS = ['分析內容中…', '規劃版面結構…', 'AI 動態配色中…', '生成排版中…'];
-function setLoading(on) {
+const OUTLINE_LOADING_MSGS = ['分析內容中…', '規劃故事線…', '整理每頁重點…'];
+// kind：'deck' 生成整份簡報，'outline' 產生大綱；pages 為骨架屏的頁數（依大綱生成時以大綱頁數為準）
+function setLoading(on, kind = 'deck', pages) {
     const btn = document.getElementById('btnGenerate');
     const spinner = document.getElementById('loadingSpinner');
     const icon = document.getElementById('btnIcon');
     const label = document.getElementById('btnLabel');
     const skel = document.getElementById('sectionSkeleton');
     btn.disabled = on;
+    setOutlineBusy(on);
     spinner.classList.toggle('hidden', !on);
     icon.classList.toggle('hidden', on);
     clearInterval(loadingTimer);
     if (on) {
+        const msgs = kind === 'outline' ? OUTLINE_LOADING_MSGS : LOADING_MSGS;
         let i = 0;
-        label.textContent = LOADING_MSGS[0];
-        loadingTimer = setInterval(() => { i = (i + 1) % LOADING_MSGS.length; label.textContent = LOADING_MSGS[i]; }, 1800);
+        label.textContent = msgs[0];
+        loadingTimer = setInterval(() => { i = (i + 1) % msgs.length; label.textContent = msgs[i]; }, 1800);
         document.getElementById('sectionReview').classList.add('hidden');
         document.getElementById('sectionPlayer').classList.add('hidden');
-        buildSkeletonCards();
+        document.getElementById('sectionOutline').classList.add('hidden');
+        buildSkeletonCards(kind, pages);
         skel.classList.remove('hidden');
         animateIn(skel);
         skel.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else {
-        label.textContent = '生成排版';
+        updateGenerateLabel();
         skel.classList.add('hidden');
     }
 }
@@ -222,38 +236,48 @@ async function initModelSelectors() {
 }
 initModelSelectors();
 
-async function startGeneration() {
+// 讀取輸入區的設定；內容空白或正在匯入檔案時提示並回傳 null
+function readGenerationInput() {
     const ta = document.getElementById('inputContent');
     const content = ta.value.trim();
-    const targetAudience = document.getElementById('targetAudience').value;
-    const numPages = parseInt(document.getElementById('numPages').value);
-    const stylePreference = getStylePreference(); // 讀取選擇的風格（自訂風格會組成含四色的描述）
-    const deckMode = getDeckMode();
-
-    if (importing) { showToast('檔案匯入中，請稍候', 'info'); return; }
+    if (importing) { showToast('檔案匯入中，請稍候', 'info'); return null; }
     if (!content) {
         ta.classList.remove('shake'); void ta.offsetWidth; ta.classList.add('shake');
         ta.focus();
         showToast('請輸入內容！', 'error');
-        return;
+        return null;
     }
+    return {
+        content,
+        target_audience: document.getElementById('targetAudience').value,
+        num_pages: parseInt(document.getElementById('numPages').value),
+        style_preference: getStylePreference(),  // 自訂風格會組成含四色的描述
+        deck_mode: getDeckMode()
+    };
+}
+
+// 輸入區的生成按鈕：開啟「先確認大綱」時先產生大綱，否則直接生成整份簡報
+function startGeneration() {
     if (isGenerating()) return;
+    const input = readGenerationInput();
+    if (!input) return;
+    if (isOutlineFirst()) requestOutline(input);
+    else generateDeck(input);
+}
+
+// outline 為使用者確認過的大綱（見 outline.js）；有值時頁數以大綱為準
+async function generateDeck(input, outline = null) {
+    if (isGenerating()) return;
+    if (outline) input = { ...input, num_pages: outline.slides.length };
 
     burstFromButton(true);
-    setLoading(true);
+    setLoading(true, 'deck', outline?.slides.length);
 
     try {
         const res = await fetch('/api/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                content,
-                target_audience: targetAudience,
-                num_pages: numPages,
-                style_preference: stylePreference,
-                deck_mode: deckMode,
-                ...getLlmChoice()
-            })
+            body: JSON.stringify({ ...input, ...getLlmChoice(), ...(outline ? { outline } : {}) })
         });
 
         throwIfSessionExpired(res);
@@ -264,13 +288,15 @@ async function startGeneration() {
         currentSlideIdx = 0;
         resetUndo();
         setLoading(false);
-        addHistory({ content, target_audience: targetAudience, num_pages: numPages, style_preference: stylePreference, deck_mode: deckMode }, data);
+        if (outline) clearOutline();
+        addHistory(input, data);
         renderReviewSection();
         burstFromButton(false);
         showToast('版面生成完成，已存入歷史記錄', 'success', 2200);
     } catch (err) {
         setLoading(false);
-        if (!err.handled) showToast(friendlyError(err), 'error', 8000, retryAction(err, startGeneration));
+        if (outline) showOutlineSection();       // 失敗時回到大綱，修改的內容不會遺失
+        if (!err.handled) showToast(friendlyError(err), 'error', 8000, retryAction(err, () => generateDeck(input, outline)));
     }
     refreshQuota();                // 成功或失敗都算次數
 }
@@ -328,7 +354,7 @@ function renderQuota() {
 <div class="quota-pop" role="tooltip">
   <div class="quota-pop-title"><i class="fa-regular fa-clock text-violet-500" aria-hidden="true"></i>用量限制</div>
   ${rows.map(([label, q]) => quotaRow(label, q)).join('')}
-  <p class="quota-note">生成與重產合併計算，失敗的生成也會算一次</p>
+  <p class="quota-note">生成、大綱與重產合併計算，失敗的生成也會算一次</p>
 </div>` : '';
     ['quotaInfo', 'regenQuotaInfo'].forEach(id => {
         const el = document.getElementById(id);

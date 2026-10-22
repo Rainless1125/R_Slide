@@ -25,7 +25,7 @@
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/app/app.css?v=17">
+    <link rel="stylesheet" href="/static/app/app.css?v=18">
 </head>
 
 <body
@@ -328,6 +328,15 @@
                     </div>
 
                     <div class="flex flex-wrap items-center justify-end gap-x-4 gap-y-2 pt-4">
+                        <!-- 先確認大綱：開啟時生成按鈕先產生大綱（outline.js），關閉時直接生成整份簡報 -->
+                        <label class="outline-toggle mr-auto" title="開啟後先產生每頁標題與重點，確認或修改後才生成完整版面（產生大綱也會算一次用量）">
+                            <input type="checkbox" id="outlineFirst" role="switch" class="sr-only">
+                            <span class="outline-switch" aria-hidden="true"></span>
+                            <span class="min-w-0">
+                                <span class="block text-sm font-semibold">先確認大綱</span>
+                                <span class="block text-[11px] text-zinc-500 dark:text-zinc-400">先看每頁標題與重點，改好再生成</span>
+                            </span>
+                        </label>
                         <div id="quotaInfo" class="quota hidden" data-align="right"></div>
                         <button id="btnGenerate" onclick="startGeneration()"
                             class="ripple-btn btn-flow text-white font-semibold px-6 py-2.5 rounded-xl flex items-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 disabled:opacity-70 disabled:cursor-wait disabled:hover:translate-y-0">
@@ -355,6 +364,39 @@
                     </div>
                 </div>
                 <div id="skeletonGrid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5"></div>
+            </section>
+
+            <!-- 確認大綱（開啟「先確認大綱」時）：修改每頁標題與重點、調整頁序、增刪頁面後再生成 -->
+            <section id="sectionOutline"
+                class="hidden card-elevated bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-[1.25rem] p-4 sm:p-8 transition-colors mt-6">
+                <div class="flex flex-wrap items-center justify-between mb-5 gap-4">
+                    <div class="min-w-0 basis-56 flex-1">
+                        <h2 class="text-2xl font-bold tracking-tight mb-1 flex items-center gap-2">確認大綱<span id="outlineCount" class="deck-mode-badge"></span></h2>
+                        <p class="text-sm text-zinc-500 dark:text-zinc-400">可修改標題與重點（一行一點）、調整頁序或增刪頁面，確認後再生成完整版面。</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button type="button" onclick="discardOutline()" data-outline-busy
+                            class="icon-btn text-xs px-3 py-2 rounded-full text-zinc-500 hover:text-red-500 font-semibold flex items-center gap-1.5 whitespace-nowrap disabled:opacity-40">
+                            <i class="fa-solid fa-xmark text-[11px]"></i><span>放棄</span>
+                        </button>
+                        <button type="button" onclick="regenerateOutline()" data-outline-busy title="依輸入區目前的內容重新產生大綱（會算一次用量）"
+                            class="icon-btn text-xs px-3 py-2 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed font-semibold flex items-center gap-1.5 whitespace-nowrap">
+                            <i class="fa-solid fa-arrows-rotate text-[11px]"></i><span>重新產生大綱</span>
+                        </button>
+                        <button type="button" onclick="generateFromOutline()" data-outline-busy title="依此大綱生成簡報 (Ctrl+Enter)"
+                            class="ripple-btn bg-black hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black text-sm font-semibold px-5 py-2 rounded-lg transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-95 disabled:opacity-60 disabled:cursor-wait whitespace-nowrap">
+                            <i class="fa-solid fa-wand-magic-sparkles mr-1.5 text-xs"></i>依大綱生成簡報
+                        </button>
+                    </div>
+                </div>
+                <label for="outlineTitle" class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider"><i
+                        class="fa-solid fa-heading mr-1"></i>簡報標題</label>
+                <input type="text" id="outlineTitle" maxlength="200" placeholder="簡報標題"
+                    class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow mb-5">
+                <ol id="outlineList" class="space-y-3"></ol>
+                <button type="button" id="outlineAddBtn" onclick="addOutlineSlide()"
+                    class="mt-3 w-full py-3 rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-700 text-sm font-semibold text-zinc-500 hover:text-black hover:border-zinc-400 dark:hover:text-white dark:hover:border-zinc-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                    <i class="fa-solid fa-plus mr-1.5 text-xs"></i>新增一頁</button>
             </section>
 
             <!-- 步驟 2: AI 版面構思審查 -->
@@ -757,6 +799,13 @@
                             <li><b>頁數</b>：可指定 2~12 頁或由 AI 決定；詳細模式資訊量較大，素材豐富時建議由 AI 決定。</li>
                             <li><b>受眾與視覺風格</b>：例如「主管會議」「蘋果極簡白」「科技深色風」，AI 會依此調整語氣與配色。</li>
                         </ul>
+                        <h5>先確認大綱（選用）</h5>
+                        <ul>
+                            <li>開啟生成按鈕旁的「<b>先確認大綱</b>」，AI 會先列出每頁的標題、重點與建議版型。</li>
+                            <li>可直接修改文字（重點一行一點）、用箭頭調整頁序、新增或刪除頁面；確認後按「<b>依大綱生成簡報</b>」（<kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>Enter</kbd>）。</li>
+                            <li>確認大綱期間仍可更換風格、受眾與模型，生成時會套用輸入區當下的設定。</li>
+                            <li>產生大綱與生成簡報各算一次用量；想省事就關閉此選項，直接生成整份簡報。</li>
+                        </ul>
                         <div class="guide-tip"><i class="fa-regular fa-lightbulb"></i><span>按 <kbd>Ctrl</kbd> / <kbd>⌘</kbd> + <kbd>Enter</kbd> 可快速生成；輸入內容會自動保存為草稿。</span></div>
                     </section>
 
@@ -1004,9 +1053,10 @@
     <script src="/static/export.js?v=8"></script>
     <script src="/static/presenter.js?v=4"></script>
     <script src="/static/icons.js?v=2"></script>
-    <script src="/static/app/core.js?v=8"></script>
+    <script src="/static/app/core.js?v=9"></script>
     <script src="/static/app/input.js?v=4"></script>
-    <script src="/static/app/generate.js?v=16"></script>
+    <script src="/static/app/generate.js?v=17"></script>
+    <script src="/static/app/outline.js?v=1"></script>
     <script src="/static/app/shapes.js?v=2"></script>
     <script src="/static/app/editor.js?v=5"></script>
     <script src="/static/app/media.js?v=5"></script>

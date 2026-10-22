@@ -269,6 +269,18 @@ class AdaptivePresentation(BaseModel):
     presentation_title: str = Field(description="整份簡報的大標題")
     slides: list[AdaptiveSlide] = Field(description="動態排版的多頁投影片清單")
 
+
+# 大綱：先讓使用者確認每頁的標題與重點（可改字、調順序、增刪頁），再依大綱生成完整版面
+class OutlineSlide(BaseModel):
+    slide_title: str = Field(description="此頁標題")
+    key_points: list[str] = Field(description="此頁要傳達的重點，每點一句話")
+    layout_concept: str = Field(description="建議的版型概念，例如「KPI 大數字」「三步驟流程卡」「左右對比」")
+
+
+class DeckOutline(BaseModel):
+    presentation_title: str = Field(description="整份簡報的大標題")
+    slides: list[OutlineSlide] = Field(description="依頁序排列的每頁大綱")
+
 MAX_CONTENT_CHARS = 50_000
 MAX_PAGES = 20
 # 生成與重產的欄位上限：送進 LLM 的提示詞都由這些欄位組成，避免超大請求消耗大量 token（前端輸入框也有相同上限）
@@ -283,6 +295,8 @@ MAX_SLIDE_META_CHARS = 500                    # 每頁的標題與版型概念�
 MAX_SLIDE_HTML_CHARS = 50_000
 MAX_SLIDE_NOTES_CHARS = 5000
 MAX_SLIDE_CHARTS_CHARS = 20_000
+MAX_OUTLINE_POINTS = 8                        # 使用者確認後送回的大綱：每頁重點數與每點字數上限
+MAX_OUTLINE_POINT_CHARS = 300
 
 # 投影片固定以 1024×576 px 渲染（static/index.html 與 export.js 的 .slide-scaler），超出部分會被裁掉
 SLIDE_LAYOUT_RULES = """
@@ -357,6 +371,19 @@ def check_field_lengths(req):
     if isinstance(req, RegenerateSlideRequest):
         limits += [("簡報標題", req.presentation_title, MAX_TITLE_CHARS),
                    ("重產提示詞", req.custom_prompt, MAX_CUSTOM_PROMPT_CHARS)]
+    outline = getattr(req, "outline", None)
+    if outline is not None:
+        if not outline.slides:
+            raise HTTPException(status_code=400, detail="大綱至少需要 1 頁")
+        if len(outline.slides) > MAX_PAGES:
+            raise HTTPException(status_code=400, detail=f"大綱超過 {MAX_PAGES} 頁")
+        limits.append(("簡報標題", outline.presentation_title, MAX_TITLE_CHARS))
+        for i, s in enumerate(outline.slides, 1):
+            if len(s.key_points) > MAX_OUTLINE_POINTS:
+                raise HTTPException(status_code=400, detail=f"大綱第 {i} 頁的重點超過 {MAX_OUTLINE_POINTS} 點")
+            limits += [(f"大綱第 {i} 頁的標題", s.slide_title, MAX_SLIDE_META_CHARS),
+                       (f"大綱第 {i} 頁的版型", s.layout_concept, MAX_SLIDE_META_CHARS)]
+            limits += [(f"大綱第 {i} 頁的重點", p, MAX_OUTLINE_POINT_CHARS) for p in s.key_points]
     for label, value, limit in limits:
         if len(value) > limit:
             raise HTTPException(status_code=400, detail=f"{label}過長（上限 {limit:,} 字）")
@@ -370,6 +397,7 @@ class GenerateRequest(BaseModel):
     deck_mode: DeckMode = "speaker"
     provider: str = "gemini"
     model: str = ""
+    outline: DeckOutline | None = None            # 使用者確認過的大綱；有值時依大綱生成，頁數以大綱為準
 
 class RegenerateSlideRequest(BaseModel):
     content: str
@@ -385,7 +413,7 @@ class RegenerateSlideRequest(BaseModel):
     model: str = ""
 
 # 2. API 端點
-LLM_PATHS = {"/api/generate", "/api/regenerate-slide"}
+LLM_PATHS = {"/api/generate", "/api/outline", "/api/regenerate-slide"}
 
 
 @app.middleware("http")
@@ -431,9 +459,22 @@ def generate_slides(req: GenerateRequest, request: Request, user: dict = Depends
        - 【重要】你必須絕對服從使用者指定的「視覺風格」。如果要求明亮風，請多用 bg-white/bg-slate-50；如果要求科技風，才使用深色底 bg-slate-900 搭配螢光點綴色。
     """ + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + SPEAKER_NOTES_RULES
 
-    # 頁數固定時，模式規則中的「拆成更多頁」改以精簡內容達成，避免與指定頁數衝突
-    pages_hint = (f"{req.num_pages} 頁（頁數固定，必須剛好 {req.num_pages} 頁；素材太多時請精簡文字、合併重點，不可增加頁數）"
-                  if req.num_pages > 0 else "由你依內容多寡與重點自行決定（建議 3~8 頁）")
+    outline_block = ""
+    if req.outline:
+        # 大綱經過使用者確認：頁數、頁序與每頁主題以大綱為準，素材只用來補足細節
+        n = len(req.outline.slides)
+        pages_hint = f"{n} 頁（依使用者確認的大綱，必須剛好 {n} 頁，不可增減或調換頁序）"
+        outline_block = f"""
+    【使用者確認的大綱（最優先，必須照做）】：
+    簡報標題：{req.outline.presentation_title}
+{format_outline(req.outline)}
+    每一頁的標題與重點以大綱為準（可微調措辭以符合版面字數），版型概念為建議、可依內容調整；
+    使用者刪掉的主題不要再加回來，使用者新增的重點即使素材沒有提到也要呈現。
+"""
+    else:
+        # 頁數固定時，模式規則中的「拆成更多頁」改以精簡內容達成，避免與指定頁數衝突
+        pages_hint = (f"{req.num_pages} 頁（頁數固定，必須剛好 {req.num_pages} 頁；素材太多時請精簡文字、合併重點，不可增加頁數）"
+                      if req.num_pages > 0 else "由你依內容多寡與重點自行決定（建議 3~8 頁）")
     prompt = f"""
     【簡報目標客群】：{req.target_audience}
     【預計生成頁數】：{pages_hint}
@@ -441,7 +482,7 @@ def generate_slides(req: GenerateRequest, request: Request, user: dict = Depends
     【指定視覺風格】：{req.style_preference} (請利用 Tailwind CSS 確實實踐此氛圍)
     【原始素材內容】：
     {req.content}
-    
+    {outline_block}
     請深入理解內容，依【簡報模式】決定每頁的文字量，為每一頁構思最能凸顯該主題的獨特版面，並確保整體色彩與背景符合指定的【視覺風格】。
     """
     
@@ -451,6 +492,60 @@ def generate_slides(req: GenerateRequest, request: Request, user: dict = Depends
             for slide in data.get("slides") or []:
                 slide["charts"] = normalize_charts(slide.get("charts"))
             usage["slides_returned"] = len(data.get("slides") or [])
+            return data
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+def format_outline(outline: DeckOutline) -> str:
+    lines = []
+    for i, s in enumerate(outline.slides, 1):
+        lines.append(f"    第 {i} 頁｜{s.slide_title}｜建議版型：{s.layout_concept or '（由你決定）'}")
+        lines += [f"      - {p}" for p in s.key_points if p.strip()]
+    return "\n".join(lines)
+
+
+@app.post("/api/outline")
+def generate_outline(req: GenerateRequest, request: Request, user: dict = Depends(current_user)):
+    """先產生大綱（每頁標題、重點、建議版型）讓使用者確認，只有文字、不含版面，比整份生成快。"""
+    req.outline = None
+    check_field_lengths(req)
+
+    system_instruction = """
+    你是一位資深的簡報架構顧問。
+    你的任務是把使用者提供的原始內容規劃成簡報大綱：決定頁數、頁序、每頁標題與要傳達的重點，以及建議的版型。
+    這份大綱會先交給使用者修改確認，之後才依大綱設計版面，因此現在只需要規劃內容結構，不要輸出 HTML。
+
+    【大綱準則】：
+    1. 故事線清楚：通常以封面開場、結尾做總結或呼籲行動，中間依邏輯（問題 → 方案 → 成效、時間順序等）排列。
+    2. 每頁標題簡短明確；重點 2 ~ 5 點，每點一句話，只寫要傳達的訊息，不要寫版面指示。
+    3. 只使用素材中的資訊，不要捏造數據。
+    4. 建議版型依內容型態選擇，例如「KPI 大數字」「三步驟流程卡」「時間軸」「左右對比」「直條圖 + 重點」「封面」「結語」。
+    5. 使用與原始素材相同的語言。
+    """ + DECK_MODE_RULES[req.deck_mode]
+
+    pages_hint = (f"{req.num_pages} 頁（必須剛好 {req.num_pages} 頁）"
+                  if req.num_pages > 0 else "由你依內容多寡與重點自行決定（建議 3~8 頁）")
+    prompt = f"""
+    【簡報目標客群】：{req.target_audience}
+    【預計頁數】：{pages_hint}
+    【簡報模式】：{DECK_MODE_LABELS[req.deck_mode]}
+    【原始素材內容】：
+    {req.content}
+
+    請依【簡報模式】規劃每頁的資訊量，輸出整份簡報的大綱。
+    """
+
+    with llm_usage_log(request, user, "outline", req) as usage:
+        try:
+            data = call_llm(req.provider, req.model, system_instruction, prompt, DeckOutline, 0.5, usage)
+            slides = (data.get("slides") or [])[:MAX_PAGES]
+            for s in slides:
+                s["key_points"] = [p.strip() for p in s.get("key_points") or [] if p and p.strip()][:MAX_OUTLINE_POINTS]
+            data["slides"] = slides
+            usage["slides_returned"] = len(slides)
             return data
         except HTTPException:
             raise
