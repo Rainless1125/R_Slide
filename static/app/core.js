@@ -341,6 +341,7 @@ async function openHistory(id) {
     }
     if (!h.data || !Array.isArray(h.data.slides)) { showToast('此紀錄資料已損毀', 'error'); return; }
     stopAutoplay();
+    clearOutline();                                  // 輸入區會換成這份簡報的設定，未確認的大綱已不適用
     currentHistoryId = id;
     currentPresentationData = sanitizePresentation(h.data);
     currentSlideIdx = 0;
@@ -420,6 +421,7 @@ function resetWorkspace(clearFields = true) {
     resetUndo();
     document.getElementById('sectionReview').classList.add('hidden');
     document.getElementById('sectionPlayer').classList.add('hidden');
+    clearOutline();
     if (clearFields) clearInput();
     setStep(1);
 }
