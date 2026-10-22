@@ -2,8 +2,11 @@
 
 > Rapid & Responsive AI Presentation Engine — 貼上文字內容,由 LLM 自動規劃版面並產生可編輯的簡報,可匯出為 PDF、PowerPoint 或 HTML。可自行部署於自己的伺服器或內網。
 
-<!-- TODO: 補上 badges(License / Python 版本 / Docker)與畫面截圖或 GIF -->
-<!-- ![Demo](docs/demo.gif) -->
+<!-- TODO: 補上 badges(License / Python 版本 / Docker) -->
+
+![R Slide 介紹影片](docs/demo.gif)
+
+> 高畫質版本(1080p / 60fps):[docs/r_slide_showreel.mp4](docs/r_slide_showreel.mp4)
 
 ## 特色
 
