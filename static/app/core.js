@@ -40,6 +40,9 @@ let currentStep = 1;
 // 移除 script / 事件屬性 / meta refresh / iframe / 非白名單的外部資源（與匯出共用 sanitizeSlideHtml）
 function sanitizeSlide(slide) {
     if (slide && typeof slide.html_content === 'string') slide.html_content = sanitizeSlideHtml(slide.html_content);
+    if (Array.isArray(slide?.versions)) slide.versions.forEach(v => {
+        if (v && typeof v.html_content === 'string') v.html_content = sanitizeSlideHtml(v.html_content);
+    });
     return slide;
 }
 function sanitizePresentation(data) {

@@ -30,6 +30,11 @@ document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') { e.preventDefault(); closeShapePicker(); document.getElementById('shapePickerBtn').focus(); return; }
         if (e.target.closest?.('#shapePicker')) return;
     }
+    if (isVersionModalOpen()) {
+        if (e.key === 'Escape') { e.preventDefault(); closeVersionModal(); }
+        else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); stepVersionModal(e.key === 'ArrowRight' ? 1 : -1); }
+        return;                                   // 版本視窗開啟時不觸發換頁等快捷鍵
+    }
     if (e.key === 'Escape' && !document.getElementById('regenModal').classList.contains('hidden')) {
         e.preventDefault();
         closeRegenerateModal();

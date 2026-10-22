@@ -20,7 +20,7 @@ function slimSlidesForLlm(slides) {
             img.setAttribute('src', 'rs-img:' + (images.length - 1));
             img.setAttribute('data-rs-img', '');
         });
-        return { ...s, html_content: doc.body.innerHTML, charts: s.charts || [] };
+        return { ...withoutVersions(s), html_content: doc.body.innerHTML, charts: s.charts || [] };
     });
     return { slides: out, images };
 }
