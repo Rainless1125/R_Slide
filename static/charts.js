@@ -8,6 +8,9 @@
  *   chartFontScale(el)           依容器的字級（格式工具列的 text-xs ~ text-4xl）換算文字縮放倍率
  *   fillChartPlaceholders(root, charts, measure)  把容器內容換成對應的 SVG
  *   bakeSlideCharts(slides)      新投影片進入應用時呼叫：量測容器尺寸後畫入圖表
+ *
+ * spec.highlight（labels 中的名稱）標出要凸顯的類別：凸顯的項目維持原色、標籤與數值加粗，
+ * 其餘單一系列改用文字色的淡色（中性灰，深淺色背景都適用）、多系列與圓餅則淡化原色。
  */
 
 /* 預設類別色（依序使用、不循環打亂；LLM 可用 colors 依視覺風格覆寫） */
@@ -92,6 +95,28 @@ function _cColors(spec, n) {
     return Array.from({ length: n }, (_, i) => custom[i] || RS_CHART_COLORS[i % RS_CHART_COLORS.length]);
 }
 
+/* 凸顯的類別：回傳索引集合；沒有凸顯、或全部都凸顯（等於沒有凸顯）時回傳 null */
+const RS_CHART_MUTED_OPACITY = .22;   // 單一系列：未凸顯的長條改用文字色的淡色
+const RS_CHART_FADED_OPACITY = .3;    // 多系列 / 圓餅：未凸顯的類別保留原色但淡化
+function _cHighlight(spec, labels) {
+    const want = new Set((Array.isArray(spec?.highlight) ? spec.highlight : []).map(String));
+    if (!want.size) return null;
+    const idx = new Set(labels.map((l, i) => want.has(l) ? i : -1).filter(i => i >= 0));
+    return idx.size && idx.size < labels.length ? idx : null;
+}
+
+/* 數值標籤避開參考線：標籤的範圍 [a, b] 與任一條線的位置重疊時，移到線的另一側（dir = 1 往右 / 下，-1 往左 / 上）。
+ * pos 為標籤錨點，回傳調整後的錨點 */
+function _cAvoidLines(pos, a, b, lines, dir) {
+    for (const l of [...lines].sort((x, y) => dir * (x - y))) {
+        if (l >= a - 3 && l <= b + 3) {
+            const shift = dir > 0 ? l + 5 - a : l - 5 - b;
+            pos += shift; a += shift; b += shift;
+        }
+    }
+    return pos;
+}
+
 /* 單邊圓角的長條：資料端 4px 圓角、基準線端為直角 */
 function _cBarPath(x, y, w, h, dir) {
     const r = Math.max(0, Math.min(4, w / 2, h));
@@ -113,8 +138,9 @@ function _cLegend(items, x, y, maxW, size) {
         const sw = _cNum(size * 0.84), gap = sw + 4;
         const w = gap + _cTextW(label, size) + 14;
         if (cx > x && cx + w > x + maxW) { cx = x; cy += size + 8; }
-        out += `<rect x="${_cNum(cx)}" y="${_cNum(cy + size * 0.1)}" width="${sw}" height="${sw}" rx="2" fill="${it.color}"/>` +
-            `<text x="${_cNum(cx + gap)}" y="${_cNum(cy + size * 0.85)}" font-size="${size}" fill="currentColor" fill-opacity=".8">${_cEsc(label)}</text>`;
+        // it.faded / it.strong：圓餅圖凸顯類別時，未凸顯的色塊淡化、凸顯的文字加粗
+        out += `<rect x="${_cNum(cx)}" y="${_cNum(cy + size * 0.1)}" width="${sw}" height="${sw}" rx="2" fill="${it.color}"${it.faded ? ` fill-opacity="${RS_CHART_FADED_OPACITY}"` : ''}/>` +
+            `<text x="${_cNum(cx + gap)}" y="${_cNum(cy + size * 0.85)}" font-size="${size}" fill="currentColor" ${it.strong ? 'font-weight="700"' : `fill-opacity="${it.faded ? .55 : .8}"`}>${_cEsc(label)}</text>`;
         cx += w;
     }
     return { svg: out, height: cy - y + size + 8 };
@@ -171,6 +197,12 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs, k = 1) {
     const tip = (i, d) => `${labels[i]}${multi ? ' · ' + (d.label || '') : ''}：${_cFmt(d.values[i] ?? 0, unit)}${_cCornerUnit(unit) ? ' ' + unit : ''}`;
     const showValues = n * datasets.length <= 16;
     const refText = l => `${l.label ? l.label + ' ' : ''}${_cFmt(l.value, unit)}`;
+    const hl = _cHighlight(spec, labels);
+    const on = i => !hl || hl.has(i);
+    // 有凸顯時：未凸顯的長條單一系列改中性色、多系列淡化；類別名稱與數值標籤凸顯的加粗、其餘變淡
+    const barFill = (i, k) => on(i) ? `fill="${colors[k]}"`
+        : multi ? `fill="${colors[k]}" fill-opacity="${RS_CHART_FADED_OPACITY}"` : `fill="currentColor" fill-opacity="${RS_CHART_MUTED_OPACITY}"`;
+    const textAttr = (i, base) => !hl ? `fill-opacity="${base}"` : on(i) ? 'font-weight="700"' : 'fill-opacity=".55"';
     const refTip = l => `${l.label || '參考線'}：${_cFmt(l.value, unit)}${_cCornerUnit(unit) ? ' ' + unit : ''}`;
 
     if (type === 'horizontal_bar') {
@@ -179,6 +211,7 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs, k = 1) {
         const valueW = showValues ? Math.max(...datasets.flatMap(d => d.values.slice(0, n).map(v => _cTextW(_cFmt(Number(v) || 0, unit), fs - 1)))) + 8 : 0;
         const left = labelW, right = W - 8 - valueW, bottom = H - fs - 8;
         const px = v => left + (v - sc.lo) / (sc.hi - sc.lo) * (right - left);
+        const refXs = refs.map(l => px(l.value));
         ticks.forEach(t => {
             out += `<line x1="${_cNum(px(t))}" x2="${_cNum(px(t))}" y1="${top}" y2="${bottom}" stroke="currentColor" stroke-opacity="${t === 0 ? .35 : .12}"/>` +
                 `<text x="${_cNum(px(t))}" y="${_cNum(bottom + fs + 3)}" text-anchor="middle" font-size="${fs - 1}" fill="currentColor" fill-opacity=".6">${_cFmt(t, unit)}</text>`;
@@ -188,13 +221,17 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs, k = 1) {
         const barH = Math.max(2, (groupH - 2 * (datasets.length - 1)) / datasets.length);
         labels.forEach((l, i) => {
             const gy = top + band * i + (band - groupH) / 2;
-            out += `<text x="${_cNum(left - 8)}" y="${_cNum(top + band * (i + .5) + fs * .35)}" text-anchor="end" font-size="${fs}" fill="currentColor" fill-opacity=".85">${_cEsc(_cFit(l, labelW - 8, fs))}</text>`;
+            out += `<text x="${_cNum(left - 8)}" y="${_cNum(top + band * (i + .5) + fs * .35)}" text-anchor="end" font-size="${fs}" fill="currentColor" ${textAttr(i, .85)}>${_cEsc(_cFit(l, labelW - 8, fs))}</text>`;
             datasets.forEach((d, k) => {
                 const v = Number(d.values[i]) || 0;
                 const y = gy + k * (barH + 2);
                 const x0 = px(Math.min(0, v)), x1 = px(Math.max(0, v));
-                out += `<path d="${_cBarPath(x0, y, x1 - x0, barH, v >= 0 ? 'right' : 'left')}" fill="${colors[k]}"><title>${_cEsc(tip(i, d))}</title></path>`;
-                if (showValues) out += `<text x="${_cNum(v >= 0 ? x1 + 4 : x0 - 4)}" y="${_cNum(y + barH / 2 + fs * .35)}" text-anchor="${v >= 0 ? 'start' : 'end'}" font-size="${fs - 1}" fill="currentColor" fill-opacity=".85">${_cFmt(v, unit)}</text>`;
+                out += `<path d="${_cBarPath(x0, y, x1 - x0, barH, v >= 0 ? 'right' : 'left')}" ${barFill(i, k)}><title>${_cEsc(tip(i, d))}</title></path>`;
+                if (showValues) {
+                    const text = _cFmt(v, unit), tw = _cTextW(text, fs - 1);
+                    const tx = v >= 0 ? _cAvoidLines(x1 + 4, x1 + 4, x1 + 4 + tw, refXs, 1) : _cAvoidLines(x0 - 4, x0 - 4 - tw, x0 - 4, refXs, -1);
+                    out += `<text x="${_cNum(tx)}" y="${_cNum(y + barH / 2 + fs * .35)}" text-anchor="${v >= 0 ? 'start' : 'end'}" font-size="${fs - 1}" fill="currentColor" ${textAttr(i, .85)}>${text}</text>`;
+                }
             });
         });
         refs.forEach(l => {
@@ -216,6 +253,9 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs, k = 1) {
     const left = axisW, right = W - (type === 'line' ? 12 : 4) - refGutter, bottom = H - fs - 10;
     const plotTop = top + (showValues ? fs + 2 : 4);
     const py = v => bottom - (v - sc.lo) / (sc.hi - sc.lo) * (bottom - plotTop);
+    const refYs = refs.map(l => py(l.value));
+    // 長條或資料點上方的數值標籤（基準線 y）避開水平參考線：重疊時移到線的上方
+    const labelY = y => _cAvoidLines(y, y - (fs - 1) * .8, y + 2, refYs, -1);
     ticks.forEach(t => {
         out += `<line x1="${left}" x2="${right}" y1="${_cNum(py(t))}" y2="${_cNum(py(t))}" stroke="currentColor" stroke-opacity="${t === 0 ? .35 : .12}"/>` +
             `<text x="${left - 6}" y="${_cNum(py(t) + 4)}" text-anchor="end" font-size="${fs - 1}" fill="currentColor" fill-opacity=".6">${_cFmt(t, unit)}</text>`;
@@ -242,7 +282,7 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs, k = 1) {
         const cx = i => n === 1 ? (left + right) / 2 : left + 8 + i * (right - left - 16) / (n - 1);
         labels.forEach((l, i) => {
             if (i % labelEvery) return;
-            out += `<text x="${_cNum(cx(i))}" y="${_cNum(bottom + fs + 4)}" text-anchor="middle" font-size="${xLabelSize}" fill="currentColor" fill-opacity=".8">${_cEsc(_cFit(l, Math.max(band * labelEvery - 4, 24), xLabelSize))}</text>`;
+            out += `<text x="${_cNum(cx(i))}" y="${_cNum(bottom + fs + 4)}" text-anchor="middle" font-size="${xLabelSize}" fill="currentColor" ${textAttr(i, .8)}>${_cEsc(_cFit(l, Math.max(band * labelEvery - 4, 24), xLabelSize))}</text>`;
         });
         datasets.forEach((d, k) => {
             const pts = labels.map((_, i) => [cx(i), py(Number(d.values[i]) || 0)]);
@@ -252,12 +292,15 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs, k = 1) {
             }
             out += `<polyline points="${line}" fill="none" stroke="${colors[k]}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
             pts.forEach((p, i) => {
-                out += `<circle cx="${_cNum(p[0])}" cy="${_cNum(p[1])}" r="${_cNum(Math.max(3, 4 * Math.min(k, 1.5)))}" fill="${colors[k]}"><title>${_cEsc(tip(i, d))}</title></circle>`;
+                // 凸顯的資料點放大並加白色外框
+                const big = hl && hl.has(i);
+                out += `<circle cx="${_cNum(p[0])}" cy="${_cNum(p[1])}" r="${_cNum(big ? 6 : Math.max(3, 4 * Math.min(k, 1.5)))}" fill="${colors[k]}"${big ? ' stroke="#fff" stroke-width="2"' : ''}><title>${_cEsc(tip(i, d))}</title></circle>`;
             });
-            // 直接標註：單一系列標每個點（點數不多時），多系列只標最後一點
-            const labelIdx = !multi && showValues ? labels.map((_, i) => i) : [n - 1];
+            // 直接標註：單一系列標每個點（點數不多時），多系列只標最後一點；凸顯的點一律標註
+            const labelIdx = new Set(!multi && showValues ? labels.map((_, i) => i) : [n - 1]);
+            if (hl) hl.forEach(i => labelIdx.add(i));
             labelIdx.forEach(i => {
-                out += `<text x="${_cNum(pts[i][0])}" y="${_cNum(pts[i][1] - fs * 0.75)}" text-anchor="middle" font-size="${fs - 1}" fill="currentColor" fill-opacity=".85">${_cFmt(d.values[i] ?? 0, unit)}</text>`;
+                out += `<text x="${_cNum(pts[i][0])}" y="${_cNum(labelY(pts[i][1] - fs * 0.75))}" text-anchor="middle" font-size="${fs - 1}" fill="currentColor" ${textAttr(i, .85)}>${_cFmt(d.values[i] ?? 0, unit)}</text>`;
             });
         });
         return out + refSvg();
@@ -269,14 +312,14 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs, k = 1) {
     labels.forEach((l, i) => {
         const gx = left + band * i + (band - groupW) / 2;
         if (!(i % labelEvery)) {
-            out += `<text x="${_cNum(left + band * (i + .5))}" y="${_cNum(bottom + fs + 4)}" text-anchor="middle" font-size="${xLabelSize}" fill="currentColor" fill-opacity=".8">${_cEsc(_cFit(l, Math.max(band * labelEvery - 4, 24), xLabelSize))}</text>`;
+            out += `<text x="${_cNum(left + band * (i + .5))}" y="${_cNum(bottom + fs + 4)}" text-anchor="middle" font-size="${xLabelSize}" fill="currentColor" ${textAttr(i, .8)}>${_cEsc(_cFit(l, Math.max(band * labelEvery - 4, 24), xLabelSize))}</text>`;
         }
         datasets.forEach((d, k) => {
             const v = Number(d.values[i]) || 0;
             const x = gx + k * (barW + 2);
             const y0 = py(Math.max(0, v)), y1 = py(Math.min(0, v));
-            out += `<path d="${_cBarPath(x, y0, barW, y1 - y0, v >= 0 ? 'up' : 'down')}" fill="${colors[k]}"><title>${_cEsc(tip(i, d))}</title></path>`;
-            if (showValues) out += `<text x="${_cNum(x + barW / 2)}" y="${_cNum(v >= 0 ? y0 - 5 : y1 + fs)}" text-anchor="middle" font-size="${fs - 1}" fill="currentColor" fill-opacity=".85">${_cFmt(v, unit)}</text>`;
+            out += `<path d="${_cBarPath(x, y0, barW, y1 - y0, v >= 0 ? 'up' : 'down')}" ${barFill(i, k)}><title>${_cEsc(tip(i, d))}</title></path>`;
+            if (showValues) out += `<text x="${_cNum(x + barW / 2)}" y="${_cNum(v >= 0 ? labelY(y0 - 5) : y1 + fs)}" text-anchor="middle" font-size="${fs - 1}" fill="currentColor" ${textAttr(i, .85)}>${_cFmt(v, unit)}</text>`;
         });
     });
     return out + refSvg();
@@ -288,8 +331,13 @@ function _cPie(type, labels, ds, unit, spec, W, H, top, fs, k = 1) {
     const total = values.reduce((a, b) => a + b, 0);
     if (!total) return '';
     const colors = _cColors(spec, labels.length);
+    const hl = _cHighlight(spec, labels);
+    const fade = i => hl && !hl.has(i) ? ` fill-opacity="${RS_CHART_FADED_OPACITY}"` : '';
     const side = W >= H * 1.3;                       // 寬的容器圖例放右邊，否則放下方
-    const legendItems = labels.map((l, i) => ({ label: `${l}  ${Math.round(values[i] / total * 1000) / 10}%`, color: colors[i] }));
+    const legendItems = labels.map((l, i) => ({
+        label: `${l}  ${Math.round(values[i] / total * 1000) / 10}%`, color: colors[i],
+        faded: !!hl && !hl.has(i), strong: !!hl && hl.has(i)
+    }));
     let legendSvg = '', cx, cy, r;
     if (side) {
         const legendW = Math.min(W * 0.42, Math.max(...legendItems.map(it => _cTextW(it.label, fs))) + fs + 10);
@@ -300,8 +348,8 @@ function _cPie(type, labels, ds, unit, spec, W, H, top, fs, k = 1) {
         const ly = cy - legendItems.length * rowH / 2;
         legendItems.forEach((it, i) => {
             const sw = _cNum(fs * 0.84);
-            legendSvg += `<rect x="${_cNum(lx)}" y="${_cNum(ly + i * rowH + fs * 0.1)}" width="${sw}" height="${sw}" rx="2" fill="${it.color}"/>` +
-                `<text x="${_cNum(lx + sw + 6)}" y="${_cNum(ly + i * rowH + fs * .85)}" font-size="${fs}" fill="currentColor" fill-opacity=".85">${_cEsc(_cFit(it.label, W - lx - sw - 6, fs))}</text>`;
+            legendSvg += `<rect x="${_cNum(lx)}" y="${_cNum(ly + i * rowH + fs * 0.1)}" width="${sw}" height="${sw}" rx="2" fill="${it.color}"${fade(i)}/>` +
+                `<text x="${_cNum(lx + sw + 6)}" y="${_cNum(ly + i * rowH + fs * .85)}" font-size="${fs}" fill="currentColor" ${it.strong ? 'font-weight="700"' : `fill-opacity="${it.faded ? .55 : .85}"`}>${_cEsc(_cFit(it.label, W - lx - sw - 6, fs))}</text>`;
         });
     } else {
         const lg = _cLegend(legendItems, 0, 0, W, fs);
@@ -318,15 +366,15 @@ function _cPie(type, labels, ds, unit, spec, W, H, top, fs, k = 1) {
         const sweep = v / total * Math.PI * 2;
         const tip = `${labels[i]}：${_cFmt(v, unit)}${_cCornerUnit(unit) ? ' ' + unit : ''}（${Math.round(v / total * 1000) / 10}%）`;
         if (sweep >= Math.PI * 2 - 1e-6) {
-            out += `<circle cx="${_cNum(cx)}" cy="${_cNum(cy)}" r="${_cNum((r + inner) / 2)}" fill="none" stroke="${colors[i]}" stroke-width="${_cNum(r - inner || r)}"><title>${_cEsc(tip)}</title></circle>`;
+            out += `<circle cx="${_cNum(cx)}" cy="${_cNum(cy)}" r="${_cNum((r + inner) / 2)}" fill="none" stroke="${colors[i]}" stroke-width="${_cNum(r - inner || r)}"${fade(i).replace('fill-opacity', 'stroke-opacity')}><title>${_cEsc(tip)}</title></circle>`;
         } else {
             const a0 = a + gap / 2, a1 = a + sweep - gap / 2;
             const large = a1 - a0 > Math.PI ? 1 : 0;
             const d = inner
                 ? `M${P(a0, r)}A${_cNum(r)},${_cNum(r)} 0 ${large} 1 ${P(a1, r)}L${P(a1, inner)}A${_cNum(inner)},${_cNum(inner)} 0 ${large} 0 ${P(a0, inner)}Z`
                 : `M${_cNum(cx)},${_cNum(cy)}L${P(a0, r)}A${_cNum(r)},${_cNum(r)} 0 ${large} 1 ${P(a1, r)}Z`;
-            out += `<path d="${d}" fill="${colors[i]}"><title>${_cEsc(tip)}</title></path>`;
-            if (v / total >= 0.06 && r >= 50) {
+            out += `<path d="${d}" fill="${colors[i]}"${fade(i)}><title>${_cEsc(tip)}</title></path>`;
+            if (v / total >= 0.06 && r >= 50 && !fade(i)) {   // 淡化的扇形上白字看不清楚，比例只寫在圖例
                 const mid = a + sweep / 2, lr = inner ? (r + inner) / 2 : r * 0.62;
                 out += `<text x="${_cNum(cx + lr * Math.cos(mid))}" y="${_cNum(cy + lr * Math.sin(mid) + 4)}" text-anchor="middle" font-size="${fs - 1}" font-weight="600" fill="#fff">${Math.round(v / total * 100)}%</text>`;
             }

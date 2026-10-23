@@ -20,7 +20,42 @@ def chart(**kw):
 
 
 def test_valid_chart_passes_through():
-    assert normalize_chart(chart()) == chart(datasets=[{"label": "營收", "values": [1.0, 2.0, 3.0]}], ref_lines=[])
+    assert normalize_chart(chart()) == chart(datasets=[{"label": "營收", "values": [1.0, 2.0, 3.0]}], ref_lines=[],
+                                             highlight=[])
+
+
+def test_highlight_keeps_existing_labels_in_order():
+    c = normalize_chart(chart(highlight=["2024", " 2022 ", "2024", "不存在", None, True]))
+    assert c["highlight"] == ["2022", "2024"]
+
+
+def test_highlight_numeric_label_and_invalid_input():
+    assert normalize_chart(chart(highlight=[2023]))["highlight"] == ["2023"]
+    assert normalize_chart(chart(highlight="2023"))["highlight"] == []      # 不是清單：忽略
+    assert normalize_chart(chart(highlight=None))["highlight"] == []
+
+
+def test_highlighting_every_label_means_no_highlight():
+    assert normalize_chart(chart(highlight=["2022", "2023", "2024"]))["highlight"] == []
+    dup = chart(labels=["A", "A", "B"], datasets=[{"label": "", "values": [1, 2, 3]}], highlight=["A"])
+    assert normalize_chart(dup)["highlight"] == ["A"]
+
+
+def test_highlight_is_required_in_llm_schema():
+    schema = app_module.AdaptivePresentation.model_json_schema()
+    assert "highlight" in schema["$defs"]["ChartSpec"]["required"]
+
+
+def test_generate_prompt_explains_highlight(monkeypatch):
+    captured = {}
+
+    def fake_llm(provider, model, system_instruction, prompt, schema, temperature, usage=None):
+        captured["system"] = system_instruction
+        return {"presentation_title": "t", "theme": None, "slides": []}
+
+    monkeypatch.setattr(app_module, "call_llm", fake_llm)
+    assert client.post("/api/generate", json={"content": "素材"}).status_code == 200
+    assert "用 highlight 凸顯這些項目" in captured["system"]
 
 
 def test_ref_lines_are_cleaned_and_limited():

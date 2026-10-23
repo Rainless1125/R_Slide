@@ -746,8 +746,42 @@ function readChartRefLines(type) {
     return out;
 }
 
+/* ----- 強調項目：勾選要凸顯的類別（spec.highlight 存類別名稱） ----- */
+let chartHlSelected = new Set();
+let chartHlKey = null;               // 目前勾選清單對應的類別（類別改變時才重建）
+
+function syncChartHlUi(labels) {
+    const uniq = [...new Set(labels)];
+    const key = JSON.stringify(uniq);
+    if (key === chartHlKey) return;
+    chartHlKey = key;
+    const list = document.getElementById('chartHlList');
+    list.replaceChildren(...uniq.map(l => {
+        const chip = document.createElement('label');
+        chip.className = 'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-zinc-200 dark:border-zinc-700 text-xs cursor-pointer select-none hover:bg-zinc-100 dark:hover:bg-zinc-800 has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50 dark:has-[:checked]:bg-blue-950/40 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-blue-500';
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.className = 'accent-blue-600';
+        box.checked = chartHlSelected.has(l);
+        box.addEventListener('change', () => {
+            if (box.checked) chartHlSelected.add(l); else chartHlSelected.delete(l);
+            updateChartPreview();
+        });
+        chip.append(box, document.createTextNode(l));
+        return chip;
+    }));
+}
+
+// 只保留目前還存在的類別；全部都勾等於沒有凸顯
+function readChartHighlight(labels) {
+    const uniq = [...new Set(labels)];
+    const picked = uniq.filter(l => chartHlSelected.has(l));
+    return picked.length < uniq.length ? picked : [];
+}
+
 function readChartForm() {
     const { labels, datasets } = parseChartRows(chartGrid.getRows());
+    syncChartHlUi(labels);
     const type = document.getElementById('chartType').value;
     const colors = document.getElementById('chartColors').value.split(/[,，\s]+/).map(c => c.trim()).filter(Boolean);
     const bad = colors.find(c => !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(c));
@@ -759,7 +793,8 @@ function readChartForm() {
         labels,
         datasets: type === 'pie' || type === 'doughnut' ? datasets.slice(0, 1) : datasets,
         colors,
-        ref_lines: readChartRefLines(type)
+        ref_lines: readChartRefLines(type),
+        highlight: readChartHighlight(labels)
     };
 }
 
@@ -804,6 +839,8 @@ function openChartEditor(target) {
     chartGrid.setRows(chartToRows(s));
     document.getElementById('chartRefList').replaceChildren();
     (s.ref_lines || []).forEach(l => addChartRefRow(l, false));
+    chartHlSelected = new Set(s.highlight || []);
+    chartHlKey = null;
     syncChartRefUi();
     document.getElementById('chartModal').classList.remove('hidden');
     updateChartPreview();

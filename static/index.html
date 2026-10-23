@@ -838,7 +838,7 @@
                         <div class="guide-grid">
                             <div class="guide-card"><b><i class="fa-solid fa-font"></i>文字</b><span>插入可自由移動的文字方塊。</span></div>
                             <div class="guide-card"><b><i class="fa-regular fa-image"></i>圖片</b><span>上傳、拖放或貼上圖片，在瀏覽器端壓縮後內嵌；可設定圓角、邊框（顏色、粗細、實線 / 虛線 / 點線）與透明圖片的底色。</span></div>
-                            <div class="guide-card"><b><i class="fa-solid fa-chart-column"></i>圖表</b><span>以試算表輸入數據，可直接貼上 Excel 多格資料，並可加參考虛線。</span></div>
+                            <div class="guide-card"><b><i class="fa-solid fa-chart-column"></i>圖表</b><span>以試算表輸入數據，可直接貼上 Excel 多格資料，並可加參考虛線、勾選要凸顯的項目。</span></div>
                             <div class="guide-card"><b><i class="fa-solid fa-icons"></i>圖示</b><span>內建 300 個常用圖示，可用中英文關鍵字搜尋，Enter 插入第一個。</span></div>
                             <div class="guide-card"><b><i class="fa-solid fa-shapes"></i>圖案</b><span>16 種圖案，可調整填滿、外框、線條樣式與圓角，雙擊輸入文字。</span></div>
                             <div class="guide-card"><b><i class="fa-regular fa-square-plus"></i>空白頁</b><span>在目前頁面之後新增空白頁並直接切換過去。</span></div>
@@ -1017,6 +1017,12 @@
                         <p id="chartRefHint" class="mt-1 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
                             以虛線標示目標、規格上下限或門檻，一眼看出哪些資料達標（最多 3 條）。</p>
                     </div>
+                    <div id="chartHlSection">
+                        <span id="chartHlLabel" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">強調項目（選填）</span>
+                        <div id="chartHlList" role="group" aria-labelledby="chartHlLabel" class="mt-1.5 flex flex-wrap gap-1.5"></div>
+                        <p class="mt-1 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
+                            勾選要凸顯的類別（建議 1~3 個），凸顯的項目使用第一個顏色，其餘自動改成中性色。</p>
+                    </div>
                     <label class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">顏色（選填，以逗號分隔的 HEX 色碼）
                         <input id="chartColors" placeholder="#2563eb, #f97316" class="mt-1 w-full h-9 px-2 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm font-mono text-zinc-900 dark:text-zinc-100">
                     </label>
@@ -1040,7 +1046,7 @@
         </div>
     </div>
 
-    <script src="/static/charts.js?v=4"></script>
+    <script src="/static/charts.js?v=5"></script>
     <script src="/static/chart-grid.js?v=1"></script>
     <script src="/static/export.js?v=9"></script>
     <script src="/static/presenter.js?v=4"></script>
@@ -1051,7 +1057,7 @@
     <script src="/static/app/outline.js?v=1"></script>
     <script src="/static/app/shapes.js?v=2"></script>
     <script src="/static/app/editor.js?v=7"></script>
-    <script src="/static/app/media.js?v=6"></script>
+    <script src="/static/app/media.js?v=7"></script>
     <script src="/static/app/player.js?v=4"></script>
     <script src="/static/app/versions.js?v=2"></script>
     <script src="/static/app/auth.js?v=3"></script>
