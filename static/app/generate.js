@@ -63,13 +63,13 @@ const pickByElapsed = (list, sec) => list.reduce((cur, [t, text]) => sec >= t ? 
 // kind：'deck' 生成整份簡報，'outline' 產生大綱；pages 為骨架屏的頁數（依大綱生成時以大綱頁數為準）
 function setLoading(on, kind = 'deck', pages) {
     const btn = document.getElementById('btnGenerate');
-    const spinner = document.getElementById('loadingSpinner');
+    const wand = document.getElementById('loadingWand');
     const icon = document.getElementById('btnIcon');
     const label = document.getElementById('btnLabel');
     const skel = document.getElementById('sectionSkeleton');
     btn.disabled = on;
     setOutlineBusy(on);
-    spinner.classList.toggle('hidden', !on);
+    wand.classList.toggle('hidden', !on);
     icon.classList.toggle('hidden', on);
     clearInterval(loadingTimer);
     if (on) {

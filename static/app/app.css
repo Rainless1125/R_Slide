@@ -473,6 +473,62 @@ body.sb-open #sidebar {
     #btnGenerate .dots i { animation: none !important; }
 }
 
+/* ---------- 生成中：魔法棒揮動、星星輪流閃爍（按鈕與骨架屏狀態列） ---------- */
+.ld-wand {
+    position: relative;
+    display: inline-grid;
+    place-items: center;
+    width: 1.3em;
+    height: 1.3em;
+    flex: none;
+    color: #a855f7;
+}
+
+.ld-wand.hidden {
+    display: none;
+}
+
+.ld-wand > i {
+    transform-origin: 20% 80%;
+    animation: wandWave 1.2s ease-in-out infinite;
+}
+
+.ld-wand .sp {
+    position: absolute;
+    width: .42em;
+    height: .42em;
+    background: #ec4899;
+    clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+    transform: scale(0);
+    animation: wandTwinkle 1.2s ease-in-out infinite;
+}
+
+.ld-wand .s1 { top: -.2em; right: -.25em; }
+.ld-wand .s2 { top: .25em; right: -.55em; width: .3em; height: .3em; background: #3b82f6; animation-delay: .4s; }
+.ld-wand .s3 { top: -.45em; left: .3em; width: .28em; height: .28em; background: #a855f7; animation-delay: .8s; }
+
+/* 按鈕在漸層底上：白色魔法棒，星星用淺黃、白、淺粉 */
+#btnGenerate .ld-wand { color: #fff; }
+#btnGenerate .ld-wand .s1 { background: #fde68a; }
+#btnGenerate .ld-wand .s2 { background: #fff; }
+#btnGenerate .ld-wand .s3 { background: #fbcfe8; }
+
+@keyframes wandWave {
+    0%, 100% { transform: rotate(-12deg); }
+    50% { transform: rotate(10deg); }
+}
+
+@keyframes wandTwinkle {
+    0%, 100% { transform: scale(0) rotate(0); opacity: 0; }
+    45% { transform: scale(1) rotate(45deg); opacity: 1; }
+    70% { opacity: .8; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ld-wand > i { animation: none; }
+    .ld-wand .sp { animation: none; transform: scale(.8) rotate(45deg); opacity: .9; }
+}
+
 /* ---------- 骨架屏 ---------- */
 .skeleton {
     background: linear-gradient(90deg, rgba(161, 161, 170, .15) 25%, rgba(161, 161, 170, .32) 50%, rgba(161, 161, 170, .15) 75%);
