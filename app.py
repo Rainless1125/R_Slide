@@ -19,6 +19,8 @@ from starlette.datastructures import UploadFile
 
 import store
 from accounts import current_user, router as accounts_router
+from deck_design import (DECK_RHYTHM_RULES, LAYOUT_CATALOG, THEME_RULES, DeckTheme, format_theme,
+                         theme_from_input)
 from admin import router as admin_router
 from charts import CHART_RULES, MAX_CHARTS_PER_SLIDE, ChartSpec, normalize_charts
 from exporter import ExportError, build_pptx
@@ -267,6 +269,8 @@ class SlideInput(AdaptiveSlide):
 
 class AdaptivePresentation(BaseModel):
     presentation_title: str = Field(description="整份簡報的大標題")
+    # theme 放在 slides 之前：LLM 依欄位順序輸出，先決定設計規範再產生每一頁
+    theme: DeckTheme = Field(description="整份簡報共用的設計規範（配色、卡片、標題樣式），每一頁都要套用，規則見【整份簡報的設計規範】")
     slides: list[AdaptiveSlide] = Field(description="動態排版的多頁投影片清單")
 
 
@@ -409,6 +413,7 @@ class RegenerateSlideRequest(BaseModel):
     slide_index: int
     slides: list[SlideInput]
     custom_prompt: str = ""
+    theme: dict | None = None                     # 整份簡報的設計規範（舊簡報沒有），見 deck_design.py
     provider: str = "gemini"
     model: str = ""
 
@@ -448,16 +453,14 @@ def generate_slides(req: GenerateRequest, request: Request, user: dict = Depends
     你的任務是將使用者提供的原始內容，規劃為多頁「版面各異、針對內容最適化」的現代簡報。
     
     【設計核心準則】：
-    1. 拒絕單一死板模板：
-       - 若內容是數據/成效，請設計為「巨大數字 (Big Numbers) + KPI 資訊卡片」。
-       - 若內容是流程/SOP，請設計為「橫向流程步驟卡 (Step Cards) 或 時間軸 (Timeline)」。
-       - 若內容是優缺點/方案比較，請設計為「左右對稱對比欄位 (Comparison Columns)」。
-       - 若內容有可比較的數值（趨勢、占比、排名），請搭配圖表呈現（見下方【圖表】規則）。
+    1. 拒絕單一死板模板：每一頁依內容從【版型目錄】挑選最適合的版型，並遵守【整份簡報的節奏】；
+       內容有可比較的數值（趨勢、占比、排名）時，請搭配圖表呈現（見下方【圖表】規則）。
     2. 視覺與配色規範：
        - 僅輸出 Tailwind CSS class。
        - 禁止使用emoji，請一律使用font-awesome圖示。
        - 【重要】你必須絕對服從使用者指定的「視覺風格」。如果要求明亮風，請多用 bg-white/bg-slate-50；如果要求科技風，才使用深色底 bg-slate-900 搭配螢光點綴色。
-    """ + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + SPEAKER_NOTES_RULES
+    """ + THEME_RULES + LAYOUT_CATALOG + DECK_RHYTHM_RULES + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] \
+        + CHART_RULES + SPEAKER_NOTES_RULES
 
     outline_block = ""
     if req.outline:
@@ -469,6 +472,7 @@ def generate_slides(req: GenerateRequest, request: Request, user: dict = Depends
     簡報標題：{req.outline.presentation_title}
 {format_outline(req.outline)}
     每一頁的標題與重點以大綱為準（可微調措辭以符合版面字數），版型概念為建議、可依內容調整；
+    頁數與頁序以大綱為準，【整份簡報的節奏】只用來決定每頁的版型，不要因此增加、刪除或調換頁面；
     使用者刪掉的主題不要再加回來，使用者新增的重點即使素材沒有提到也要呈現。
 """
     else:
@@ -489,6 +493,7 @@ def generate_slides(req: GenerateRequest, request: Request, user: dict = Depends
     with llm_usage_log(request, user, "generate", req) as usage:
         try:
             data = call_llm(req.provider, req.model, system_instruction, prompt, AdaptivePresentation, 0.6, usage)
+            data["theme"] = theme_from_input(data.get("theme"))   # 去除多餘空白、限制長度；格式不符時為 None
             for slide in data.get("slides") or []:
                 slide["charts"] = normalize_charts(slide.get("charts"))
             usage["slides_returned"] = len(data.get("slides") or [])
@@ -522,9 +527,9 @@ def generate_outline(req: GenerateRequest, request: Request, user: dict = Depend
     1. 故事線清楚：通常以封面開場、結尾做總結或呼籲行動，中間依邏輯（問題 → 方案 → 成效、時間順序等）排列。
     2. 每頁標題簡短明確；重點 2 ~ 5 點，每點一句話，只寫要傳達的訊息，不要寫版面指示。
     3. 只使用素材中的資訊，不要捏造數據。
-    4. 建議版型依內容型態選擇，例如「KPI 大數字」「三步驟流程卡」「時間軸」「左右對比」「直條圖 + 重點」「封面」「結語」。
+    4. 建議版型從【版型目錄】中依內容型態選擇（寫出版型名稱即可），並遵守【整份簡報的節奏】。
     5. 使用與原始素材相同的語言。
-    """ + DECK_MODE_RULES[req.deck_mode]
+    """ + LAYOUT_CATALOG + DECK_RHYTHM_RULES + DECK_MODE_RULES[req.deck_mode]
 
     pages_hint = (f"{req.num_pages} 頁（必須剛好 {req.num_pages} 頁）"
                   if req.num_pages > 0 else "由你依內容多寡與重點自行決定（建議 3~8 頁）")
@@ -626,6 +631,10 @@ def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict =
         raise HTTPException(status_code=400, detail=f"此頁講者備註過長（上限 {MAX_SLIDE_NOTES_CHARS:,} 字）")
     if len(json.dumps(target_slide.charts, ensure_ascii=False)) > MAX_SLIDE_CHARTS_CHARS:
         raise HTTPException(status_code=400, detail="此頁圖表資料過多，無法重產")
+    theme = theme_from_input(req.theme)
+    theme_block = (f"""以下 JSON 是整份簡報共用的設計規範，這一頁必須沿用其中的頁面背景、文字顏色、強調色、卡片、標題與小標籤樣式，
+    圖表 colors 依序使用 chart_colors（封面、章節分隔與結尾頁可改用強調色或深色滿版背景）：
+    {format_theme(theme)}""" if theme else "（這份簡報沒有記錄設計規範，請沿用原 HTML 與其他頁的配色、卡片與標題樣式）")
     deck_outline = "\n".join(
         f"- 第 {s.page_number} 頁｜{s.slide_title}｜{s.layout_concept}"
         for s in req.slides
@@ -639,12 +648,12 @@ def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict =
     1. 只輸出單頁資料，不要輸出整份簡報。
     2. 僅使用 Tailwind CSS class。
     3. 禁止使用 emoji，請使用 font-awesome 圖示。
-    4. 必須服從指定視覺風格，並避免與其他頁過度重複。
+    4. 必須服從指定視覺風格與【整份簡報的設計規範】，版型從【版型目錄】挑選，並避免與前後頁使用相同的版型。
     5. 使用者的額外需求若會讓內容超出畫面（例如要求加入更多內容），請以精簡文字的方式達成，不可違反版面尺寸限制。
     6. 原 HTML 中 <img data-rs-img src="rs-img:數字"> 是使用者上傳的圖片：除非使用者要求移除，否則請保留該 <img> 標籤與 src 原樣，
        可調整它的位置與大小。原 HTML 中的 data-rs-chart 容器內容已省略，圖表資料請參考【原圖表資料】。
     7. 講者備註需配合新版面重新撰寫；使用者的額外需求若只針對版面，仍可沿用【原講者備註】的重點。
-    """ + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + SPEAKER_NOTES_RULES
+    """ + LAYOUT_CATALOG + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + SPEAKER_NOTES_RULES
 
     prompt = f"""
     【簡報標題】：{req.presentation_title}
@@ -654,6 +663,9 @@ def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict =
     【指定視覺風格】：{req.style_preference}
     【原始素材內容】：
     {req.content}
+
+    【整份簡報的設計規範】：
+    {theme_block}
 
     【整份簡報大綱（請保持一致性）】：
     {deck_outline}

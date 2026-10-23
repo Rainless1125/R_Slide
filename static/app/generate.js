@@ -667,6 +667,7 @@ async function regenerateSingleSlide(idx, customPrompt = '', deckMode) {
                 slide_index: idx,
                 slides: slim.slides,
                 custom_prompt: customPrompt,
+                theme: currentPresentationData.theme || null,   // 整份簡報的設計規範，讓重產的頁面沿用（舊簡報沒有）
                 ...getLlmChoice()
             })
         });
