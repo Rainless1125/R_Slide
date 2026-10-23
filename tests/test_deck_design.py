@@ -51,7 +51,8 @@ def test_generate_prompt_has_theme_catalog_and_rhythm(monkeypatch):
     captured = capture_llm(monkeypatch, {"presentation_title": "t", "theme": THEME, "slides": [SLIDE]})
     res = client.post("/api/generate", json={"content": "素材"})
     assert res.status_code == 200
-    for section in ("【整份簡報的設計規範", "【版型目錄", "【整份簡報的節奏】", "2×2 矩陣", "theme.chart_colors"):
+    for section in ("【整份簡報的設計規範", "【版型目錄", "【整份簡報的節奏】", "2×2 矩陣", "theme.chart_colors",
+                    "以畫面結構判斷", "折線圖至少要有 3 個時間點", "空間分配要平衡", "沒有功能的裝飾元素"):
         assert section in captured["system"]
     assert res.json()["theme"] == THEME
 
@@ -92,6 +93,7 @@ def test_regenerate_follows_deck_theme(monkeypatch):
     assert "必須沿用其中的頁面背景" in captured["prompt"]
     assert THEME["card_style"] in captured["prompt"] and "#0ea5e9" in captured["prompt"]
     assert "【版型目錄" in captured["system"]
+    assert "空間分配要平衡" in captured["system"] and "折線圖至少要有 3 個時間點" in captured["system"]
 
 
 def test_regenerate_without_theme_follows_existing_style(monkeypatch):
