@@ -108,7 +108,21 @@ function toggleEditMode(force) {
     document.getElementById('editLabel').textContent = editMode ? '完成編輯' : '編輯';
     document.getElementById('editIcon').className = 'fa-solid text-[11px] ' + (editMode ? 'fa-check' : 'fa-pen-to-square');
     document.querySelectorAll('[data-edit-only]').forEach(b => { b.classList.toggle('hidden', !editMode); b.classList.toggle('flex', editMode); });
-    if (editMode) { prepareEditing(); showToast('單擊選取元素、雙擊編輯文字；選取後可拖曳移動（自動對齊，按住 Alt 暫停）、拉角落縮放、方向鍵微調，Ctrl+C / V 複製貼上、Ctrl+D 再製（Esc 取消選取，可撤銷）', 'info', 5000); }
+    if (editMode) {
+        prepareEditing();   // 操作提示顯示在投影片上方的編輯列（#fmtDockHint），不另外跳出提示
+        revealFmtDock();
+    }
+}
+
+// 進入編輯模式時，投影片頂端若太靠近頁首，往下捲讓編輯列完整出現在投影片上方，而不是疊在投影片上
+// （編輯列黏在頁首下方 72px，見 app.css 的 #fmtDock）
+function revealFmtDock() {
+    requestAnimationFrame(() => {
+        const dock = document.getElementById('fmtDock');
+        const want = 72 + dock.offsetHeight + 8;
+        const top = document.getElementById('slideCanvas').getBoundingClientRect().top;
+        if (top < want) window.scrollBy({ top: top - want, behavior: 'smooth' });
+    });
 }
 
 // 把畫面上的修改寫回資料（一次編輯 = 一個撤銷步驟）
@@ -148,6 +162,7 @@ function clearSelection() {
     selectedEl = null;
     fmtRO.disconnect();
     hidePalette();
+    hideMoreMenu();
     document.getElementById('fmtToolbar')?.classList.remove('open');
     document.getElementById('floatBox')?.classList.remove('open');
 }
@@ -449,15 +464,34 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
   <span class="sep"></span>
   ${btn('chart', '<i class="fa-solid fa-chart-column text-[11px]"></i><span>圖表資料</span>', '編輯圖表資料', '', 'chart')}
   <span class="sep"></span>
-  ${btn('resetPos', '<i class="fa-solid fa-arrows-to-dot text-[11px]"></i><span>還原位置</span>', '移回 AI 版面的原始位置', '', 'resetPos')}
-  ${btn('resetScale', '<i class="fa-solid fa-compress text-[11px]"></i><span>還原大小</span>', '還原為 AI 版面的原始大小（100%）', '', 'resetScale')}
+  ${btn('resetPos', '<i class="fa-solid fa-arrows-to-dot text-[11px]"></i><span>還原位置</span>', '移回 AI 版面的原始位置', '', 'aiReset')}
+  ${btn('resetScale', '<i class="fa-solid fa-compress text-[11px]"></i><span>還原大小</span>', '還原為 AI 版面的原始大小（100%）', '', 'aiReset')}
   <span class="sep"></span>
-  ${btn('duplicate', '<i class="fa-regular fa-clone text-[11px]"></i>', '複製元素（Ctrl+D）', '', 'common')}
-  ${btn('moveUp', '<i class="fa-solid fa-arrow-up text-[11px]"></i>', '同層上移（往前）', '', 'common')}
-  ${btn('moveDown', '<i class="fa-solid fa-arrow-down text-[11px]"></i>', '同層下移（往後）', '', 'common')}
+  ${btn('more', '<i class="fa-solid fa-ellipsis text-[12px]"></i>', '更多操作（複製、同層排序）', '', 'common')}
   ${btn('remove', '<i class="fa-regular fa-trash-can text-[11px]"></i>', '刪除元素（Delete）', 'danger', 'common')}`;
-    tb.querySelectorAll('[data-fmt]').forEach(b => { b.dataset.title = b.title; });   // 依元素類型換提示後可還原
-    document.body.appendChild(tb);
+    // 工具列固定在投影片上方的編輯列（#fmtDock）內，不會蓋住投影片內容
+    document.getElementById('fmtDock').appendChild(tb);
+    tb.querySelector('[data-fmt="more"]').setAttribute('aria-haspopup', 'menu');
+
+    // 較少用的操作收在「更多」選單，工具列維持一列
+    const more = document.createElement('div');
+    more.id = 'fmtMore';
+    more.setAttribute('role', 'menu');
+    const item = (id, icon, label, ctl, key = '') => `<button type="button" role="menuitem" class="mi" data-fmt="${id}" data-ctl="${ctl}" title="${label}">` +
+        `<i class="${icon}"></i><span>${label}</span>${key ? `<kbd>${key}</kbd>` : ''}</button>`;
+    more.innerHTML = `
+  ${item('duplicate', 'fa-regular fa-clone', '複製元素', 'common', 'Ctrl+D')}
+  ${item('moveUp', 'fa-solid fa-arrow-up', '同層上移（往前）', 'common')}
+  ${item('moveDown', 'fa-solid fa-arrow-down', '同層下移（往後）', 'common')}`;
+    document.body.appendChild(more);
+    more.addEventListener('mousedown', e => e.preventDefault());
+    more.addEventListener('click', e => {
+        const b = e.target.closest('[data-fmt]');
+        if (!b || b.disabled) return;
+        hideMoreMenu();
+        runFmt(b.dataset.fmt);
+    });
+    [tb, more].forEach(root => root.querySelectorAll('[data-fmt]').forEach(b => { b.dataset.title = b.title; }));   // 依元素類型換提示後可還原
 
     const pal = document.createElement('div');
     pal.id = 'fmtPalette';
@@ -479,6 +513,7 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
         if (!b || b.disabled) return;
         const id = b.dataset.fmt;
         if (id === 'chart') openChartEditor(selectedEl);
+        else if (id === 'more') toggleMoreMenu(b);
         else if (id.startsWith('align-')) runFmt('align', id.slice(6));
         else if (id.startsWith('pal-')) togglePalette(id.slice(4), b);
         else runFmt(id);
@@ -535,8 +570,29 @@ function cssColorToHex(css) {
 }
 function hidePalette() { document.getElementById('fmtPalette')?.classList.remove('open'); }
 
-/* 各類元素實際有作用的控制項群組（data-ctl）；parent 與 common（複製、排序、刪除）一律顯示，
- * resetPos / resetScale 只在移動過 / 縮放過的 AI 元素顯示。
+// 工具列或「更多」選單中的按鈕
+function fmtEl(id) { return document.querySelector(`#fmtToolbar [data-fmt="${id}"], #fmtMore [data-fmt="${id}"]`); }
+
+function toggleMoreMenu(anchor) {
+    const menu = document.getElementById('fmtMore');
+    if (menu.classList.contains('open')) { hideMoreMenu(); return; }
+    hidePalette();
+    menu.classList.add('open');
+    anchor.setAttribute('aria-expanded', 'true');
+    const r = anchor.getBoundingClientRect();
+    const w = menu.offsetWidth, h = menu.offsetHeight;
+    let top = r.bottom + 6;
+    if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
+    menu.style.top = top + 'px';
+    menu.style.left = Math.min(Math.max(8, r.right - w), window.innerWidth - w - 8) + 'px';
+}
+function hideMoreMenu() {
+    document.getElementById('fmtMore')?.classList.remove('open');
+    fmtEl('more')?.setAttribute('aria-expanded', 'false');
+}
+
+/* 各類元素實際有作用的控制項群組（data-ctl）；parent 與 common（刪除、更多選單的複製與排序）一律顯示，
+ * aiReset（還原位置 / 大小）只在 AI 版面元素顯示。
  * 圖片：文字類設定對 <img> 無效；背景只在透明圖片看得到，仍保留作為去背圖的底色。
  * 圖示：<i> 的 Font Awesome class 自帶字重、外框固定置中，粗細與對齊無效；字級 ± 為縮放圖示。
  * 圖表：SVG 文字用 currentColor 與固定字重，對齊與粗細看不出差別。 */
@@ -564,8 +620,8 @@ function elementKind(el) {
 // 只顯示目前元素可用的控制項，並隱藏多餘的分隔線（開頭、結尾與連續的分隔線）
 function applyToolbarCtls(tb, kind, extras = []) {
     const show = new Set(['parent', 'common', ...TOOLBAR_CTLS[kind], ...extras]);
-    tb.querySelectorAll('[data-ctl]').forEach(n => { n.style.display = show.has(n.dataset.ctl) ? '' : 'none'; });
-    tb.querySelectorAll('[data-fmt]').forEach(b => {
+    document.querySelectorAll('#fmtToolbar [data-ctl], #fmtMore [data-ctl]').forEach(n => { n.style.display = show.has(n.dataset.ctl) ? '' : 'none'; });
+    document.querySelectorAll('#fmtToolbar [data-fmt], #fmtMore [data-fmt]').forEach(b => {
         const t = TOOLBAR_TITLES[kind]?.[b.dataset.fmt] || b.dataset.title;
         b.title = t;
         b.setAttribute('aria-label', t);
@@ -602,18 +658,18 @@ function refreshToolbar() {
     document.getElementById('fmtBgChip').style.background = bg === 'rgba(0, 0, 0, 0)' ? 'transparent' : bg;
     const root = isRootBlock(el);
     const sizeIdx = currentSizeIndex(el);
-    tb.querySelector('[data-fmt="parent"]').disabled = root;
-    tb.querySelector('[data-fmt="sizeDown"]').disabled = isIcon ? el.offsetWidth <= ICON_MIN : sizeIdx <= 0;
-    tb.querySelector('[data-fmt="sizeUp"]').disabled = isIcon ? el.offsetWidth >= ICON_MAX : sizeIdx >= (isChart ? CHART_SIZE_MAX : SIZE_STEPS.length - 1);
-    tb.querySelector('[data-fmt="duplicate"]').disabled = root;
-    tb.querySelector('[data-fmt="remove"]').disabled = root;
-    tb.querySelector('[data-fmt="moveUp"]').disabled = root || !el.previousElementSibling;
-    tb.querySelector('[data-fmt="moveDown"]').disabled = root || !el.nextElementSibling;
+    fmtEl('parent').disabled = root;
+    fmtEl('sizeDown').disabled = isIcon ? el.offsetWidth <= ICON_MIN : sizeIdx <= 0;
+    fmtEl('sizeUp').disabled = isIcon ? el.offsetWidth >= ICON_MAX : sizeIdx >= (isChart ? CHART_SIZE_MAX : SIZE_STEPS.length - 1);
+    fmtEl('duplicate').disabled = root;
+    fmtEl('remove').disabled = root;
+    fmtEl('moveUp').disabled = root || !el.previousElementSibling;
+    fmtEl('moveDown').disabled = root || !el.nextElementSibling;
+    // 還原位置 / 大小：AI 版面元素一律顯示在工具列，沒有移動或縮放過時停用（浮動物件沒有原始位置可還原）
     const ai = !isFloat(el);
-    applyToolbarCtls(tb, kind, [
-        ...(ai && getOffset(el).some(Boolean) ? ['resetPos'] : []),
-        ...(ai && getScale(el) !== 1 ? ['resetScale'] : [])
-    ]);
+    applyToolbarCtls(tb, kind, ai ? ['aiReset'] : []);
+    fmtEl('resetPos').disabled = !ai || !getOffset(el).some(Boolean);
+    fmtEl('resetScale').disabled = !ai || getScale(el) === 1;
     // 圖案：填滿 / 外框；線條沒有填滿，沒有轉角的圖案沒有圓角
     const shape = kind === 'shape' ? shapeOf(el) : null;
     if (shape) {
@@ -643,21 +699,11 @@ function refreshToolbar() {
     positionToolbar();
 }
 
-// 工具列固定在視窗座標：優先放在元素上方，放不下就改放下方
+// 工具列固定在投影片上方的編輯列，不需要跟著元素移動；保留這個函式讓拖曳、縮放時同步更新控制點
 function positionToolbar() {
     positionFloatBox();
-    const tb = document.getElementById('fmtToolbar');
-    if (!tb || !selectedEl || !tb.classList.contains('open')) return;
-    const r = selectedEl.getBoundingClientRect();
-    if (r.bottom < 0 || r.top > window.innerHeight) { tb.style.visibility = 'hidden'; return; }
-    tb.style.visibility = 'visible';
-    const w = tb.offsetWidth, h = tb.offsetHeight;
-    let top = r.top - h - 8;
-    if (top < 8) top = r.bottom + 8;
-    if (top + h > window.innerHeight - 8) top = Math.max(8, Math.min(r.top + 8, window.innerHeight - h - 8));
-    tb.style.top = top + 'px';
-    tb.style.left = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - w - 8)) + 'px';
 }
 document.addEventListener('mousedown', e => {
     if (!e.target.closest('#fmtPalette') && !e.target.closest('[data-fmt^="pal-"]')) hidePalette();
+    if (!e.target.closest('#fmtMore') && !e.target.closest('[data-fmt="more"]')) hideMoreMenu();
 });

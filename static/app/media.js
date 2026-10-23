@@ -658,7 +658,7 @@ function nudgeSelected(dx, dy) {
     const merge = nudgeState && nudgeState.el === el && Date.now() - nudgeState.at < 800 && undoStack[undoStack.length - 1] === nudgeState.snap;
     commitSlideEdit(!merge);
     nudgeState = { el, at: Date.now(), snap: merge ? nudgeState.snap : undoStack[undoStack.length - 1] };
-    positionToolbar();
+    refreshToolbar();                    // 移動後啟用工具列的「還原位置」
     return true;
 }
 
