@@ -337,17 +337,22 @@ function isFloat(el) { return !!el && el.hasAttribute('data-rs-float') && el.sty
     document.body.appendChild(box);
     box.addEventListener('pointerdown', e => {
         const h = e.target.closest('.fh');
-        if (h) startFloatDrag(e, h.dataset.h);
+        if (!h) return;
+        if (isFloat(selectedEl)) startFloatDrag(e, h.dataset.h);
+        else startScaleDrag(e, h.dataset.h);        // AI 版面元素：等比例縮放
     });
 })();
 
 function positionFloatBox() {
     const box = document.getElementById('floatBox');
     if (!box) return;
-    if (!editMode || !isFloat(selectedEl) || !selectedEl.isConnected) { box.classList.remove('open'); return; }
-    const r = selectedEl.getBoundingClientRect();
+    const el = selectedEl;
+    const float = isFloat(el);
+    // 浮動物件與可縮放的 AI 版面元素顯示控制點；AI 元素編輯文字時隱藏，避免擋住游標操作
+    if (!editMode || !el || !el.isConnected || (!float && (!canScale(el) || editingEl === el))) { box.classList.remove('open'); return; }
+    const r = el.getBoundingClientRect();
     Object.assign(box.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
-    box.querySelector('.fsize').textContent = `${selectedEl.offsetWidth} × ${selectedEl.offsetHeight}`;
+    box.querySelector('.fsize').textContent = float ? `${el.offsetWidth} × ${el.offsetHeight}` : `${Math.round(getScale(el) * 100)}%`;
     box.classList.add('open');
 }
 
@@ -551,6 +556,76 @@ function endOffsetDrag() {
     showSnapGuides(null);
     const d = offsetDrag;
     offsetDrag = null;
+    if (!d || !d.moved) return;
+    suppressNextClick = true;
+    setTimeout(() => { suppressNextClick = false; }, 0);
+    commitSlideEdit();
+    refreshToolbar();
+}
+
+/* ----- AI 版面元素：等比例縮放 ----- */
+// 與原地位移相同，不改變排版：以 CSS scale 等比例放大縮小（文字、邊框、圓角一起縮放），旁邊的元素不受影響。
+// 只支援等比例：只拉寬或拉高會把文字壓扁。transform-origin 固定為左上角，
+// 元素外框的左上角 = 原位置 + translate，從任一角縮放時以 translate 補償，讓對角固定不動。
+const SCALE_MIN = 0.3, SCALE_MAX = 3;
+const SCALE_RE = /^\d*\.?\d+$/;
+function getScale(el) {
+    const v = (el.style.scale || '').trim();
+    return SCALE_RE.test(v) && Number(v) > 0 ? Number(v) : 1;
+}
+function setScale(el, s) {
+    s = Math.round(Math.min(SCALE_MAX, Math.max(SCALE_MIN, s)) * 100) / 100;
+    if (s === 1) { el.style.removeProperty('scale'); el.style.removeProperty('transform-origin'); }
+    else Object.assign(el.style, { scale: String(s), transformOrigin: '0 0' });
+    if (!el.getAttribute('style')) el.removeAttribute('style');
+    return s;
+}
+// AI 自己寫了非數字的 scale（例如兩個方向不同）就不動
+function canScale(el) { return canOffset(el) && (!el.style.scale || SCALE_RE.test(el.style.scale.trim())); }
+
+let scaleDrag = null;
+function startScaleDrag(e, handle) {
+    const el = selectedEl;
+    if (!editMode || !canScale(el) || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    stopTextEdit();
+    const [ox, oy] = getOffset(el);
+    scaleDrag = { el, handle, sx: e.clientX, sy: e.clientY, s: getScale(el), ox, oy, r: slideRectOf(el), k: slideScale(), moved: false, snap: collectSnapTargets(el) };
+    e.target.setPointerCapture?.(e.pointerId);
+    e.target.addEventListener('pointermove', onScaleDragMove);
+    e.target.addEventListener('pointerup', endScaleDrag, { once: true });
+    e.target.addEventListener('pointercancel', endScaleDrag, { once: true });
+}
+function onScaleDragMove(e) {
+    const d = scaleDrag;
+    if (!d) return;
+    const dx = (e.clientX - d.sx) / d.k, dy = (e.clientY - d.sy) / d.k;
+    if (!d.moved && Math.abs(dx) + Math.abs(dy) < 2) return;
+    d.moved = true;
+    const { x, y, w, h } = d.r;
+    const west = d.handle.includes('w'), north = d.handle.includes('n');
+    // 等比例：取水平、垂直兩個方向中放大（或縮小）較多的比例
+    let nw = w * Math.max((w + (west ? -dx : dx)) / w, (h + (north ? -dy : dy)) / h);
+    const guides = { x: [], y: [] };
+    if (!e.altKey) {
+        // 只吸附正在拖動的那一側邊線（高度隨比例決定，不另外吸附）
+        const sx = snapAxis([west ? x + w - nw : x + nw], d.snap.x, SNAP_PX / d.k);
+        nw += west ? -sx.delta : sx.delta;
+        guides.x = sx.lines;
+    }
+    const s = setScale(d.el, d.s * Math.max(nw, 1) / w);
+    nw = w * s / d.s;
+    const nh = h * s / d.s;
+    setOffset(d.el, d.ox + (west ? w - nw : 0), d.oy + (north ? h - nh : 0));
+    showSnapGuides(guides);
+    positionToolbar();
+}
+function endScaleDrag(e) {
+    e.target.removeEventListener('pointermove', onScaleDragMove);
+    showSnapGuides(null);
+    const d = scaleDrag;
+    scaleDrag = null;
     if (!d || !d.moved) return;
     suppressNextClick = true;
     setTimeout(() => { suppressNextClick = false; }, 0);

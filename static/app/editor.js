@@ -108,7 +108,7 @@ function toggleEditMode(force) {
     document.getElementById('editLabel').textContent = editMode ? '完成編輯' : '編輯';
     document.getElementById('editIcon').className = 'fa-solid text-[11px] ' + (editMode ? 'fa-check' : 'fa-pen-to-square');
     document.querySelectorAll('[data-edit-only]').forEach(b => { b.classList.toggle('hidden', !editMode); b.classList.toggle('flex', editMode); });
-    if (editMode) { prepareEditing(); showToast('單擊選取元素、雙擊編輯文字；選取後可拖曳移動（自動對齊，按住 Alt 暫停）、方向鍵微調，插入的文字、圖片、圖表、圖示與圖案還可拉角落縮放，Ctrl+C / V 複製貼上、Ctrl+D 再製（Esc 取消選取，可撤銷）', 'info', 5000); }
+    if (editMode) { prepareEditing(); showToast('單擊選取元素、雙擊編輯文字；選取後可拖曳移動（自動對齊，按住 Alt 暫停）、拉角落縮放、方向鍵微調，Ctrl+C / V 複製貼上、Ctrl+D 再製（Esc 取消選取，可撤銷）', 'info', 5000); }
 }
 
 // 把畫面上的修改寫回資料（一次編輯 = 一個撤銷步驟）
@@ -353,6 +353,7 @@ const FMT_ACTIONS = {
     imgBorder(prop, v) { setImgBorder(selectedEl, prop, v); },
     shapeProp(prop, v) { const s = shapeOf(selectedEl); if (s) setShapeStyle(s, prop, v); },
     resetPos() { setOffset(selectedEl, 0, 0); },
+    resetScale() { setScale(selectedEl, 1); },      // 縮放以左上角為基準，還原後左上角位置不變
     moveUp() { moveSibling(-1); },
     moveDown() { moveSibling(1); }
 };
@@ -449,6 +450,7 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
   ${btn('chart', '<i class="fa-solid fa-chart-column text-[11px]"></i><span>圖表資料</span>', '編輯圖表資料', '', 'chart')}
   <span class="sep"></span>
   ${btn('resetPos', '<i class="fa-solid fa-arrows-to-dot text-[11px]"></i><span>還原位置</span>', '移回 AI 版面的原始位置', '', 'resetPos')}
+  ${btn('resetScale', '<i class="fa-solid fa-compress text-[11px]"></i><span>還原大小</span>', '還原為 AI 版面的原始大小（100%）', '', 'resetScale')}
   <span class="sep"></span>
   ${btn('duplicate', '<i class="fa-regular fa-clone text-[11px]"></i>', '複製元素（Ctrl+D）', '', 'common')}
   ${btn('moveUp', '<i class="fa-solid fa-arrow-up text-[11px]"></i>', '同層上移（往前）', '', 'common')}
@@ -533,7 +535,8 @@ function cssColorToHex(css) {
 }
 function hidePalette() { document.getElementById('fmtPalette')?.classList.remove('open'); }
 
-/* 各類元素實際有作用的控制項群組（data-ctl）；parent 與 common（複製、排序、刪除）一律顯示，resetPos 只在移動過的 AI 元素顯示。
+/* 各類元素實際有作用的控制項群組（data-ctl）；parent 與 common（複製、排序、刪除）一律顯示，
+ * resetPos / resetScale 只在移動過 / 縮放過的 AI 元素顯示。
  * 圖片：文字類設定對 <img> 無效；背景只在透明圖片看得到，仍保留作為去背圖的底色。
  * 圖示：<i> 的 Font Awesome class 自帶字重、外框固定置中，粗細與對齊無效；字級 ± 為縮放圖示。
  * 圖表：SVG 文字用 currentColor 與固定字重，對齊與粗細看不出差別。 */
@@ -559,8 +562,8 @@ function elementKind(el) {
     return 'text';
 }
 // 只顯示目前元素可用的控制項，並隱藏多餘的分隔線（開頭、結尾與連續的分隔線）
-function applyToolbarCtls(tb, kind, moved) {
-    const show = new Set(['parent', 'common', ...TOOLBAR_CTLS[kind], ...(moved ? ['resetPos'] : [])]);
+function applyToolbarCtls(tb, kind, extras = []) {
+    const show = new Set(['parent', 'common', ...TOOLBAR_CTLS[kind], ...extras]);
     tb.querySelectorAll('[data-ctl]').forEach(n => { n.style.display = show.has(n.dataset.ctl) ? '' : 'none'; });
     tb.querySelectorAll('[data-fmt]').forEach(b => {
         const t = TOOLBAR_TITLES[kind]?.[b.dataset.fmt] || b.dataset.title;
@@ -606,7 +609,11 @@ function refreshToolbar() {
     tb.querySelector('[data-fmt="remove"]').disabled = root;
     tb.querySelector('[data-fmt="moveUp"]').disabled = root || !el.previousElementSibling;
     tb.querySelector('[data-fmt="moveDown"]').disabled = root || !el.nextElementSibling;
-    applyToolbarCtls(tb, kind, !isFloat(el) && getOffset(el).some(Boolean));
+    const ai = !isFloat(el);
+    applyToolbarCtls(tb, kind, [
+        ...(ai && getOffset(el).some(Boolean) ? ['resetPos'] : []),
+        ...(ai && getScale(el) !== 1 ? ['resetScale'] : [])
+    ]);
     // 圖案：填滿 / 外框；線條沒有填滿，沒有轉角的圖案沒有圓角
     const shape = kind === 'shape' ? shapeOf(el) : null;
     if (shape) {
