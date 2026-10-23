@@ -53,8 +53,13 @@ function buildSkeletonCards(kind = 'deck', pages) {
   </div>`;
     document.getElementById('skeletonGrid').innerHTML = card.repeat(Math.min(Math.max(n, 1), 6));
 }
-const LOADING_MSGS = ['分析內容中…', '規劃版面結構…', 'AI 動態配色中…', '生成排版中…'];
-const OUTLINE_LOADING_MSGS = ['分析內容中…', '規劃故事線…', '整理每頁重點…'];
+// 生成中顯示的階段依經過秒數往下走、停在最後一個（不循環，避免看起來像重新開始）；只是大略的示意，不是實際進度
+const LOADING_PHASES = [[0, '分析內容中…'], [3, '正在規劃版面…'], [8, '設計配色與排版…'], [15, '生成每頁版面…']];
+const OUTLINE_LOADING_PHASES = [[0, '分析內容中…'], [3, '規劃故事線…'], [8, '整理每頁重點…']];
+// 等待較久時的補充說明
+const LOADING_SLOW_HINTS = [[40, '頁數較多、詳細模式或較慢的模型需要較長時間，請稍候'], [120, '等待時間比平常久，仍在等候 AI 回應']];
+const pickByElapsed = (list, sec) => list.reduce((cur, [t, text]) => sec >= t ? text : cur, '');
+
 // kind：'deck' 生成整份簡報，'outline' 產生大綱；pages 為骨架屏的頁數（依大綱生成時以大綱頁數為準）
 function setLoading(on, kind = 'deck', pages) {
     const btn = document.getElementById('btnGenerate');
@@ -68,10 +73,23 @@ function setLoading(on, kind = 'deck', pages) {
     icon.classList.toggle('hidden', on);
     clearInterval(loadingTimer);
     if (on) {
-        const msgs = kind === 'outline' ? OUTLINE_LOADING_MSGS : LOADING_MSGS;
-        let i = 0;
-        label.textContent = msgs[0];
-        loadingTimer = setInterval(() => { i = (i + 1) % msgs.length; label.textContent = msgs[i]; }, 1800);
+        const phases = kind === 'outline' ? OUTLINE_LOADING_PHASES : LOADING_PHASES;
+        const verb = kind === 'outline' ? '產生大綱中' : '生成中';
+        const phaseEl = document.getElementById('loadingPhase');
+        const elapsedEl = document.getElementById('loadingElapsed');
+        const hintEl = document.getElementById('loadingHint');
+        const start = Date.now();
+        const tick = () => {
+            const sec = Math.floor((Date.now() - start) / 1000);
+            const phase = pickByElapsed(phases, sec);
+            if (phaseEl.textContent !== phase) phaseEl.textContent = phase;   // 只在換階段時更新，螢幕閱讀器不會每秒朗讀
+            elapsedEl.textContent = `已等待 ${sec} 秒`;
+            const hint = pickByElapsed(LOADING_SLOW_HINTS, sec);
+            hintEl.textContent = hint ? '・' + hint : '';
+            label.textContent = `${verb} ${sec} 秒`;
+        };
+        tick();
+        loadingTimer = setInterval(tick, 1000);
         document.getElementById('sectionReview').classList.add('hidden');
         document.getElementById('sectionPlayer').classList.add('hidden');
         document.getElementById('sectionOutline').classList.add('hidden');
