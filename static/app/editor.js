@@ -464,7 +464,10 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
   <span class="sep"></span>
   ${btn('chart', '<i class="fa-solid fa-chart-column text-[11px]"></i><span>圖表資料</span>', '編輯圖表資料', '', 'chart')}
   <span class="sep"></span>
-  ${btn('more', '<i class="fa-solid fa-ellipsis text-[12px]"></i>', '更多操作（複製、排序、還原位置與大小）', 'more-btn', 'common')}
+  ${btn('resetPos', '<i class="fa-solid fa-arrows-to-dot text-[11px]"></i><span>還原位置</span>', '移回 AI 版面的原始位置', '', 'aiReset')}
+  ${btn('resetScale', '<i class="fa-solid fa-compress text-[11px]"></i><span>還原大小</span>', '還原為 AI 版面的原始大小（100%）', '', 'aiReset')}
+  <span class="sep"></span>
+  ${btn('more', '<i class="fa-solid fa-ellipsis text-[12px]"></i>', '更多操作（複製、同層排序）', '', 'common')}
   ${btn('remove', '<i class="fa-regular fa-trash-can text-[11px]"></i>', '刪除元素（Delete）', 'danger', 'common')}`;
     // 工具列固定在投影片上方的編輯列（#fmtDock）內，不會蓋住投影片內容
     document.getElementById('fmtDock').appendChild(tb);
@@ -479,10 +482,7 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
     more.innerHTML = `
   ${item('duplicate', 'fa-regular fa-clone', '複製元素', 'common', 'Ctrl+D')}
   ${item('moveUp', 'fa-solid fa-arrow-up', '同層上移（往前）', 'common')}
-  ${item('moveDown', 'fa-solid fa-arrow-down', '同層下移（往後）', 'common')}
-  <div class="msep" data-reset-sep></div>
-  ${item('resetPos', 'fa-solid fa-arrows-to-dot', '還原位置', 'resetPos')}
-  ${item('resetScale', 'fa-solid fa-compress', '還原大小（100%）', 'resetScale')}`;
+  ${item('moveDown', 'fa-solid fa-arrow-down', '同層下移（往後）', 'common')}`;
     document.body.appendChild(more);
     more.addEventListener('mousedown', e => e.preventDefault());
     more.addEventListener('click', e => {
@@ -591,8 +591,8 @@ function hideMoreMenu() {
     fmtEl('more')?.setAttribute('aria-expanded', 'false');
 }
 
-/* 各類元素實際有作用的控制項群組（data-ctl）；parent 與 common（複製、排序、刪除）一律顯示，
- * resetPos / resetScale 只在移動過 / 縮放過的 AI 元素顯示。
+/* 各類元素實際有作用的控制項群組（data-ctl）；parent 與 common（刪除、更多選單的複製與排序）一律顯示，
+ * aiReset（還原位置 / 大小）只在 AI 版面元素顯示。
  * 圖片：文字類設定對 <img> 無效；背景只在透明圖片看得到，仍保留作為去背圖的底色。
  * 圖示：<i> 的 Font Awesome class 自帶字重、外框固定置中，粗細與對齊無效；字級 ± 為縮放圖示。
  * 圖表：SVG 文字用 currentColor 與固定字重，對齊與粗細看不出差別。 */
@@ -621,10 +621,6 @@ function elementKind(el) {
 function applyToolbarCtls(tb, kind, extras = []) {
     const show = new Set(['parent', 'common', ...TOOLBAR_CTLS[kind], ...extras]);
     document.querySelectorAll('#fmtToolbar [data-ctl], #fmtMore [data-ctl]').forEach(n => { n.style.display = show.has(n.dataset.ctl) ? '' : 'none'; });
-    // 「更多」選單：有還原項目時才顯示分隔線，並在「更多」按鈕加上提示點
-    const canReset = extras.length > 0;
-    document.querySelector('#fmtMore [data-reset-sep]').style.display = canReset ? '' : 'none';
-    fmtEl('more').classList.toggle('has-dot', canReset);
     document.querySelectorAll('#fmtToolbar [data-fmt], #fmtMore [data-fmt]').forEach(b => {
         const t = TOOLBAR_TITLES[kind]?.[b.dataset.fmt] || b.dataset.title;
         b.title = t;
@@ -669,11 +665,11 @@ function refreshToolbar() {
     fmtEl('remove').disabled = root;
     fmtEl('moveUp').disabled = root || !el.previousElementSibling;
     fmtEl('moveDown').disabled = root || !el.nextElementSibling;
+    // 還原位置 / 大小：AI 版面元素一律顯示在工具列，沒有移動或縮放過時停用（浮動物件沒有原始位置可還原）
     const ai = !isFloat(el);
-    applyToolbarCtls(tb, kind, [
-        ...(ai && getOffset(el).some(Boolean) ? ['resetPos'] : []),
-        ...(ai && getScale(el) !== 1 ? ['resetScale'] : [])
-    ]);
+    applyToolbarCtls(tb, kind, ai ? ['aiReset'] : []);
+    fmtEl('resetPos').disabled = !ai || !getOffset(el).some(Boolean);
+    fmtEl('resetScale').disabled = !ai || getScale(el) === 1;
     // 圖案：填滿 / 外框；線條沒有填滿，沒有轉角的圖案沒有圓角
     const shape = kind === 'shape' ? shapeOf(el) : null;
     if (shape) {

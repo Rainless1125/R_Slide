@@ -1081,22 +1081,6 @@ body:has(#slideCanvas.editing) #toastRoot {
     display: flex;
 }
 
-/* 「更多」按鈕：可還原位置 / 大小時加上提示點 */
-#fmtToolbar .more-btn {
-    position: relative;
-}
-
-#fmtToolbar .more-btn.has-dot::after {
-    content: "";
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #3b82f6;
-}
-
 #fmtMore {
     position: fixed;
     z-index: 56;
@@ -1153,12 +1137,6 @@ body:has(#slideCanvas.editing) #toastRoot {
 #fmtMore .mi:disabled {
     opacity: .35;
     cursor: not-allowed;
-}
-
-#fmtMore .msep {
-    height: 1px;
-    margin: 4px 6px;
-    background: rgba(128, 128, 128, .3);
 }
 
 #fmtToolbar .fb {
