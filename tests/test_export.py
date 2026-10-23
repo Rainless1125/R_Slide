@@ -2,6 +2,7 @@ import base64
 import io
 import os
 
+import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 from pptx import Presentation
@@ -12,6 +13,8 @@ from app import app  # noqa: E402
 from exporter import MAX_EXPORT_SLIDES, SLIDE_HEIGHT, SLIDE_WIDTH  # noqa: E402
 
 client = TestClient(app)
+# 檔案解析與匯出需要登入；未登入的情況見 test_requires_login
+pytestmark = pytest.mark.usefixtures("logged_in")
 
 
 def image_data_url(fmt: str = "JPEG", size=(256, 144), color=(30, 64, 175)) -> str:
@@ -99,3 +102,10 @@ def test_decompression_bomb_is_rejected():
     res = export([{"title": "封面", "image": "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()}])
     assert res.status_code == 400
     assert "尺寸過大" in res.json()["detail"]
+
+
+def test_requires_login(logged_in):
+    from accounts import current_user
+    app.dependency_overrides.pop(current_user, None)
+    res = export([{"title": "封面", "image": image_data_url()}])
+    assert res.status_code == 401

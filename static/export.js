@@ -491,7 +491,7 @@ async function _exportRun(kind, build) {
         _exportDownload(blob, title, kind.toLowerCase());
         showToast(`已匯出 ${kind}`, 'success', 1800);
     } catch (err) {
-        showToast(typeof friendlyError === 'function' ? friendlyError(err) : String(err?.message || err), 'error', 6000);
+        if (!err?.handled) showToast(typeof friendlyError === 'function' ? friendlyError(err) : String(err?.message || err), 'error', 6000);
     } finally {
         _exportSetBusy(false);
     }
@@ -519,6 +519,7 @@ function exportPresentationPptx() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title, slides: slides.map((s, i) => ({ title: s.slide_title, notes: s.speaker_notes || '', image: images[i] })) })
         });
+        throwIfSessionExpired(res);         // 登入逾時：跳出登入視窗，不另外顯示錯誤
         if (!res.ok) throw await readApiError(res);
         return res.blob();
     });

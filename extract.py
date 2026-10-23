@@ -10,6 +10,9 @@ from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+# .docx 是 zip 壓縮檔：解壓縮後的總大小上限，避免很小的檔案解壓出數 GB 的資料（zip bomb）把記憶體用光。
+# 一般文件解壓後多在數 MB 以內，內嵌大量圖片時才會較大
+MAX_DOCX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".md", ".markdown", ".txt"}
 TEXT_ENCODINGS = ("utf-8-sig", "cp950", "big5hkscs")
 
@@ -121,8 +124,17 @@ def _table_to_text(table: Table) -> str:
     return "\n".join(rows)
 
 
+def _check_docx_size(data: bytes):
+    """以 zip 目錄記錄的解壓縮大小檢查；zipfile 讀取每個檔案時最多只輸出記錄的大小，因此這個總和就是實際上限。"""
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        total = sum(info.file_size for info in zf.infolist())
+    if total > MAX_DOCX_UNCOMPRESSED_BYTES:
+        raise ExtractError("Word 檔解壓縮後的內容過大，無法讀取", 413)
+
+
 def _extract_docx(data: bytes) -> tuple[str, None]:
     try:
+        _check_docx_size(data)
         doc = Document(io.BytesIO(data))
     except (zipfile.BadZipFile, KeyError, ValueError) as e:
         raise ExtractError("無法讀取此 Word 檔，請確認為 .docx 格式（舊版 .doc 請先另存新檔）") from e

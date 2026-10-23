@@ -11,6 +11,8 @@ from app import MAX_CONTENT_CHARS, app  # noqa: E402
 from extract import MAX_UPLOAD_BYTES  # noqa: E402
 
 client = TestClient(app)
+# 檔案解析與匯出需要登入；未登入的情況見 test_requires_login
+pytestmark = pytest.mark.usefixtures("logged_in")
 
 
 def make_pdf(pages: list[list[str]]) -> bytes:
@@ -92,6 +94,14 @@ def test_docx_keeps_headings_lists_and_tables():
     assert "指標 | 數值" in text and "完成度 | 85%" in text
 
 
+def test_docx_zip_bomb_is_rejected(monkeypatch):
+    import extract
+    monkeypatch.setattr(extract, "MAX_DOCX_UNCOMPRESSED_BYTES", 1024)
+    res = upload("bomb.docx", make_docx())
+    assert res.status_code == 413
+    assert "解壓縮後的內容過大" in res.json()["detail"]
+
+
 def test_invalid_docx_is_rejected():
     res = upload("old.docx", b"not a zip file")
     assert res.status_code == 400
@@ -160,3 +170,10 @@ def test_pdf_strips_offset_page_numbers_and_labels():
     res = upload("deck.pdf", make_pdf([["Cover"], ["Intro", "2"], ["Plan", "3"], ["Page 4 of 4", "End"]]))
     assert res.status_code == 200
     assert res.json()["text"] == "Cover\n\nIntro\n\nPlan\n\nEnd"
+
+
+def test_requires_login(logged_in):
+    from accounts import current_user
+    app.dependency_overrides.pop(current_user, None)
+    res = upload("notes.txt", "內容".encode())
+    assert res.status_code == 401
