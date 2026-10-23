@@ -10,7 +10,8 @@ def temp_db(tmp_path, monkeypatch):
     """每個測試使用各自的暫存資料庫，不會寫到 data/rslide.db。"""
     monkeypatch.setenv("RSLIDE_DB_PATH", str(tmp_path / "test.db"))
     monkeypatch.delenv("ALLOW_REGISTRATION", raising=False)
-    monkeypatch.delenv("REGISTER_LIMIT_PER_IP_PER_DAY", raising=False)
+    # 其他測試會從同一個 IP 註冊多個帳號；註冊次數限制只在 test_register_limit.py 測試（該檔會移除這個設定）
+    monkeypatch.setenv("REGISTER_LIMIT_PER_IP_PER_DAY", "0")
 
 
 TEST_USER = {"id": 1, "username": "tester"}

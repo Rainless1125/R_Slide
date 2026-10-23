@@ -98,14 +98,14 @@ DATABRICKS_MODELS=databricks-claude-sonnet-4-5,databricks-gpt-oss-120b
 - 舊版存在瀏覽器 localStorage 的歷史記錄,會在該瀏覽器第一次登入時詢問是否匯入到目前的帳號。
 - 密碼以 scrypt 雜湊儲存;登入狀態為 HttpOnly cookie,有效 30 天。
 - 防暴力破解:同一 IP 在 30 分鐘內登入失敗 5 次(不分帳號),該 IP 會被鎖定 30 分鐘,期間即使密碼正確也無法登入;中間成功登入不會重設失敗次數。管理者可用 `manage_users.py lockouts` 查看、`manage_users.py unlock <IP>` 提前解除。部署在反向代理之後時務必設定 uvicorn 的 `--forwarded-allow-ips`(見下方部署),否則所有人共用代理的 IP,一人輸錯 5 次就會鎖住所有使用者。
-- 註冊次數限制:同一 IP 在 24 小時內最多可自行註冊 5 個帳號(只計成功建立的帳號,可用 `REGISTER_LIMIT_PER_IP_PER_DAY` 調整),避免有人大量建立帳號繞過每個帳號的 LLM 次數上限;管理者在後台或以 `manage_users.py add` 建立的帳號不受限制。公司內網多人共用同一個對外 IP 時,可調高上限或改由管理者建立帳號;部署在反向代理之後同樣需要設定 `--forwarded-allow-ips`。
+- 註冊次數限制:同一 IP 在 24 小時內只能自行註冊 1 個帳號(只計成功建立的帳號,可用 `REGISTER_LIMIT_PER_IP_PER_DAY` 調整),避免有人大量建立帳號繞過每個帳號的 LLM 次數上限;管理者在後台或以 `manage_users.py add` 建立的帳號不受限制。公司內網多人共用同一個對外 IP 時,同一天只有第一個人能自行註冊,可調高上限或改由管理者建立帳號;部署在反向代理之後同樣需要設定 `--forwarded-allow-ips`。
 - 密碼規則:註冊、`manage_users.py add` 與 `reset-password` 設定的密碼需為 8~128 個字元,且至少包含一個英文字母與一個數字;規則調整前建立的舊密碼仍可登入。
 
 | 變數 | 說明 | 預設 |
 |------|------|------|
 | `RSLIDE_DB_PATH` | SQLite 檔案路徑 | `data/rslide.db` |
 | `ALLOW_REGISTRATION` | 是否開放在登入頁自行註冊;設為 `false` 時只能由管理員建立帳號 | `true` |
-| `REGISTER_LIMIT_PER_IP_PER_DAY` | 同一 IP 在 24 小時內最多可自行註冊幾個帳號,`0` 為不限制 | `5` |
+| `REGISTER_LIMIT_PER_IP_PER_DAY` | 同一 IP 在 24 小時內最多可自行註冊幾個帳號,`0` 為不限制 | `1` |
 | `COOKIE_SECURE` | 以 HTTPS 提供服務時設為 `true`,登入 cookie 只會經由 HTTPS 傳送 | `false` |
 | `LLM_USAGE_RETENTION_DAYS` | LLM 使用紀錄保留天數,`0` 為永久保留 | `365` |
 | `LLM_RATE_LIMIT_PER_HOUR` | 每個帳號每小時最多可生成 / 大綱 / 重產幾次,`0` 為不限制 | `20` |

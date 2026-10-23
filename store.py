@@ -200,7 +200,7 @@ def create_user(username: str, password: str) -> dict:
         raise UsernameTaken(username)
 
 
-DEFAULT_REGISTER_LIMIT_PER_IP = 5
+DEFAULT_REGISTER_LIMIT_PER_IP = 1
 
 
 def register_limit() -> int:

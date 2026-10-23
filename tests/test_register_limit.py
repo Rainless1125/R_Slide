@@ -1,6 +1,7 @@
 import os
 from concurrent.futures import ThreadPoolExecutor
 
+import pytest
 from fastapi.testclient import TestClient
 
 os.environ.setdefault("GEMINI_API_KEY", "test-key")  # app.py 啟動時需要至少一組 Key，測試不會實際呼叫 LLM
@@ -11,6 +12,12 @@ import store  # noqa: E402
 LIMIT = store.DEFAULT_REGISTER_LIMIT_PER_IP
 
 
+@pytest.fixture(autouse=True)
+def default_register_limit(monkeypatch):
+    """conftest 為其他測試關閉了註冊次數限制，這裡改回預設值。"""
+    monkeypatch.delenv("REGISTER_LIMIT_PER_IP_PER_DAY", raising=False)
+
+
 def client(ip="10.0.0.1"):
     return TestClient(app_module.app, client=(ip, 50000))
 
@@ -19,8 +26,8 @@ def register(c, username, password="secret123"):
     return c.post("/api/auth/register", json={"username": username, "password": password})
 
 
-def test_default_limit_is_five_per_day():
-    assert LIMIT == 5
+def test_default_limit_is_one_per_day():
+    assert LIMIT == 1
 
 
 def test_same_ip_is_limited():
@@ -44,12 +51,12 @@ def test_limit_is_per_ip():
 
 
 def test_failed_registrations_do_not_count():
+    store.create_user("taken", "secret123")
     c = client()
-    register(c, "taken")
     for _ in range(LIMIT + 2):
         assert register(c, "taken").status_code == 409          # 帳號重複
         assert register(c, "bad", "123").status_code == 400      # 密碼不符規則
-    for i in range(LIMIT - 1):
+    for i in range(LIMIT):
         assert register(c, f"user{i}").status_code == 200
     assert register(c, "blocked").status_code == 429
 
@@ -66,10 +73,11 @@ def test_window_slides_after_24_hours(monkeypatch):
 
 
 def test_limit_from_env(monkeypatch):
-    monkeypatch.setenv("REGISTER_LIMIT_PER_IP_PER_DAY", "1")
+    monkeypatch.setenv("REGISTER_LIMIT_PER_IP_PER_DAY", "3")
     c = client()
-    assert register(c, "first").status_code == 200
-    assert register(c, "second").status_code == 429
+    for i in range(3):
+        assert register(c, f"user{i}").status_code == 200
+    assert register(c, "fourth").status_code == 429
 
 
 def test_zero_disables_limit(monkeypatch):
