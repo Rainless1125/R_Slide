@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 CHART_TYPES = ("bar", "horizontal_bar", "line", "pie", "doughnut")
 REF_LINE_TYPES = ("bar", "horizontal_bar", "line")   # 有數值軸的圖才有參考線；圓餅 / 環圈是占比，不適用
 MAX_REF_LINES = 3
+MAX_HIGHLIGHT = 6                                  # 強調的類別數上限（規則建議 1~3 個）
 MAX_CHARTS_PER_SLIDE = 2
 MAX_LABELS = 12
 MAX_DATASETS = 4
@@ -48,6 +49,10 @@ class ChartSpec(BaseModel):
     ref_lines: list[ChartRefLine] = Field(
         description="參考線（虛線），用於目標值、規格上下限、門檻或平均值；只適用 bar / horizontal_bar / line，"
                     "最多 3 條；內容沒有提到門檻或目標時給空陣列"
+    )
+    highlight: list[str] = Field(
+        description="要凸顯的類別，填 labels 中的名稱（1~3 個），例如結論提到的最低分項目、未達標的部門或建議方案；"
+                    "被凸顯的項目維持原色，其餘自動變成中性色。沒有特別要凸顯的項目時給空陣列"
     )
 
 
@@ -103,6 +108,12 @@ def normalize_chart(raw) -> dict | None:
             ref_lines.append(item)
             if len(ref_lines) >= MAX_REF_LINES:
                 break
+    # 強調的類別：只保留 labels 中存在的名稱（依 labels 順序、不重複）；全部都強調等於沒有強調
+    raw_highlight = raw.get("highlight") if isinstance(raw.get("highlight"), list) else []
+    wanted = {_clean_text(x, 24) for x in raw_highlight if isinstance(x, (str, int, float)) and not isinstance(x, bool)}
+    highlight = [label for i, label in enumerate(labels) if label in wanted and label not in labels[:i]][:MAX_HIGHLIGHT]
+    if len(highlight) >= len(set(labels)):
+        highlight = []
     return {
         "type": chart_type,
         "title": _clean_text(raw.get("title")),
@@ -111,6 +122,7 @@ def normalize_chart(raw) -> dict | None:
         "datasets": datasets,
         "colors": [c.strip() for c in colors][:MAX_LABELS],
         "ref_lines": ref_lines,
+        "highlight": highlight,
     }
 
 
@@ -148,5 +160,8 @@ CHART_RULES = """
        反之若 title 有值，HTML 就不要再寫一次相同的標題。
     10. 單位填在 unit（例如 分、%、億元），不要另外在 HTML 寫「單位：…」或「5 分制」這類重複的說明；
        百分比會直接加在每個數值後面，其他單位會顯示在圖表右上角。
-    11. 該頁沒有圖表時，charts 請輸出空陣列 []。
+    11. 標題或解讀提到特定項目（最低 / 最高、未達標、唯一下滑、建議方案）時，用 highlight 凸顯這些項目（1~3 個），
+       讓圖表與結論一致；被凸顯的項目使用 colors 的第一個顏色（強調色），其餘項目會自動變成中性色。
+       沒有特別要凸顯的項目時 highlight 給空陣列，不要為了凸顯而凸顯。
+    12. 該頁沒有圖表時，charts 請輸出空陣列 []。
 """
