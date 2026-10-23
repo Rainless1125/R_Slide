@@ -40,7 +40,7 @@ class ChartSpec(BaseModel):
         description="bar=直條（類別比較）、horizontal_bar=橫條（類別名稱較長或排名）、line=折線（時間趨勢）、"
                     "pie / doughnut=圓餅 / 環圈（占比，只使用第一個資料系列，類別 2~6 個）"
     )
-    title: str = Field(description="圖表標題（15 字內）；若投影片標題已說明清楚可為空字串")
+    title: str = Field(description="圖表標題（15 字內）；佔位容器上方的 HTML 已有圖表標題、或投影片標題已說明清楚時給空字串，避免重複")
     unit: str = Field(description="數值單位，例如 %、億元、萬人；沒有單位就給空字串")
     labels: list[str] = Field(description="類別或時間點標籤（最多 12 個，每個 10 字內）")
     datasets: list[ChartDataset] = Field(description="資料系列（1~3 個）")
@@ -139,5 +139,12 @@ CHART_RULES = """
        colors 請給與視覺風格協調、彼此容易區分的 HEX 色碼。
     6. 內容提到目標值、規格上下限、門檻、及格線或平均值時，用 ref_lines 畫成參考虛線（只用於 bar / horizontal_bar / line），
        讓觀眾一眼看出哪些資料達標；沒有這類數值時 ref_lines 給空陣列，不要自己編造門檻。
-    7. 該頁沒有圖表時，charts 請輸出空陣列 []。
+    7. 只有 2 個數值（例如今年與去年、兩個時間點）時不要用折線圖：改用 KPI 大數字並列呈現變化（例如 3.6 → 3.9，並標示與目標的差距），
+       或用直條圖。折線圖至少要有 3 個時間點。
+    8. 數值之間差距很小（例如 5 分制的 3.6 與 3.9）時，從 0 起算的圖表看不出差異，請改用大數字與增減幅度呈現。
+    9. 圖表標題只寫一次：在佔位容器上方的 HTML 寫了圖表標題（例如卡片標題）時，charts 的 title 請給空字串；
+       反之若 title 有值，HTML 就不要再寫一次相同的標題。
+    10. 單位填在 unit（例如 分、%、億元），不要另外在 HTML 寫「單位：…」或「5 分制」這類重複的說明；
+       百分比會直接加在每個數值後面，其他單位會顯示在圖表右上角。
+    11. 該頁沒有圖表時，charts 請輸出空陣列 []。
 """

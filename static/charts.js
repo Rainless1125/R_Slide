@@ -54,9 +54,14 @@ function _cEsc(s) {
 function _cNum(n) { return Math.round(n * 100) / 100; }
 
 /* 數字格式：千分位、最多兩位小數；短單位（%、元）直接接在數字後 */
+// 只有百分比逐一加在數值與刻度後面（12%）；其他單位（分、元、萬人…）統一在右上角標示「單位：…」，
+// 避免每個數值與刻度都帶單位顯得雜亂
+function _cInlineUnit(unit) { return unit === '%' || unit === '％'; }
+function _cCornerUnit(unit) { return !!unit && !_cInlineUnit(unit); }
+
 function _cFmt(v, unit) {
     const s = Number(v).toLocaleString('zh-TW', { maximumFractionDigits: 2 });
-    return unit && unit.length <= 2 ? s + unit : s;
+    return _cInlineUnit(unit) ? s + unit : s;
 }
 
 /* 粗估文字寬度：中日韓全形字約 1em，其餘約 0.58em */
@@ -132,10 +137,10 @@ function renderChartSvg(spec, width, height, scale = 1) {
     if (title) {
         body += `<text x="0" y="${top + titleFs}" font-size="${titleFs}" font-weight="600" fill="currentColor">${_cEsc(_cFit(title, W * 0.75, titleFs))}</text>`;
     }
-    if (unit.length > 2) {
+    if (_cCornerUnit(unit)) {
         body += `<text x="${W}" y="${top + (title ? titleFs : noteFs)}" text-anchor="end" font-size="${noteFs}" fill="currentColor" fill-opacity=".6">單位：${_cEsc(_cFit(unit, W * 0.25, noteFs))}</text>`;
     }
-    if (title || unit.length > 2) top += title ? titleFs + 11 : noteFs + 7;
+    if (title || _cCornerUnit(unit)) top += title ? titleFs + 11 : noteFs + 7;
 
     const empty = msg => `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" font-size="${_cNum(13 * k)}" fill="currentColor" fill-opacity=".5">${msg}</text>`;
     if (!labels.length || !datasets.length) body += empty('無圖表資料');
@@ -163,10 +168,10 @@ function _cCartesian(type, labels, datasets, unit, spec, W, H, top, fs, k = 1) {
     const ticks = [];
     for (let v = sc.lo; v <= sc.hi + sc.step / 2; v += sc.step) ticks.push(_cNum(v));
     const n = labels.length;
-    const tip = (i, d) => `${labels[i]}${multi ? ' · ' + (d.label || '') : ''}：${_cFmt(d.values[i] ?? 0, unit)}${unit.length > 2 ? ' ' + unit : ''}`;
+    const tip = (i, d) => `${labels[i]}${multi ? ' · ' + (d.label || '') : ''}：${_cFmt(d.values[i] ?? 0, unit)}${_cCornerUnit(unit) ? ' ' + unit : ''}`;
     const showValues = n * datasets.length <= 16;
     const refText = l => `${l.label ? l.label + ' ' : ''}${_cFmt(l.value, unit)}`;
-    const refTip = l => `${l.label || '參考線'}：${_cFmt(l.value, unit)}${unit.length > 2 ? ' ' + unit : ''}`;
+    const refTip = l => `${l.label || '參考線'}：${_cFmt(l.value, unit)}${_cCornerUnit(unit) ? ' ' + unit : ''}`;
 
     if (type === 'horizontal_bar') {
         const labelW = Math.min(W * 0.32, Math.max(...labels.map(l => _cTextW(l, fs))) + 8);
@@ -311,7 +316,7 @@ function _cPie(type, labels, ds, unit, spec, W, H, top, fs, k = 1) {
     values.forEach((v, i) => {
         if (!v) return;
         const sweep = v / total * Math.PI * 2;
-        const tip = `${labels[i]}：${_cFmt(v, unit)}${unit.length > 2 ? ' ' + unit : ''}（${Math.round(v / total * 1000) / 10}%）`;
+        const tip = `${labels[i]}：${_cFmt(v, unit)}${_cCornerUnit(unit) ? ' ' + unit : ''}（${Math.round(v / total * 1000) / 10}%）`;
         if (sweep >= Math.PI * 2 - 1e-6) {
             out += `<circle cx="${_cNum(cx)}" cy="${_cNum(cy)}" r="${_cNum((r + inner) / 2)}" fill="none" stroke="${colors[i]}" stroke-width="${_cNum(r - inner || r)}"><title>${_cEsc(tip)}</title></circle>`;
         } else {
