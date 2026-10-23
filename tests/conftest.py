@@ -10,6 +10,7 @@ def temp_db(tmp_path, monkeypatch):
     """每個測試使用各自的暫存資料庫，不會寫到 data/rslide.db。"""
     monkeypatch.setenv("RSLIDE_DB_PATH", str(tmp_path / "test.db"))
     monkeypatch.delenv("ALLOW_REGISTRATION", raising=False)
+    monkeypatch.delenv("REGISTER_LIMIT_PER_IP_PER_DAY", raising=False)
 
 
 TEST_USER = {"id": 1, "username": "tester"}

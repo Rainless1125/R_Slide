@@ -56,8 +56,13 @@ def auth_me(request: Request):
             "allow_registration": env_flag("ALLOW_REGISTRATION", True)}
 
 
+def client_ip(request: Request) -> str:
+    # 部署於反向代理之後時，需以 uvicorn 的 --forwarded-allow-ips 採用 X-Forwarded-For，否則所有人共用代理的 IP
+    return request.client.host if request.client else "unknown"
+
+
 @router.post("/api/auth/register")
-def auth_register(body: Credentials, response: Response):
+def auth_register(body: Credentials, request: Request, response: Response):
     if not env_flag("ALLOW_REGISTRATION", True):
         raise HTTPException(status_code=403, detail="目前未開放註冊，請聯絡管理員建立帳號")
     username = body.username.strip()
@@ -66,9 +71,13 @@ def auth_register(body: Credentials, response: Response):
     if not password_ok(body.password):
         raise HTTPException(status_code=400, detail=PASSWORD_RULE)
     try:
-        user = store.create_user(username, body.password)
+        user = store.register_user(username, body.password, client_ip(request))
     except store.UsernameTaken:
         raise HTTPException(status_code=409, detail="此帳號已有人使用")
+    except store.RegisterLimited as e:
+        raise HTTPException(status_code=429, headers={"Retry-After": str(e.retry_after)},
+                            detail=f"同一個網路 24 小時內最多可註冊 {e.limit} 個帳號，請於 {store.fmt_wait(e.retry_after)}後再試，"
+                                   "或聯絡管理員建立帳號")
     return start_session(response, user)
 
 
@@ -80,8 +89,7 @@ def locked_error(locked_until: int) -> HTTPException:
 
 @router.post("/api/auth/login")
 def auth_login(body: Credentials, request: Request, response: Response):
-    # 部署於反向代理之後時，需以 uvicorn 的 --forwarded-allow-ips 採用 X-Forwarded-For，否則所有人共用代理的 IP
-    ip = request.client.host if request.client else "unknown"
+    ip = client_ip(request)
     try:
         attempt_id, remaining = store.begin_login_attempt(ip)
     except store.LoginLocked as e:

@@ -552,8 +552,9 @@ def generate_outline(req: GenerateRequest, request: Request, user: dict = Depend
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
+# 檔案解析與 PPTX 匯出不呼叫 LLM，但會佔用伺服器的 CPU 與記憶體，同樣只開放給已登入的使用者
 @app.post("/api/extract")
-async def extract_file(request: Request):
+async def extract_file(request: Request, user: dict = Depends(current_user)):
     """抽取上傳檔案的文字，供前端填入輸入框。檔案不會被保存。"""
     # 解析 multipart 前先以 Content-Length 擋下過大的請求（預留 64KB 給表單邊界等額外資料）
     length = request.headers.get("content-length")
@@ -583,7 +584,7 @@ MAX_EXPORT_BODY_BYTES = 40 * 1024 * 1024
 PPTX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
 @app.post("/api/export/pptx")
-async def export_pptx(request: Request):
+async def export_pptx(request: Request, user: dict = Depends(current_user)):
     """將前端渲染好的投影片圖片組成 PPTX 並直接回傳，不保存檔案。"""
     length = request.headers.get("content-length")
     if not length or not length.isdigit():

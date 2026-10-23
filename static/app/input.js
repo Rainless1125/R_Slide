@@ -59,10 +59,11 @@ async function importFile(file) {
         const form = new FormData();
         form.append('file', file);
         const res = await fetch('/api/extract', { method: 'POST', body: form });
+        throwIfSessionExpired(res);
         if (!res.ok) throw await readApiError(res);
         applyImportedText(await res.json());
     } catch (err) {
-        showToast(friendlyError(err), 'error', 6000);
+        if (!err.handled) showToast(friendlyError(err), 'error', 6000);
     } finally {
         setImporting(false);
     }

@@ -97,6 +97,14 @@ CREATE TABLE IF NOT EXISTS login_lockouts (
     ip           TEXT PRIMARY KEY,
     locked_until INTEGER NOT NULL         -- 毫秒
 );
+-- 自行註冊紀錄：限制同一 IP 在 24 小時內可註冊的帳號數，避免大量建立帳號繞過每個帳號的 LLM 次數上限
+-- （管理者在後台或 manage_users.py 建立的帳號不記錄、不受限制）
+CREATE TABLE IF NOT EXISTS registrations (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    ip         TEXT NOT NULL,
+    created_at INTEGER NOT NULL           -- 毫秒
+);
+CREATE INDEX IF NOT EXISTS idx_registrations_ip_time ON registrations(ip, created_at);
 -- 後台管理者的登入 session（帳號密碼設定於 .env，見 admin.py）；cred_mac 用來在 .env 改密碼後讓舊 session 失效
 CREATE TABLE IF NOT EXISTS admin_sessions (
     token_hash TEXT PRIMARY KEY,
@@ -187,6 +195,48 @@ def create_user(username: str, password: str) -> dict:
         with connect() as conn:
             cur = conn.execute("INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
                                (username, hash_password(password), now_ms()))
+            return {"id": cur.lastrowid, "username": username}
+    except sqlite3.IntegrityError:
+        raise UsernameTaken(username)
+
+
+DEFAULT_REGISTER_LIMIT_PER_IP = 5
+
+
+def register_limit() -> int:
+    """同一 IP 在 24 小時內可自行註冊的帳號數（.env 的 REGISTER_LIMIT_PER_IP_PER_DAY），0 為不限制。"""
+    try:
+        return max(0, int(os.getenv("REGISTER_LIMIT_PER_IP_PER_DAY", DEFAULT_REGISTER_LIMIT_PER_IP)))
+    except ValueError:
+        return DEFAULT_REGISTER_LIMIT_PER_IP
+
+
+class RegisterLimited(Exception):
+    def __init__(self, limit: int, retry_after: int):
+        super().__init__(limit)
+        self.limit = limit
+        self.retry_after = retry_after
+
+
+def register_user(username: str, password: str, ip: str) -> dict:
+    """自行註冊：檢查同一 IP 的註冊次數後建立帳號並記錄，只有成功建立的帳號算次數。
+    BEGIN IMMEDIATE 讓同時送出的註冊依序檢查與寫入，無法一次送出大量請求超過上限。"""
+    limit = register_limit()
+    password_hash = hash_password(password)       # 雜湊約數十毫秒，在交易外先算好，不佔住寫入鎖
+    now = now_ms()
+    try:
+        with connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute("DELETE FROM registrations WHERE created_at <= ?", (now - DAY_MS,))
+            if limit:
+                rows = conn.execute("SELECT created_at FROM registrations WHERE ip = ? ORDER BY created_at DESC LIMIT ?",
+                                    (ip, limit)).fetchall()
+                if len(rows) >= limit:
+                    # 要等到區間內「倒數第 limit 筆」滑出 24 小時才能再註冊
+                    raise RegisterLimited(limit, max(1, -(-(rows[-1][0] + DAY_MS - now) // 1000)))
+            cur = conn.execute("INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
+                               (username, password_hash, now))
+            conn.execute("INSERT INTO registrations (ip, created_at) VALUES (?, ?)", (ip, now))
             return {"id": cur.lastrowid, "username": username}
     except sqlite3.IntegrityError:
         raise UsernameTaken(username)
