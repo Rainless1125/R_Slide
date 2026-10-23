@@ -25,7 +25,7 @@
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/app/app.css?v=21">
+    <link rel="stylesheet" href="/static/app/app.css?v=22">
 </head>
 
 <body
@@ -446,6 +446,15 @@
                     </button>
                 </div>
 
+                <!-- 編輯模式的格式工具列：固定在投影片上方，不會蓋住投影片內容；沒有選取元素時顯示操作提示 -->
+                <div id="fmtDock" data-edit-only class="hidden w-full max-w-[1024px] items-center mb-2">
+                    <p id="fmtDockHint">
+                        <i class="fa-regular fa-hand-pointer" aria-hidden="true"></i>
+                        <span>點選元素即可調整格式；雙擊編輯文字，拖曳移動、拉角落縮放，Esc 取消選取</span>
+                        <button type="button" onclick="openGuideSection('edit')">編輯說明與快捷鍵</button>
+                    </p>
+                </div>
+
                 <!-- 16:9 投影片主畫布 -->
                 <div id="slideStage" class="w-full max-w-[1024px] relative group/stage">
                     <div id="slideCanvas"
@@ -830,7 +839,7 @@
                         <p>在簡報頁按「編輯」進入編輯模式，直接修改投影片內容，不會呼叫 AI。</p>
                         <h5>修改 AI 生成的版面</h5>
                         <ul>
-                            <li>點擊文字即可修改；選取元素後，格式工具列可調整字級、粗細、對齊、顏色與圓角，或複製、刪除、調整同層順序。工具列只顯示該類元素有作用的設定，例如圖片沒有字級與對齊。</li>
+                            <li>點擊文字即可修改；選取元素後，投影片上方的編輯列會顯示格式工具列，可調整字級、粗細、對齊、顏色與圓角，或刪除元素；複製、調整同層順序、還原位置與大小在「⋯」更多選單中。工具列只顯示該類元素有作用的設定，例如圖片沒有字級與對齊。</li>
                             <li>AI 生成的元素可以移動與縮放：先單擊選取（必要時按「選取父層」選到整張卡片），按住拖曳或用方向鍵微調位置，拉四個角可等比例縮放（文字一起放大縮小），旁邊的元素不會跟著變動；工具列的「還原位置」「還原大小」可恢復原狀。AI 產生的圖表可修改數據。</li>
                             <li>元素被拖出所在的卡片或區塊時，超出的部分可能被裁掉，建議選取外層卡片整個移動。</li>
                         </ul>
@@ -1051,17 +1060,17 @@
     <script src="/static/export.js?v=9"></script>
     <script src="/static/presenter.js?v=4"></script>
     <script src="/static/icons.js?v=2"></script>
-    <script src="/static/app/core.js?v=9"></script>
+    <script src="/static/app/core.js?v=10"></script>
     <script src="/static/app/input.js?v=5"></script>
     <script src="/static/app/generate.js?v=20"></script>
     <script src="/static/app/outline.js?v=1"></script>
     <script src="/static/app/shapes.js?v=2"></script>
-    <script src="/static/app/editor.js?v=8"></script>
-    <script src="/static/app/media.js?v=8"></script>
+    <script src="/static/app/editor.js?v=10"></script>
+    <script src="/static/app/media.js?v=9"></script>
     <script src="/static/app/player.js?v=4"></script>
     <script src="/static/app/versions.js?v=2"></script>
     <script src="/static/app/auth.js?v=3"></script>
-    <script src="/static/app/guide.js?v=1"></script>
+    <script src="/static/app/guide.js?v=2"></script>
     <script src="/static/app/feedback.js?v=2"></script>
     <script src="/static/app/main.js?v=9"></script>
 </body>

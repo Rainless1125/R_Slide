@@ -79,6 +79,15 @@ header {
     position: sticky;
 }
 
+/* 各區塊以 scrollIntoView 捲到頂端時，扣掉 sticky 頁首（h-16）的高度，避免區塊頂端被頁首蓋住 */
+#sectionInput,
+#sectionSkeleton,
+#sectionOutline,
+#sectionReview,
+#sectionPlayer {
+    scroll-margin-top: 76px;
+}
+
 /* ---------- 捲動進度條 ---------- */
 #scrollProgress {
     position: fixed;
@@ -1007,32 +1016,149 @@ body.sb-open #sidebar {
 }
 
 /* ---------- 浮動格式工具列 ---------- */
-#fmtToolbar {
-    position: fixed;
-    z-index: 55;
-    display: none;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 2px;
-    max-width: calc(100vw - 16px);
+/* 編輯列：固定在投影片上方（捲動時黏在頁首下方：header 為 h-16 的 sticky），工具列放在裡面，不會蓋住投影片內容 */
+#fmtDock {
+    position: sticky;
+    top: 72px;
+    z-index: 40;
+    min-height: 46px;
     padding: 4px 6px;
     border-radius: 14px;
     border: 1px solid rgb(228 228 231);
     background: rgba(255, 255, 255, .97);
     color: #18181b;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, .18);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .08);
     backdrop-filter: blur(8px);
     font-size: 12px;
 }
 
-.dark #fmtToolbar {
+.dark #fmtDock {
     border-color: rgb(63 63 70);
     background: rgba(24, 24, 27, .97);
     color: #f4f4f5;
 }
 
+#fmtDockHint {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    margin: 0;
+    padding: 0 6px;
+    color: rgb(113 113 122);
+}
+
+#fmtDockHint button {
+    font-weight: 600;
+    color: #2563eb;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.dark #fmtDockHint button { color: #60a5fa; }
+
+/* 選取元素後以工具列取代提示 */
+#fmtDock:has(#fmtToolbar.open) #fmtDockHint {
+    display: none;
+}
+
+/* 編輯模式中提示訊息改在畫面底部顯示，避免蓋住黏在上方的編輯列 */
+body:has(#slideCanvas.editing) #toastRoot {
+    top: auto;
+    bottom: 24px;
+}
+
+#fmtToolbar {
+    display: none;
+    flex: 1;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+}
+
 #fmtToolbar.open {
     display: flex;
+}
+
+/* 「更多」按鈕：可還原位置 / 大小時加上提示點 */
+#fmtToolbar .more-btn {
+    position: relative;
+}
+
+#fmtToolbar .more-btn.has-dot::after {
+    content: "";
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #3b82f6;
+}
+
+#fmtMore {
+    position: fixed;
+    z-index: 56;
+    display: none;
+    min-width: 200px;
+    padding: 6px;
+    border-radius: 12px;
+    border: 1px solid rgb(228 228 231);
+    background: #fff;
+    color: #18181b;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .18);
+    font-size: 13px;
+}
+
+.dark #fmtMore {
+    border-color: rgb(63 63 70);
+    background: #18181b;
+    color: #f4f4f5;
+}
+
+#fmtMore.open {
+    display: block;
+}
+
+#fmtMore .mi {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    text-align: left;
+    white-space: nowrap;
+}
+
+#fmtMore .mi i {
+    width: 14px;
+    text-align: center;
+    font-size: 12px;
+    opacity: .8;
+}
+
+#fmtMore .mi kbd {
+    margin-left: auto;
+    font-family: inherit;
+    font-size: 11px;
+    opacity: .55;
+}
+
+#fmtMore .mi:hover:not(:disabled) {
+    background: rgba(128, 128, 128, .15);
+}
+
+#fmtMore .mi:disabled {
+    opacity: .35;
+    cursor: not-allowed;
+}
+
+#fmtMore .msep {
+    height: 1px;
+    margin: 4px 6px;
+    background: rgba(128, 128, 128, .3);
 }
 
 #fmtToolbar .fb {

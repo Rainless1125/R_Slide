@@ -77,9 +77,18 @@ function showToast(msg, type = 'info', ms = 3200, action = null) {
         btn.onclick = () => { dismiss(); action.onClick(); };
         t.appendChild(btn);
     }
+    // 相同內容的提示只保留最新一則；同時最多顯示 TOAST_MAX 則，優先移除沒有操作按鈕的舊提示，避免堆疊蓋住畫面
+    const live = () => [...root.children].filter(n => !n.classList.contains('out'));
+    live().filter(n => n.dataset.msg === msg).forEach(n => n.remove());
+    t.dataset.msg = msg;
     root.appendChild(t);
+    while (live().length > TOAST_MAX) {
+        const all = live();
+        (all.find(n => n !== t && !n.querySelector('.toast-action')) || all[0]).remove();
+    }
     setTimeout(dismiss, ms);
 }
+const TOAST_MAX = 2;
 
 /* ===================== 錯誤訊息白話化 ===================== */
 // 讀出後端回傳的錯誤字串（FastAPI 的 {"detail": "..."} 或純文字）

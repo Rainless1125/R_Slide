@@ -32,6 +32,13 @@ function openGuide() {
     showGuideTab(guideIdx, true);
 }
 
+// 直接開啟某個章節（例如編輯列的「編輯說明與快捷鍵」）
+function openGuideSection(key) {
+    const idx = guideTabs().findIndex(t => t.dataset.guide === key);
+    if (idx >= 0) guideIdx = idx;
+    openGuide();
+}
+
 function closeGuide() {
     document.getElementById('guideModal').classList.add('hidden');
     guideReturnFocus?.focus?.();
