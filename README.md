@@ -1,79 +1,147 @@
 # R Slide
 
-> Rapid & Responsive AI Presentation Engine — 貼上文字內容,由 LLM 自動規劃版面並產生可編輯的簡報,可匯出為 PDF、PowerPoint 或 HTML。可自行部署於自己的伺服器或內網。
-
-<!-- TODO: 補上 badges(License / Python 版本 / Docker) -->
+R Slide 用 AI 把文字素材做成簡報。
+你可以編輯簡報，再匯出為 PDF、PowerPoint 或 HTML。
+你可以把 R Slide 安裝在自己的伺服器或公司內網。
 
 ![R Slide 介紹影片](docs/demo.gif)
 
-> 高畫質版本(1080p / 60fps):[docs/r_slide_showreel.mp4](docs/r_slide_showreel.mp4)
+高畫質影片：[docs/r_slide_showreel.mp4](docs/r_slide_showreel.mp4)
 
-## 特色
+## 用語
 
-- **內容導向的動態版面**:依內容型態從 14 種版型中挑選(封面、議程、章節分隔、KPI 大數字、圖表 + 解讀、流程步驟、時間軸、左右對比、前後對照、比較表格、2×2 矩陣、圖示網格、金句、結尾行動呼籲),而非固定模板;並規定整份簡報的節奏(封面開場、結尾收束、相鄰兩頁不用相同版型)。
-- **整份一致的設計規範**:AI 先決定整份簡報共用的配色、卡片、標題與小標籤樣式及圖表色碼,再套用到每一頁,避免各頁配色不一;設計規範跟著歷史記錄保存,單頁重產時也會沿用。
-- **簡報模式**:生成前可選「簡易模式(演講型 / Speaker Deck)」或「詳細模式(閱讀型 / Document Deck)」。演講型一頁一重點、少字大圖,論述細節寫進較完整的講者備註,適合上台報告;閱讀型以結論句當標題、附導言與完整論述和數據出處,不需講者也能看懂,適合會後寄送。歷史記錄、審查頁與播放器會標示每份簡報的模式;單頁重產預設沿用該簡報的模式,也可在重產視窗改用另一種模式(之後的重產都會沿用)。頁數可指定 2~12 頁或由 AI 決定,詳細模式資訊量較大,素材豐富時建議由 AI 決定頁數。
-- **先確認大綱(選用)**:開啟生成按鈕旁的「先確認大綱」,AI 會先列出每頁的標題、重點與建議版型,可修改文字、調整頁序、增刪頁面,確認後才生成完整版面,避免整份生成後才發現方向不對;不需要時關閉即可直接生成。開關狀態會記在瀏覽器;產生大綱與生成簡報各算一次用量。
-- **圖表**:數據類內容由 LLM 輸出結構化圖表資料(直條、橫條、折線、圓餅、環圈),前端畫成靜態 SVG,編輯與匯出都不需要額外腳本;編輯模式中可修改圖表數據或自行插入圖表,數據以試算表式表格輸入(方向鍵移動、可直接貼上 Excel / Google 試算表的多格資料),直條、橫條與折線圖可加上參考虛線(目標、規格上下限、門檻);也可勾選要凸顯的類別(例如最低分的部門、建議方案),凸顯的項目維持原色、其餘自動改為中性色,AI 生成時也會依結論標出要凸顯的項目。
-- **插入文字與圖片**:編輯模式中可插入文字方塊(字級、粗細、顏色沿用格式工具列),也可上傳、拖放或貼上圖片;兩者都能拖曳移動、拉角落調整大小。圖片可設定圓角、邊框(顏色、粗細 1~16px、實線 / 虛線 / 點線)與背景顏色(作為透明圖片的底色),在瀏覽器端壓縮後內嵌於簡報,不經過伺服器。格式工具列依選取的元素類型只顯示有作用的設定,例如圖片沒有字級、粗細與對齊,圖示的字級按鈕改為縮放圖示。
-- **快速插入圖示**:編輯模式中點「圖示」開啟清單,內建 300 個辦公室簡報常用的 Font Awesome Free 圖示,依商務、財務、數據、人員、溝通、文件、時間、科技、流程、箭頭、地點、常用符號、操作介面、醫療健康、教育學習、環境能源、建築工地、創意設計分組,每列 10 個;可用中英文關鍵字搜尋(例如 `cash`、`會議`、`成長`),Enter 直接插入第一個結果。插入後可拖曳移動、拉角落等比縮放,顏色、背景與圓角沿用格式工具列(背景 + 圓形圓角即可做成圖示徽章)。
-- **插入圖案**:編輯模式中點「圖案」可插入 16 種常用圖案:矩形、圓角矩形、橢圓、三角形、直角三角形、菱形、平行四邊形、梯形、五邊形、六邊形、星形、箭頭、流程箭頭、對話框,以及直線與箭頭線。選取圖案後,格式工具列可調整填滿顏色、外框顏色、外框粗細(無外框、1~16px)、線條樣式(實線、虛線、點線)與圓角(直角、4~48px 或最大,套用在圖形的每個轉角,例如圓角三角形、圓角星形;橢圓與線條沒有轉角),顏色可從色盤選取或自訂;雙擊圖案可在圖案內輸入文字(字級、粗細、對齊、文字顏色沿用格式工具列)。圖案可拖曳移動、拉角落縮放,縮放後外框粗細不變;圖案為靜態 SVG,匯出 PDF / PPTX / HTML 都能保留。
-- **編輯快捷操作**:LLM 生成的版面元素與自行插入的文字、圖片、圖表、圖示與圖案拖曳時(插入的內容也可縮放),會自動對齊投影片邊緣、中線與其他元素並顯示參考線(按住 Alt 暫停吸附);選取後可用方向鍵微調位置(Shift 一次 10px,連續微調只算一個撤銷步驟),Ctrl+C / Ctrl+X / Ctrl+V 複製、剪下、貼上(可貼到其他頁,圖表資料一併帶過去),Ctrl+D 再製。
-- **不遮擋畫面的編輯列**:編輯模式中格式工具列固定在投影片上方(捲動時黏在頁首下方),不會蓋住投影片內容;沒有選取元素時顯示操作提示與「編輯說明與快捷鍵」連結。較少用的操作(複製、同層排序)收在「⋯」更多選單;AI 版面元素的「還原位置」「還原大小」固定顯示在工具列,沒有移動或縮放過時停用。提示訊息相同內容只保留最新一則、同時最多顯示 2 則,編輯模式中改在畫面底部顯示。
-- **新增空白頁**:審查頁每張卡片的「+」可在該頁後新增空白頁,最後一格可新增到最後;播放器的編輯模式也可在目前頁面後新增並直接切換過去。空白頁沿用參考頁的背景與文字顏色,再自行插入內容。
-- **匯入檔案作為素材**:支援 PDF、Word(.docx)、Markdown、TXT,可點選上傳、拖放或貼上檔案;文字抽出後會先填入輸入框,可檢查、修改再生成。
-- **多模型支援**:Gemini、OpenAI 與 Databricks AI Gateway 可切換,只需設定其中一組;Databricks 適合公司統一透過 AI Gateway 管理模型與費用的情境。
-- **視覺風格可指定**:例如「蘋果極簡白」、科技深色風等,以 Tailwind CSS 實踐。
-- **講者備註與講者檢視**:LLM 會為每頁產生口語化的講稿(補充畫面上沒寫的脈絡,不重複投影片文字),可在播放器下方的備註區直接修改(快捷鍵 N)。「講者檢視」(快捷鍵 P)另開視窗顯示目前頁、下一頁、備註與計時器,適合主畫面投影、筆電看講稿;在講者檢視中可用方向鍵、PageUp / PageDown(簡報筆)換頁。備註會寫入 PPTX 的備忘稿,HTML 匯出也可按 N 顯示。
-- **單頁重新生成**:不滿意某一頁時,可附加需求單獨重產,並維持整份簡報一致。
-- **重產前保留舊版**:單頁重產前的版本會自動保留(每頁最多 3 個,跟著簡報存入歷史記錄,重新整理或換電腦也能還原)。審查頁縮圖右上角或播放器的「舊版本」會把所有版本排成預覽圖,點擊即可改用該版本,可以來回切換比較;目前的版本也會留在記錄中,也可撤銷。
-- **匯出 PDF / PPTX / HTML**:PDF 與 PPTX 的每一頁為 2 倍解析度的圖片,外觀與畫面一致,但文字無法再編輯;HTML 為可直接播放的單一檔案,匯出時會清理 AI 產生的內容(移除 script、事件屬性、外部資源白名單)。
-- **帳號與歷史記錄**:以帳號密碼登入,每位使用者的簡報歷史記錄分開存放於伺服器的 SQLite 檔案,換電腦或瀏覽器也能接續使用。
-- **使用教學**:右上角深色 / 淺色模式切換旁的「?」可開啟使用教學,依章節說明輸入、審查、播放、編輯、匯出與快捷鍵。
-- **意見回饋**:使用教學旁的對話框圖示可為使用體驗評 1~5 星並輸入一段意見文字(兩者至少擇一,文字上限 2,000 字,`Ctrl` / `⌘` + `Enter` 送出),存於伺服器的 `feedback` 資料表,管理者以 `manage_users.py feedback` 查看;每個帳號每小時最多送出 10 則。
-- **後台管理頁面**:開啟 `/admin`,以 `.env` 設定的管理者帳號密碼登入,即可在網頁上查看總覽、建立 / 刪除帳號、重設密碼、查詢各使用者的 LLM 用量、瀏覽意見回饋與解除 IP 鎖定,不必再到伺服器上執行 `manage_users.py`。
-- **輕量部署**:後端為單一 FastAPI 服務,前端為靜態檔案;資料庫為內建的 SQLite,不需另外架設資料庫伺服器。
+本文件的用語固定如下：
 
-> **編輯模式的限制**:LLM 生成的版面可以修改文字與樣式(字級、粗細、對齊、顏色、圓角)、調整同層順序、複製或刪除元素,也可以**拖曳移動與等比例縮放**:先單擊選取(可用「選取父層」選到整張卡片),按住拖曳或用方向鍵微調位置,拉四個角等比例縮放。移動與縮放都是在原位置加上位移與縮放,旁邊的元素不會補位,工具列的「還原位置」「還原大小」可恢復原狀;縮放時文字、邊框與圓角會一起放大縮小,**無法只改寬度或高度讓文字重新換行**,元素超出所屬卡片時超出的部分可能被裁掉,單頁重產後位移與縮放也會消失。LLM 產生的圖表可修改數據。若需要自由調整寬高,請使用編輯模式的「插入文字」「插入圖片」「插入圖表」「插入圖示」「插入圖案」。
->
-> **建議用法**:想在 LLM 生成的頁面放自己的圖片時,先用「重產此頁」並在提示詞中說明要留空的區塊,例如「右半邊留白,之後放產品照片」或「標題下方保留一塊空白區域放圖表」;重產完成後再進入編輯模式,把圖片或圖表插入並拖曳到留空的位置。
+| 用語 | 意思 |
+|------|------|
+| 素材 | 你提供給 AI 的文字或檔案。 |
+| 生成 | AI 依素材做出整份簡報。 |
+| 重產 | AI 重新做出一頁投影片。 |
+| 版面元素 | AI 在投影片上做出的文字、卡片與圖表。 |
+| 插入物件 | 你在編輯模式加入的文字方塊、圖片、圖表、圖示與圖案。 |
+| 編輯列 | 編輯模式中投影片上方的工具列。 |
+| 管理者 | 在 `.env` 設定的後台帳號。 |
 
-## 快速開始
+## 功能
 
-需求:Python 3.10+(開發環境為 3.13)、至少一組 Gemini / OpenAI API Key 或 Databricks AI Gateway 設定。
+### 生成簡報
 
-```bash
-git clone https://github.com/Rainless1125/R_Slide.git
-cd R_Slide
+- AI 依內容選擇版型。共有 14 種版型，例如封面、KPI 大數字、時間軸、比較表格。
+- AI 先決定整份簡報的配色與樣式，再套用到每一頁。
+- 相鄰兩頁不使用相同的版型。
+- 生成前，選擇一種簡報模式：
+  - 簡易模式：給上台報告用。每頁一個重點，細節寫在講者備註。
+  - 詳細模式：給會後閱讀用。標題是結論句，內文有完整說明。
+- 你可以指定 2~12 頁，或讓 AI 決定頁數。
+- 你可以先確認大綱，再生成。大綱有每頁的標題、重點與建議版型。
 
-python -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+### 圖表
 
-cp .env_example .env             # 編輯 .env,填入 API Key
-python app.py
-```
+- AI 把數據做成圖表：直條、橫條、折線、圓餅、環圈。
+- 圖表可以有參考虛線，例如目標值。
+- 圖表可以凸顯特定項目。被凸顯的項目保留原色，其他項目變成灰色。
+- 你可以在編輯模式修改圖表數據。
 
-開啟瀏覽器前往 <http://127.0.0.1:8000>。
+### 編輯簡報
+
+- 修改文字：雙擊文字。
+- 調整樣式：選取元素，再使用編輯列。編輯列只顯示該元素可用的設定。
+- 移動元素：拖曳元素，或按方向鍵。
+- 縮放版面元素：拖曳元素的四個角。縮放時，文字一起變大或變小。
+- 還原版面元素：按「還原位置」或「還原大小」。
+- 插入物件：按「文字」、「圖片」、「圖表」、「圖示」或「圖案」。
+- 撤銷：按 `Ctrl` + `Z`。
+
+注意：重產一頁後，該頁的移動與縮放會消失。
+
+### 其他功能
+
+- 重產一頁：你可以加上需求，例如「改成時間軸」。
+- 舊版本：重產前，系統保留舊的版本。每頁最多保留 3 個版本。
+- 匯入檔案：支援 PDF、Word（.docx）、Markdown 與 TXT。
+- 講者備註：AI 為每頁寫一份講稿。按 `N` 顯示備註。
+- 講者檢視：按 `P` 開啟。講者檢視顯示目前頁、下一頁、備註與計時器。
+- 匯出：PDF、PowerPoint（PPTX）與 HTML。
+- 歷史記錄：系統把每個帳號的簡報存在伺服器。
+- 使用教學：按右上角的「?」。
+- 意見回饋：按右上角的對話框圖示。
+- 後台管理：開啟 `/admin`。
+
+## 限制
+
+- PDF 與 PPTX 的每一頁是圖片。匯出後，你不能編輯文字。
+- 版面元素只能等比例縮放。你不能只改寬度。
+- 掃描的 PDF 沒有文字，R Slide 不能讀取。
+- 舊的 `.doc` 檔不能讀取。先把它另存為 `.docx`。
+
+## 安裝與啟動
+
+### 需求
+
+- Python 3.10 或更新版本。
+- 一組 AI 平台設定：Gemini、OpenAI 或 Databricks。
+
+### 步驟
+
+1. 下載專案：
+
+   ```bash
+   git clone https://github.com/Rainless1125/R_Slide.git
+   cd R_Slide
+   ```
+
+2. 建立虛擬環境：
+
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   ```
+
+   在 Windows 上，改用 `.venv\Scripts\activate`。
+
+3. 安裝套件：
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. 建立設定檔：
+
+   ```bash
+   cp .env_example .env
+   ```
+
+5. 在 `.env` 填入 API Key。
+6. 啟動服務：
+
+   ```bash
+   python app.py
+   ```
+
+7. 在瀏覽器開啟 <http://127.0.0.1:8000>。
+8. 註冊一個帳號。
 
 ## 設定
 
-於專案根目錄的 `.env` 設定(以下三組平台至少設定一組):
+所有設定都在專案根目錄的 `.env` 檔。
+修改 `.env` 後，重新啟動服務。
 
-| 變數 | 說明 | 必填 |
-|------|------|------|
-| `GEMINI_API_KEY` | Google Gemini API Key | 三組擇一 |
-| `OPENAI_API_KEY` | OpenAI API Key | 三組擇一 |
-| `DATABRICKS_HOST` | Databricks workspace 網址,例如 `https://adb-123.azuredatabricks.net` | 使用 Databricks 時 |
-| `DATABRICKS_TOKEN` | Databricks 存取權杖(PAT 或 service principal 的 token) | 使用 Databricks 時 |
-| `DATABRICKS_MODELS` | 開放給使用者選的模型(serving endpoint 名稱),以逗號分隔,第一個為預設 | 使用 Databricks 時 |
-| `DATABRICKS_BASE_URL` | 選填,覆寫 OpenAI 相容端點;預設為 `<DATABRICKS_HOST>/serving-endpoints` | 否 |
+### AI 平台
 
-Gemini 與 OpenAI 的可選模型清單定義於 `app.py` 的 `MODEL_CATALOG`,可依需求修改;Databricks 的模型清單則完全由 `DATABRICKS_MODELS` 決定,前端只能選清單內的模型。
+設定以下其中一組：
 
-### 使用 Databricks AI Gateway
+| 變數 | 說明 |
+|------|------|
+| `GEMINI_API_KEY` | Gemini 的 API Key。 |
+| `OPENAI_API_KEY` | OpenAI 的 API Key。 |
+| `DATABRICKS_HOST` | Databricks 的網址。 |
+| `DATABRICKS_TOKEN` | Databricks 的存取權杖。 |
+| `DATABRICKS_MODELS` | 可用的模型名稱。用逗號分開。第一個是預設模型。 |
+| `DATABRICKS_BASE_URL` | 選填。另一個端點網址。 |
 
-Databricks 的 Model Serving / AI Gateway 提供 OpenAI 相容 API,本服務以 OpenAI SDK 呼叫:
+使用 Databricks 時，三個必填變數都要設定：`DATABRICKS_HOST`、`DATABRICKS_TOKEN`、`DATABRICKS_MODELS`。
+
+範例：
 
 ```env
 DATABRICKS_HOST=https://<workspace>.cloud.databricks.com
@@ -81,161 +149,128 @@ DATABRICKS_TOKEN=<token>
 DATABRICKS_MODELS=databricks-claude-sonnet-4-5,databricks-gpt-oss-120b
 ```
 
-- **模型名稱**:填 Databricks「Serving」頁面上的 endpoint 名稱(公司自建的外部模型 endpoint 也可以)。
-- **端點路徑**:預設呼叫 `<DATABRICKS_HOST>/serving-endpoints`;若公司改用 Unity AI Gateway 的新路徑,可設定 `DATABRICKS_BASE_URL=https://<workspace>/ai-gateway/mlflow/v1`,模型名稱改用 `system.ai.<模型>` 這類完整名稱。
-- **結構化輸出**:先以 JSON Schema 結構化輸出呼叫;若該模型不支援(回 400),會自動改為在提示詞附上 schema、由後端驗證回傳的 JSON。
-- **權杖**:測試可用個人 PAT;正式上線建議使用 service principal 的權杖,避免綁定個人帳號。
-- **用量與限流**:所有請求都以同一個權杖送出,Databricks 端只會看到「這個服務」的用量;流量限制、用量追蹤與內容記錄請在 Databricks 的 AI Gateway 設定。
+說明：
 
-### 檔案匯入限制
+- 模型名稱是 Databricks「Serving」頁面上的 endpoint 名稱。
+- 正式環境使用 service principal 的權杖。不要使用個人權杖。
+- 如果模型不支援結構化輸出，系統自動改用另一種方式。
 
-- 支援格式:`.pdf`、`.docx`、`.md` / `.markdown`、`.txt`(TXT 會自動辨識 UTF-8、含 BOM 的 UTF-16、Big5 編碼)。
-- 單檔上限 10 MB(`extract.py` 的 `MAX_UPLOAD_BYTES`);抽出的文字超過 50,000 字時會截斷並提示。
-- 掃描影像型 PDF 沒有文字層,目前不支援(未做 OCR);舊版 `.doc` 請先另存為 `.docx`。
+### 帳號與用量
 
-### 帳號與歷史記錄
+| 變數 | 說明 | 預設值 |
+|------|------|--------|
+| `RSLIDE_DB_PATH` | 資料庫檔案的位置。 | `data/rslide.db` |
+| `ALLOW_REGISTRATION` | 是否允許使用者自己註冊。 | `true` |
+| `REGISTER_LIMIT_PER_IP_PER_DAY` | 一個 IP 在 24 小時內可以註冊的帳號數。`0` 表示沒有限制。 | `1` |
+| `COOKIE_SECURE` | 使用 HTTPS 時，設為 `true`。 | `false` |
+| `LLM_RATE_LIMIT_PER_HOUR` | 一個帳號每小時可以使用 AI 的次數。 | `20` |
+| `LLM_RATE_LIMIT_PER_DAY` | 一個帳號每 24 小時可以使用 AI 的次數。 | `100` |
+| `LLM_MAX_CONCURRENT` | 一個帳號同時可以進行的 AI 工作數。 | `2` |
+| `LLM_USAGE_RETENTION_DAYS` | 用量紀錄的保留天數。`0` 表示永久保留。 | `365` |
 
-- 第一次開啟時需註冊 / 登入;歷史記錄依帳號分開存放,其他使用者看不到。每個帳號最多保留 200 筆,超過時自動刪除最舊的紀錄。
-- 資料庫為單一 SQLite 檔案,預設 `data/rslide.db`(第一次使用時自動建立),**備份時複製整個 `data/` 資料夾即可**。請放在本機磁碟,不要放在 NFS / SMB 等網路磁碟上。
-- 舊版存在瀏覽器 localStorage 的歷史記錄,會在該瀏覽器第一次登入時詢問是否匯入到目前的帳號。
-- 密碼以 scrypt 雜湊儲存;登入狀態為 HttpOnly cookie,有效 30 天。
-- 防暴力破解:同一 IP 在 30 分鐘內登入失敗 5 次(不分帳號),該 IP 會被鎖定 30 分鐘,期間即使密碼正確也無法登入;中間成功登入不會重設失敗次數。管理者可用 `manage_users.py lockouts` 查看、`manage_users.py unlock <IP>` 提前解除。部署在反向代理之後時務必設定 uvicorn 的 `--forwarded-allow-ips`(見下方部署),否則所有人共用代理的 IP,一人輸錯 5 次就會鎖住所有使用者。
-- 註冊次數限制:同一 IP 在 24 小時內只能自行註冊 1 個帳號(只計成功建立的帳號,可用 `REGISTER_LIMIT_PER_IP_PER_DAY` 調整),避免有人大量建立帳號繞過每個帳號的 LLM 次數上限;管理者在後台或以 `manage_users.py add` 建立的帳號不受限制。公司內網多人共用同一個對外 IP 時,同一天只有第一個人能自行註冊,可調高上限或改由管理者建立帳號;部署在反向代理之後同樣需要設定 `--forwarded-allow-ips`。
-- 密碼規則:註冊、`manage_users.py add` 與 `reset-password` 設定的密碼需為 8~128 個字元,且至少包含一個英文字母與一個數字;規則調整前建立的舊密碼仍可登入。
+說明：
 
-| 變數 | 說明 | 預設 |
-|------|------|------|
-| `RSLIDE_DB_PATH` | SQLite 檔案路徑 | `data/rslide.db` |
-| `ALLOW_REGISTRATION` | 是否開放在登入頁自行註冊;設為 `false` 時只能由管理員建立帳號 | `true` |
-| `REGISTER_LIMIT_PER_IP_PER_DAY` | 同一 IP 在 24 小時內最多可自行註冊幾個帳號,`0` 為不限制 | `1` |
-| `COOKIE_SECURE` | 以 HTTPS 提供服務時設為 `true`,登入 cookie 只會經由 HTTPS 傳送 | `false` |
-| `LLM_USAGE_RETENTION_DAYS` | LLM 使用紀錄保留天數,`0` 為永久保留 | `365` |
-| `LLM_RATE_LIMIT_PER_HOUR` | 每個帳號每小時最多可生成 / 大綱 / 重產幾次,`0` 為不限制 | `20` |
-| `LLM_RATE_LIMIT_PER_DAY` | 每個帳號 24 小時內最多可生成 / 大綱 / 重產幾次,`0` 為不限制 | `100` |
-| `LLM_MAX_CONCURRENT` | 每個帳號同時最多進行幾個生成 / 大綱 / 重產,`0` 為不限制 | `2` |
+- 生成、大綱與重產都算一次用量。失敗的工作也算。
+- 一個帳號最多保留 200 筆歷史記錄。系統自動刪除最舊的記錄。
+- 系統不保存素材與 AI 回覆的內容。系統只記錄字數與用量。
 
-### 後台管理頁面
+### 後台管理
 
-在 `.env` 設定管理者帳號密碼並重新啟動服務後,開啟 <http://127.0.0.1:8000/admin> 登入:
+在 `.env` 設定管理者：
 
 ```env
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=<至少 8 個字元,需包含英文字母與數字>
+ADMIN_PASSWORD=<密碼>
 ```
 
-| 分頁 | 功能 |
+密碼規則：8~128 個字元，至少一個英文字母與一個數字。
+
+後台可以做這些工作：
+
+| 分頁 | 工作 |
 |------|------|
-| 總覽 | 帳號數、歷史記錄筆數、LLM 呼叫次數與 token 合計、意見回饋與平均評分、目前被鎖定的 IP 數 |
-| 帳號 | 建立帳號、重設密碼(該帳號所有裝置需重新登入)、刪除帳號(歷史記錄一併刪除,LLM 使用紀錄與意見回饋保留) |
-| LLM 用量 | 各使用者的用量,點選一列展開按日、模型的明細(同 `manage_users.py usage`) |
-| 意見回饋 | 評分與意見文字,可只看某個帳號(同 `manage_users.py feedback`) |
-| IP 鎖定 | 目前被鎖定的 IP,可提前解除(同 `manage_users.py lockouts` / `unlock`) |
+| 總覽 | 查看帳號數、用量與意見回饋的統計。 |
+| 帳號 | 建立帳號、重設密碼、刪除帳號。 |
+| LLM 用量 | 查看每個帳號的用量。 |
+| 意見回饋 | 查看使用者的評分與意見。 |
+| IP 鎖定 | 解除被鎖定的 IP。 |
 
-- 兩項都沒設定、或密碼不符合規則時後台不會啟用,`/admin` 只會顯示設定說明。
-- 管理者不是一般帳號:無法用它登入主畫面,一般使用者也無法登入後台。
-- 後台登入與一般登入共用同一套 IP 失敗鎖定(30 分鐘內失敗 5 次即鎖定 30 分鐘)。
-- 後台登入狀態為 HttpOnly、SameSite=Strict 的 cookie,有效 8 小時;修改 `.env` 的帳號或密碼並重新啟動後,已登入的後台 session 立即失效。
-- 服務對外開放時,建議在反向代理層另外限制 `/admin` 與 `/api/admin/` 只允許內網存取。
+說明：
 
-| 變數 | 說明 | 預設 |
-|------|------|------|
-| `ADMIN_USERNAME` | 後台管理者帳號 | 未設定(不啟用後台) |
-| `ADMIN_PASSWORD` | 後台管理者密碼,8~128 個字元且至少包含一個英文字母與一個數字 | 未設定(不啟用後台) |
+- 管理者不能登入主畫面。一般帳號不能登入後台。
+- 後台登入 8 小時後失效。
 
-管理員也可在伺服器上以指令管理帳號:
+你也可以在伺服器上用指令管理帳號：
 
 ```bash
-python manage_users.py list                    # 列出帳號與紀錄筆數
-python manage_users.py add <帳號>               # 建立帳號(關閉註冊時使用)
-python manage_users.py reset-password <帳號>    # 重設密碼,該帳號所有裝置需重新登入
-python manage_users.py usage [--days 30]         # 各使用者的 LLM 用量,依 token 由多到少排序
-python manage_users.py usage <帳號> [--days 30]  # 單一使用者按日、模型的用量明細
-python manage_users.py feedback [帳號] [--days 30]  # 使用者送出的意見回饋與使用體驗評分(含平均星數),新的在前
-python manage_users.py lockouts                # 目前因密碼錯誤過多而被鎖定的 IP
-python manage_users.py unlock <IP>             # 解除 IP 鎖定並清除其登入失敗紀錄
+python manage_users.py list                  # 列出帳號
+python manage_users.py add <帳號>             # 建立帳號
+python manage_users.py reset-password <帳號>  # 重設密碼
+python manage_users.py usage                 # 查看用量
+python manage_users.py feedback              # 查看意見回饋
+python manage_users.py lockouts              # 查看被鎖定的 IP
+python manage_users.py unlock <IP>           # 解除 IP 鎖定
 ```
 
-### LLM 使用紀錄
+### 安全規則
 
-生成與單頁重產需要登入,每次呼叫 LLM(包含失敗的呼叫)都會在 SQLite 的 `llm_usage` 資料表記一筆,方便回查各使用者的用量、找出異常大量使用的帳號:
+- 同一個 IP 登入失敗 5 次，該 IP 鎖定 30 分鐘。
+- 同一個 IP 在 24 小時內只能註冊 1 個帳號。
+- 生成、重產、匯入檔案與匯出 PPTX 都要先登入。
 
-- 記錄內容:帳號、時間、動作(生成 / 大綱 / 重產)、平台與模型、簡報模式與頁數、素材字數、平台回傳的 token 數(輸入 / 輸出 / 合計,部分 Databricks 模型不提供時為空白)、成功或失敗原因、耗時與來源 IP。
-- **不保存素材與 AI 回覆的內容**,素材只記字數與 SHA-256 雜湊,用來找出同一份內容被反覆送出的情況。
-- 刪除帳號後紀錄仍會保留;超過 `LLM_USAGE_RETENTION_DAYS` 天的紀錄會自動刪除。
-- 次數上限:每個帳號每小時最多 20 次、24 小時內最多 100 次、同時最多 2 個(生成與重產合併計算,失敗的呼叫也算,因為平台通常已用掉 token),超過時回 429 並告知需等待多久,不會呼叫 LLM;可用上表的環境變數調整。被擋下的請求記為 `rate_limited`,不算進次數,`manage_users.py usage` 的「限流」欄可看出誰常撞到上限。生成按鈕旁與重產視窗有「用量限制」時鐘圖示(`GET /api/quota`),滑鼠移上去(觸控裝置點一下)會顯示「1 小時內」與「24 小時內」兩條用量進度條;任一區間剩 3 次以內時圖示與該進度條以橘色提示,用完時以紅色顯示多久後恢復。
-- 欄位上限:素材 50,000 字、目標受眾 200 字、視覺風格 1,000 字、重產提示詞 2,000 字、簡報標題 200 字;重產時整份簡報最多 60 頁、要重產的那一頁 HTML 50,000 字、講者備註 5,000 字;生成與重產的請求本體最大 2 MB。
-- 部署在反向代理之後時,來源 IP 依 uvicorn 的 `--forwarded-allow-ips` 決定是否採用 `X-Forwarded-For`,否則會記成代理的位址。
-- `usage` 指令可留意:token 合計遠高於其他人、失敗次數偏高(反覆重試)、「同素材生成」次數偏高(同一份內容被大量送出)的帳號。
+## 部署到正式環境
 
-## 部署到自己的伺服器
+### 步驟
 
-`python app.py` 預設只監聽 `127.0.0.1`(`reload=True`,僅適合開發)。正式部署建議:
+1. 用以下指令啟動服務：
 
-```bash
-uvicorn app:app --host 0.0.0.0 --port 8000
-```
+   ```bash
+   uvicorn app:app --host 0.0.0.0 --port 8000
+   ```
 
-並置於 Nginx / Caddy 等反向代理之後啟用 HTTPS。此時需加上 `--forwarded-allow-ips <代理的 IP>`(例如同機的 `127.0.0.1`),並由代理送出 `X-Forwarded-For`,登入鎖定與使用紀錄才會以使用者真正的 IP 計算。若使用 Nginx,其預設上傳上限為 1 MB,需調高才能匯入較大的檔案或匯出 PPTX:
+   注意：不要在正式環境使用 `python app.py`。該指令使用開發模式。
 
-```nginx
-client_max_body_size 40m;   # 檔案匯入上限 10 MB;匯出 PPTX 與儲存單筆歷史記錄的上限 40 MB
-```
+2. 在服務前面加上反向代理，例如 Nginx 或 Caddy。
+3. 啟用 HTTPS。
+4. 在 `.env` 設定 `COOKIE_SECURE=true`。
+5. 在 uvicorn 指令加上 `--forwarded-allow-ips <代理的 IP>`。
+6. 如果使用 Nginx，加上這一行：
 
-> **注意**:生成、單頁重產、檔案匯入與匯出 PPTX 都需要登入;同一 IP 的自行註冊次數也有上限。若服務會對外開放,建議將 `ALLOW_REGISTRATION` 設為 `false` 改由管理者建立帳號,或在反向代理層加上驗證(Basic Auth、SSO 等),並以 HTTPS 提供服務、設定 `COOKIE_SECURE=true`,避免 API Key 額度被他人使用。
+   ```nginx
+   client_max_body_size 40m;
+   ```
 
-### 網路與資料流向(地端部署前請務必了解)
+警告：如果沒有做第 5 步，系統把所有使用者當成同一個 IP。一個人登入失敗 5 次，所有人都不能登入。
 
-伺服器只保存帳號、歷史記錄、LLM 使用紀錄與意見回饋(SQLite,見上方「帳號與歷史記錄」),上傳的檔案與匯出的簡報都不保存;目前並非完全離線:
+### 對外開放時
 
-| 項目 | 說明 |
-|------|------|
-| 檔案匯入 | 伺服器只抽取文字回傳給瀏覽器,不保存檔案;超過 1 MB 的檔案在解析期間會暫存於系統暫存目錄,處理完即刪除。抽取過程不會連外。 |
-| LLM 呼叫 | 輸入內容會送往 Gemini / OpenAI API 或公司的 Databricks workspace,伺服器需可連到這些服務。 |
-| 前端資源 | 介面載入 Tailwind CDN 與 Font Awesome CDN,使用者瀏覽器需可連外。 |
-| 匯出 PDF | 在瀏覽器端完成,不經過伺服器;第一次匯出時會從 cdnjs 載入 html-to-image 與 jsPDF。 |
-| 匯出 PPTX | 每頁圖片由瀏覽器渲染後送到伺服器組成 PPTX,伺服器不保存;同樣需從 cdnjs 載入 html-to-image。 |
-| 插入圖片 | 在瀏覽器端縮至最長邊 1600px 後以 data URL 內嵌於簡報,隨歷史記錄存入伺服器的 SQLite;重產單頁時圖片不會送給 LLM。單筆紀錄上限 40 MB。 |
-| 匯出 HTML | 目前為 CDN 版;離線版(內嵌 Tailwind / Font Awesome / 字型)尚在規劃中。 |
+做以下其中一項，防止他人使用你的 API 額度：
 
-若需要完全內網 / 離線運作,需自行改接內部 LLM 端點並自架前端靜態資源。
+- 設定 `ALLOW_REGISTRATION=false`，由管理者建立帳號。
+- 在反向代理加上登入驗證，例如 SSO。
 
-## 專案結構
+另外，只允許內網連到 `/admin` 與 `/api/admin/`。
 
-```
-charts.py         圖表資料的 schema、LLM 提示規則與正規化
-app.py            FastAPI 後端(/api/generate、/api/regenerate-slide、/api/extract、/api/export/pptx、/api/models)
-accounts.py       登入 / 註冊、歷史記錄與意見回饋 API(/api/auth/*、/api/history、/api/feedback)
-admin.py          後台管理 API(/api/admin/*),管理者帳號密碼來自 .env
-store.py          SQLite 資料存取(帳號、登入 session、後台 session、登入失敗鎖定、歷史記錄、LLM 使用紀錄、意見回饋)
-manage_users.py   帳號管理指令(列出、建立帳號、重設密碼、解除 IP 鎖定、查詢 LLM 用量與意見回饋)
-extract.py        上傳檔案的文字抽取(PDF / DOCX / Markdown / TXT)
-exporter.py       將投影片圖片組成 PPTX(/api/export/pptx)
-static/index.html 前端介面(HTML 結構;樣式與程式在 static/app/)
-static/admin.html 後台管理頁面(/admin;樣式與程式在 static/admin/)
-static/app/       主畫面的樣式與程式,依功能分檔,以一般 <script> 依序載入、共用全域:
-  app.css         主畫面樣式
-  core.js         主題、全域狀態、小工具、錯誤訊息、歷史記錄、側邊欄
-  input.js        範例、檔案匯入、輸入區(受眾 / 風格 / 草稿)
-  generate.js     步驟條、模型選單、生成、檢閱頁、單頁重新生成
-  editor.js       撤銷 / 重做、選取與行內文字編輯、格式工具列
-  media.js        圖片、文字方塊、圖示、浮動物件拖曳縮放、圖表資料編輯
-  player.js       頁面管理、播放器、自動播放、全螢幕、匯出選單
-  auth.js         登入 / 註冊、登出、匯入舊版 localStorage 歷史記錄
-  guide.js        右上角「使用教學」視窗（章節分頁、上一步 / 下一步）
-  feedback.js     右上角「意見回饋」視窗（輸入一段文字送到 /api/feedback）
-  main.js         全域快捷鍵、捲動 / 縮放事件與啟動(最後載入)
-static/charts.js  圖表 → 靜態 SVG 繪製
-static/chart-grid.js 圖表數據的試算表式輸入表格
-static/icons.js   快速插入圖示的內建清單(300 個 Font Awesome Free 圖示、分組與搜尋關鍵字)
-static/export.js  匯出(HTML / PDF / PPTX)與 HTML 清理邏輯
-static/presenter.js 講者備註區與講者檢視視窗
-.env_example      環境變數範本
-tests/            後端測試
-```
+### 資料存放
 
-## 測試
+- 系統把帳號、歷史記錄、用量紀錄與意見回饋存在一個 SQLite 檔案。
+- 預設位置是 `data/rslide.db`。
+- 備份時，複製整個 `data/` 資料夾。
+- 把資料庫放在本機磁碟。不要放在網路磁碟。
 
-```bash
-pip install pytest
-python -m pytest
-```
+### 網路連線
+
+R Slide 需要以下連線：
+
+| 項目 | 連線對象 |
+|------|----------|
+| AI 呼叫 | 伺服器連到 Gemini、OpenAI 或 Databricks。 |
+| 介面 | 瀏覽器連到 Tailwind 與 Font Awesome 的 CDN。 |
+| 匯出 PDF 與 PPTX | 瀏覽器從 cdnjs 下載匯出工具。 |
+
+系統不保存上傳的檔案與匯出的簡報。
+如果要完全在內網使用，你要改接內部的 AI 端點，並自己提供前端資源。
+
+## 開發
+
+專案結構、測試方法與開發規則在 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
