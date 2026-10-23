@@ -25,7 +25,7 @@
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/app/app.css?v=20">
+    <link rel="stylesheet" href="/static/app/app.css?v=21">
 </head>
 
 <body
@@ -342,28 +342,34 @@
                             class="ripple-btn btn-flow text-white font-semibold px-6 py-2.5 rounded-xl flex items-center gap-2 transition-all hover:-translate-y-0.5 active:translate-y-0 active:scale-95 disabled:opacity-70 disabled:cursor-wait disabled:hover:translate-y-0">
                             <span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
                             <i id="btnIcon" class="fa-solid fa-wand-magic-sparkles"></i>
+                            <span class="ld-wand hidden" id="loadingWand" aria-hidden="true"><i class="fa-solid fa-wand-magic-sparkles"></i><b class="sp s1"></b><b class="sp s2"></b><b class="sp s3"></b></span>
                             <span id="btnLabel">生成排版</span>
-                            <i id="loadingSpinner" class="hidden fa-solid fa-circle-notch fa-spin"></i>
                         </button>
                     </div>
                 </div>
             </section>
 
             <!-- 載入骨架屏 -->
-            <section id="sectionSkeleton" aria-hidden="true"
+            <!-- 生成中：目前階段與已等待秒數（setLoading 更新）；骨架屏只是示意，對輔助技術隱藏 -->
+            <section id="sectionSkeleton"
                 class="hidden mt-6 card-elevated bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-[1.25rem] p-4 sm:p-8">
                 <div class="flex items-center justify-between mb-6 gap-4">
-                    <div>
-                        <div class="skeleton h-6 w-28 mb-2"></div>
-                        <div class="skeleton h-3 w-64 max-w-full"></div>
+                    <div class="min-w-0">
+                        <div role="status" class="flex items-center gap-2 text-lg font-bold">
+                            <span class="ld-wand" aria-hidden="true"><i class="fa-solid fa-wand-magic-sparkles"></i><b class="sp s1"></b><b class="sp s2"></b><b class="sp s3"></b></span>
+                            <span id="loadingPhase"></span>
+                        </div>
+                        <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                            <span id="loadingElapsed" class="tabular-nums" aria-hidden="true"></span><span id="loadingHint"></span>
+                        </p>
                     </div>
-                    <div class="flex items-center gap-2 shrink-0">
+                    <div class="flex items-center gap-2 shrink-0" aria-hidden="true">
                         <div class="skeleton h-8 w-16 rounded-full hidden sm:block"></div>
                         <div class="skeleton h-8 w-16 rounded-full hidden sm:block"></div>
                         <div class="skeleton h-9 w-28 rounded-lg"></div>
                     </div>
                 </div>
-                <div id="skeletonGrid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5"></div>
+                <div id="skeletonGrid" aria-hidden="true" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5"></div>
             </section>
 
             <!-- 確認大綱（開啟「先確認大綱」時）：修改每頁標題與重點、調整頁序、增刪頁面後再生成 -->
@@ -1041,7 +1047,7 @@
     <script src="/static/icons.js?v=2"></script>
     <script src="/static/app/core.js?v=9"></script>
     <script src="/static/app/input.js?v=4"></script>
-    <script src="/static/app/generate.js?v=17"></script>
+    <script src="/static/app/generate.js?v=19"></script>
     <script src="/static/app/outline.js?v=1"></script>
     <script src="/static/app/shapes.js?v=2"></script>
     <script src="/static/app/editor.js?v=7"></script>
