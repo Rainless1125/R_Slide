@@ -19,8 +19,8 @@ from starlette.datastructures import UploadFile
 
 import store
 from accounts import current_user, router as accounts_router
-from deck_design import (DECK_RHYTHM_RULES, LAYOUT_CATALOG, THEME_RULES, DeckTheme, format_theme,
-                         theme_from_input)
+from deck_design import (CONTENT_ACCURACY_RULES, DECK_RHYTHM_RULES, LAYOUT_CATALOG, THEME_RULES, DeckTheme,
+                         format_theme, theme_from_input)
 from admin import router as admin_router
 from charts import CHART_RULES, MAX_CHARTS_PER_SLIDE, ChartSpec, normalize_charts
 from exporter import ExportError, build_pptx
@@ -325,6 +325,8 @@ SLIDE_LAYOUT_RULES = """
          並列的卡片以 items-stretch 讓彼此等高即可。
        - 卡片內的元素由上而下以 gap 排列，不要用 justify-between、mt-auto 或 flex-1 把數字或說明推到卡片底部。
        - 畫面仍顯得空時，放大重點數字與字級、加大卡片內距，或補上一句來自素材的說明，而不是留白或拉長卡片。
+       - 垂直置中後，內容群組與頁首、頁尾之間的空白各不要超過約 60px；超過時依序放大重點數字與字級、加大卡片內距與間距，
+         讓內容群組約占主要內容區高度的七成以上（仍須遵守 576px 的上限）。
        - 不要讓區塊擠在上方，或被撐到上下兩端而在中間留下大片空白。
     7. 同一組並列的數字卡片或目標卡片，結構與排版要一致：數字的位置、字級與對齊方式相同，素材有單位時每個數字都要附上單位；
        需要強調其中一張時只改變底色或邊框，不要改變內部結構。
@@ -470,7 +472,7 @@ def generate_slides(req: GenerateRequest, request: Request, user: dict = Depends
        - 禁止使用emoji，請一律使用font-awesome圖示。
        - 【重要】你必須絕對服從使用者指定的「視覺風格」。如果要求明亮風，請多用 bg-white/bg-slate-50；如果要求科技風，才使用深色底 bg-slate-900 搭配螢光點綴色。
     """ + THEME_RULES + LAYOUT_CATALOG + DECK_RHYTHM_RULES + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] \
-        + CHART_RULES + SPEAKER_NOTES_RULES
+        + CHART_RULES + SPEAKER_NOTES_RULES + CONTENT_ACCURACY_RULES
 
     outline_block = ""
     if req.outline:
@@ -539,7 +541,7 @@ def generate_outline(req: GenerateRequest, request: Request, user: dict = Depend
     3. 只使用素材中的資訊，不要捏造數據。
     4. 建議版型從【版型目錄】中依內容型態選擇（寫出版型名稱即可），並遵守【整份簡報的節奏】。
     5. 使用與原始素材相同的語言。
-    """ + LAYOUT_CATALOG + DECK_RHYTHM_RULES + DECK_MODE_RULES[req.deck_mode]
+    """ + LAYOUT_CATALOG + DECK_RHYTHM_RULES + DECK_MODE_RULES[req.deck_mode] + CONTENT_ACCURACY_RULES
 
     pages_hint = (f"{req.num_pages} 頁（必須剛好 {req.num_pages} 頁）"
                   if req.num_pages > 0 else "由你依內容多寡與重點自行決定（建議 3~8 頁）")
@@ -663,7 +665,8 @@ def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict =
     6. 原 HTML 中 <img data-rs-img src="rs-img:數字"> 是使用者上傳的圖片：除非使用者要求移除，否則請保留該 <img> 標籤與 src 原樣，
        可調整它的位置與大小。原 HTML 中的 data-rs-chart 容器內容已省略，圖表資料請參考【原圖表資料】。
     7. 講者備註需配合新版面重新撰寫；使用者的額外需求若只針對版面，仍可沿用【原講者備註】的重點。
-    """ + LAYOUT_CATALOG + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + SPEAKER_NOTES_RULES
+    """ + LAYOUT_CATALOG + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + SPEAKER_NOTES_RULES \
+        + CONTENT_ACCURACY_RULES
 
     prompt = f"""
     【簡報標題】：{req.presentation_title}

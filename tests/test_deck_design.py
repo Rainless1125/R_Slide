@@ -53,7 +53,8 @@ def test_generate_prompt_has_theme_catalog_and_rhythm(monkeypatch):
     assert res.status_code == 200
     for section in ("【整份簡報的設計規範", "【版型目錄", "【整份簡報的節奏】", "2×2 矩陣", "theme.chart_colors",
                     "以畫面結構判斷", "折線圖至少要有 3 個時間點", "空間分配要平衡", "沒有功能的裝飾元素",
-                    "不要用 justify-between、mt-auto", "圖表標題只寫一次", "每個數字都要附上單位", "都必須在所屬的卡片或容器內"):
+                    "不要用 justify-between、mt-auto", "圖表標題只寫一次", "每個數字都要附上單位", "都必須在所屬的卡片或容器內",
+                    "【內容正確性】", "必須完整列出所有符合的項目", "各不要超過約 60px"):
         assert section in captured["system"]
     assert res.json()["theme"] == THEME
 
@@ -80,6 +81,7 @@ def test_outline_suggests_layouts_from_catalog(monkeypatch):
     captured = capture_llm(monkeypatch, {"presentation_title": "t", "slides": []})
     assert client.post("/api/outline", json={"content": "素材"}).status_code == 200
     assert "【版型目錄" in captured["system"] and "【整份簡報的節奏】" in captured["system"]
+    assert "【內容正確性】" in captured["system"]
 
 
 def regenerate(monkeypatch, **extra):
@@ -95,6 +97,7 @@ def test_regenerate_follows_deck_theme(monkeypatch):
     assert THEME["card_style"] in captured["prompt"] and "#0ea5e9" in captured["prompt"]
     assert "【版型目錄" in captured["system"]
     assert "空間分配要平衡" in captured["system"] and "折線圖至少要有 3 個時間點" in captured["system"]
+    assert "【內容正確性】" in captured["system"]
 
 
 def test_regenerate_without_theme_follows_existing_style(monkeypatch):
