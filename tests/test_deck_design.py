@@ -54,7 +54,8 @@ def test_generate_prompt_has_theme_catalog_and_rhythm(monkeypatch):
     for section in ("【整份簡報的設計規範", "【版型目錄", "【整份簡報的節奏】", "2×2 矩陣", "theme.chart_colors",
                     "以畫面結構判斷", "折線圖至少要有 3 個時間點", "空間分配要平衡", "沒有功能的裝飾元素",
                     "不要用 justify-between、mt-auto", "圖表標題只寫一次", "每個數字都要附上單位", "都必須在所屬的卡片或容器內",
-                    "【內容正確性】", "必須完整列出所有符合的項目", "各不要超過約 60px"):
+                    "【內容正確性】", "必須完整列出所有符合的項目", "各不要超過約 60px",
+                    "只有一個項目的前後比較", "必須畫出兩條座標軸"):
         assert section in captured["system"]
     assert res.json()["theme"] == THEME
 
