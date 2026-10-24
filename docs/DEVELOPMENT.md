@@ -84,8 +84,8 @@ tests/            後端測試（pytest）
 - 升級元件時：
   1. 下載新版檔案，放進 `static/vendor/`。檔名包含版本號。
   2. 更新引用的路徑：`static/index.html`、`static/admin.html`、`static/export.js` 的 `RS_VENDOR` 與 `EXPORT_LIBS`。
-  3. 更新 `EXPORT_LIBS` 的 `integrity`（SRI 雜湊值）。
-  4. 更新 `static/vendor/README.md` 的版本與來源。
+  3. 更新 `static/vendor/README.md` 的版本與來源。
+- `static/vendor/` 的檔案不做換行轉換（見 `.gitattributes`）。Windows 上的 Git 預設會把換行轉成 CRLF，改變檔案內容。
 
 ### AI 輸出的規則
 

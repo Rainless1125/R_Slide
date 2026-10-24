@@ -431,15 +431,15 @@ function _exportDownload(blob, title, ext) {
 // PDF 在瀏覽器端用 jsPDF 組成；PPTX 交給後端 /api/export/pptx（python-pptx）組成。
 // 每頁都是一張圖片，外觀與畫面一致，但匯出後文字無法再編輯。
 const EXPORT_W = 1024, EXPORT_H = 576;
+// 元件由本機的 static/vendor 提供，不加 SRI 檢查：能改這些檔案的人也能改本檔，檢查沒有保護作用；
+// 而 Windows 上的 Git 會把換行轉成 CRLF，檔案雜湊值改變後瀏覽器會拒絕執行（PDF 匯出因此失敗）
 const EXPORT_LIBS = {
     htmlToImage: {
         url: '/static/vendor/html-to-image-1.11.11.min.js',
-        integrity: 'sha512-7tWCgq9tTYS/QkGVyKrtLpqAoMV9XIUxoou+sPUypsaZx56cYR/qio84fPK9EvJJtKvJEwt7vkn6je5UVzGevw==',
         global: 'htmlToImage'
     },
     jspdf: {
         url: '/static/vendor/jspdf-2.5.1.umd.min.js',
-        integrity: 'sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA==',
         global: 'jspdf'
     }
 };
@@ -454,7 +454,6 @@ function _exportLoadLib(name) {
         _exportLibLoading[name] = new Promise((resolve, reject) => {
             const s = document.createElement('script');
             s.src = lib.url;
-            s.integrity = lib.integrity;
             s.onload = () => resolve(window[lib.global]);
             s.onerror = () => {
                 delete _exportLibLoading[name];
