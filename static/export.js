@@ -1,19 +1,20 @@
 /* ===================== 匯出 HTML =====================
- * 在瀏覽器端把目前簡報組成單一 HTML 檔（CDN 版：Tailwind + Font Awesome）。
+ * 在瀏覽器端把目前簡報組成單一 HTML 檔：Tailwind 與 Font Awesome（含字型檔）內嵌在檔案中，離線也能正常顯示。
  *   sanitizeSlideHtml(html)       清理 AI 產生的內容（script / on* / javascript: / 外部資源白名單）
  *   buildExportHtml(title, slides) 輸出完整 HTML 字串
  *   exportPresentationHtml()      組裝並觸發下載
  * 圖表是 static/charts.js 預先畫好的靜態 inline SVG、上傳的圖片是 data:image/png|jpeg，
  * 兩者都不需要 script 或外部資源，因此這裡的白名單不必放行 Chart.js 等腳本。
- * 離線版（內嵌 Tailwind / FA / 字型）之後再補。
+ * Google Fonts 仍從網路載入；連不到時改用系統字型。
  */
 
-/* 固定 CDN 版本（與 index.html 一致；升級時兩邊一起改） */
-const EXPORT_CDN = {
-    tailwind: 'https://cdn.tailwindcss.com/3.4.17',
-    fontAwesome: 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css',
-    fonts: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap',
+/* 本機提供的前端元件（static/vendor，與 index.html 一致；升級時兩邊一起改） */
+const RS_VENDOR = {
+    tailwind: '/static/vendor/tailwindcss-3.4.17.js',
+    fontAwesome: '/static/vendor/fontawesome-6.5.1/css/all.min.css',
+    fontAwesomeFonts: '/static/vendor/fontawesome-6.5.1/webfonts/',
 };
+const RS_GOOGLE_FONTS = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap';
 
 /* 字體：與 index.html 的 tailwind.config 一致（英數用 Inter，中文用 Noto Sans TC；改字體時兩邊一起改）。
  * 匯出 HTML 與講者檢視都載入同一組 Google Fonts，投影片字形才會與主畫面相同 */
@@ -21,7 +22,7 @@ const RS_FONT_STACK = ['Inter', '"Noto Sans TC"', '"PingFang TC"', '"Microsoft J
 const RS_FONT_CSS = RS_FONT_STACK.join(',');
 const RS_FONT_LINKS = `<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="${EXPORT_CDN.fonts}">`;
+<link rel="stylesheet" href="${RS_GOOGLE_FONTS}" media="print" onload="this.media='all'">`;
 const RS_TAILWIND_FONT_CONFIG = `if (window.tailwind) tailwind.config = { theme: { extend: { fontFamily: { sans: ${JSON.stringify(RS_FONT_STACK)} } } } };`;
 
 /* 外部資源白名單：只允許這些網域（不含 CDN 以外的圖片 / 字型） */
@@ -182,10 +183,10 @@ const EXPORT_TEMPLATE = `<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{TITLE}}</title>
-<!-- CDN 版本：Tailwind 3.4.17、Font Awesome 6.5.1、Google Fonts（Inter + Noto Sans TC）。離線時投影片樣式與字型可能不完整，播放器本身不受影響。 -->
-<link rel="stylesheet" href="{{FA_CSS}}">
+<!-- 內嵌 Tailwind 3.4.17 與 Font Awesome 6.5.1，離線也能顯示；Google Fonts（Inter + Noto Sans TC）連不到時改用系統字型 -->
+<style>{{FA_CSS}}</style>
 ${RS_FONT_LINKS}
-<script src="{{TAILWIND_JS}}"><\/script>
+<script>{{TAILWIND_JS}}<\/script>
 <script>
 ${RS_TAILWIND_FONT_CONFIG}
 <\/script>
@@ -355,28 +356,61 @@ body{box-sizing:border-box;min-height:100vh;font-family:${RS_FONT_CSS};backgroun
 </body>
 </html>`;
 
-function buildExportHtml(title, slides) {
+/* 匯出 HTML 要內嵌的 Tailwind 與 Font Awesome：Font Awesome 的字型檔轉成 data URL（只保留 woff2）。第一次匯出時才下載 */
+let _exportAssetsLoading = null;
+function _exportInlineAssets() {
+    if (!_exportAssetsLoading) {
+        const text = url => fetch(url).then(r => { if (!r.ok) throw new Error(`無法載入 ${url}`); return r.text(); });
+        const dataUrl = url => fetch(url).then(r => { if (!r.ok) throw new Error(`無法載入 ${url}`); return r.blob(); })
+            .then(b => new Promise((resolve, reject) => {
+                const fr = new FileReader();
+                fr.onload = () => resolve(fr.result);
+                fr.onerror = () => reject(fr.error);
+                fr.readAsDataURL(b);
+            }));
+        _exportAssetsLoading = Promise.all([text(RS_VENDOR.tailwind), text(RS_VENDOR.fontAwesome)]).then(async ([tailwind, fa]) => {
+            // 舊版相容的字型名稱（FontAwesome、Font Awesome 5）重複引用同一批字型檔，內嵌會讓檔案大一倍；
+            // 投影片與播放器只用 Font Awesome 6 的 class，移除這些宣告
+            fa = fa.replace(/@font-face\{font-family:"(?:FontAwesome|Font Awesome 5 [^"]+)";[^}]*\}/g, '');
+            const files = [...new Set(fa.match(/[\w-]+\.woff2/g) || [])];
+            const urls = await Promise.all(files.map(f => dataUrl(RS_VENDOR.fontAwesomeFonts + f)));
+            // src: url(x.woff2) format("woff2"), url(x.ttf) format("truetype") → 只留內嵌的 woff2
+            fa = fa.replace(/url\(\.\.\/webfonts\/([\w-]+)\.woff2\) format\("woff2"\),url\(\.\.\/webfonts\/[\w-]+\.ttf\) format\("truetype"\)/g,
+                (m, name) => `url(${urls[files.indexOf(name + '.woff2')]}) format("woff2")`);
+            // 內嵌在 <script> / <style> 中，避免內容提早結束標籤
+            return { tailwind: tailwind.replace(/<\/script/gi, '<\\/script'), fontAwesome: fa.replace(/<\/style/gi, '<\\/style') };
+        }).catch(err => { _exportAssetsLoading = null; throw err; });
+    }
+    return _exportAssetsLoading;
+}
+
+function buildExportHtml(title, slides, assets) {
     const data = (slides || []).map(s => ({
         title: String(s.slide_title ?? ''),
         html: sanitizeSlideHtml(s.html_content),
         notes: typeof s.speaker_notes === 'string' ? s.speaker_notes.trim() : '',
     }));
     // 用函式取代，避免 $& 等特殊序列被 String.replace 解讀
-    const fill = { '{{TITLE}}': _exportEscHtml(title || '未命名簡報'), '{{FA_CSS}}': EXPORT_CDN.fontAwesome, '{{TAILWIND_JS}}': EXPORT_CDN.tailwind };
+    const fill = { '{{TITLE}}': _exportEscHtml(title || '未命名簡報'), '{{FA_CSS}}': assets.fontAwesome, '{{TAILWIND_JS}}': assets.tailwind };
     let out = EXPORT_TEMPLATE;
     for (const k in fill) out = out.split(k).join(fill[k]);
     return out.split('{{SLIDES_JSON}}').join(_exportJsonForScript(data));
 }
 
-function exportPresentationHtml() {
+async function exportPresentationHtml() {
     if (!currentPresentationData || !Array.isArray(currentPresentationData.slides) || !currentPresentationData.slides.length) {
         showToast('沒有可匯出的簡報', 'error');
         return;
     }
     const title = currentPresentationData.presentation_title || '未命名簡報';
-    const html = buildExportHtml(title, currentPresentationData.slides);
-    _exportDownload(new Blob([html], { type: 'text/html;charset=utf-8' }), title, 'html');
-    showToast('已匯出 HTML', 'success', 1800);
+    const slides = currentPresentationData.slides.slice();
+    try {
+        const html = buildExportHtml(title, slides, await _exportInlineAssets());
+        _exportDownload(new Blob([html], { type: 'text/html;charset=utf-8' }), title, 'html');
+        showToast('已匯出 HTML', 'success', 1800);
+    } catch (err) {
+        showToast('匯出 HTML 失敗：' + (err?.message || err), 'error', 6000);
+    }
 }
 
 function _exportDownload(blob, title, ext) {
@@ -396,12 +430,12 @@ function _exportDownload(blob, title, ext) {
 const EXPORT_W = 1024, EXPORT_H = 576;
 const EXPORT_LIBS = {
     htmlToImage: {
-        url: 'https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js',
+        url: '/static/vendor/html-to-image-1.11.11.min.js',
         integrity: 'sha512-7tWCgq9tTYS/QkGVyKrtLpqAoMV9XIUxoou+sPUypsaZx56cYR/qio84fPK9EvJJtKvJEwt7vkn6je5UVzGevw==',
         global: 'htmlToImage'
     },
     jspdf: {
-        url: 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+        url: '/static/vendor/jspdf-2.5.1.umd.min.js',
         integrity: 'sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAOnx5S09ydFYWWNSfcEqDTTHgtNA==',
         global: 'jspdf'
     }
@@ -418,13 +452,11 @@ function _exportLoadLib(name) {
             const s = document.createElement('script');
             s.src = lib.url;
             s.integrity = lib.integrity;
-            s.crossOrigin = 'anonymous';
-            s.referrerPolicy = 'no-referrer';
             s.onload = () => resolve(window[lib.global]);
             s.onerror = () => {
                 delete _exportLibLoading[name];
                 s.remove();
-                reject(new Error('無法載入匯出元件，請確認網路可連線至 cdnjs.cloudflare.com'));
+                reject(new Error('無法載入匯出元件，請重新整理頁面後再試'));
             };
             document.head.appendChild(s);
         });

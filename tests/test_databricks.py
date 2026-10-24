@@ -88,7 +88,7 @@ def test_openai_does_not_fall_back(monkeypatch):
     client = FakeClient(parse_error=bad_request())
     monkeypatch.setattr(app_module, "openai_client", client)
     with pytest.raises(BadRequestError):
-        app_module.call_llm("openai", "gpt-x", "sys", "prompt", Reply, 0.6)
+        app_module.call_llm("openai", "gpt-6-luna", "sys", "prompt", Reply, 0.6)
 
 
 def test_rejects_unlisted_databricks_model(monkeypatch):

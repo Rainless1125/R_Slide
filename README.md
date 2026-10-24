@@ -166,6 +166,46 @@ DATABRICKS_MODELS=databricks-claude-sonnet-4-5,databricks-gpt-oss-120b
 - 正式環境使用 service principal 的權杖。不要使用個人權杖。
 - 如果模型不支援結構化輸出，系統自動改用另一種方式。
 
+### 公司內部的 AI 端點
+
+R Slide 可以連到 OpenAI 相容的端點，例如公司內部的 AI 閘道、Azure OpenAI、vLLM 或 Ollama。
+
+| 變數 | 說明 | 預設值 |
+|------|------|--------|
+| `OPENAI_BASE_URL` | 端點網址，通常以 `/v1` 結尾。不填時連到 OpenAI。 | 無 |
+| `OPENAI_MODELS` | 可用的模型名稱。用逗號分開。第一個是預設模型。 | `gpt-6-luna` |
+| `OPENAI_API_KEY` | 端點的 API Key。端點不需要 Key 時，填任意文字。 | 無 |
+
+範例：
+
+```env
+OPENAI_API_KEY=<token>
+OPENAI_BASE_URL=https://ai-gateway.example.com/v1
+OPENAI_MODELS=corp-llm-large,corp-llm-small
+```
+
+說明：
+
+- 畫面上的平台名稱仍顯示為 OpenAI。
+- 使用者只能選擇 `OPENAI_MODELS` 中的模型。
+- 如果端點不支援結構化輸出，系統自動改用另一種方式。
+- 匯入 PowerPoint 或掃描的 PDF 時，辨識圖片的模型必須支援圖片輸入。
+
+### 呼叫 AI 時附加的標頭
+
+有些公司的 AI 閘道要求每次呼叫附加識別資料，例如系統名稱與使用區域。在 `LLM_EXTRA_HEADERS` 設定這些 HTTP 標頭：
+
+```env
+LLM_EXTRA_HEADERS={"system_name": "R_Slide", "use_area": "F12"}
+```
+
+說明：
+
+- 格式是 JSON 物件。標頭名稱與值依公司 AI 閘道的規定填寫。
+- 值只能使用英數字與符號。HTTP 標頭不支援中文。
+- 所有 AI 平台的每一次呼叫都附加這些標頭，包含生成、大綱、重產與圖片辨識。
+- 格式錯誤時，服務不會啟動，並顯示錯誤原因。
+
 ### 帳號與用量
 
 | 變數 | 說明 | 預設值 |
@@ -304,11 +344,13 @@ R Slide 需要以下連線：
 | 項目 | 連線對象 |
 |------|----------|
 | AI 呼叫 | 伺服器連到 Gemini、OpenAI 或 Databricks。匯入 PowerPoint 或掃描的 PDF 時，圖片與掃描頁也傳送到 AI 平台。 |
-| 介面 | 瀏覽器連到 Tailwind 與 Font Awesome 的 CDN。 |
-| 匯出 PDF 與 PPTX | 瀏覽器從 cdnjs 下載匯出工具。 |
+| 字型 | 瀏覽器連到 Google Fonts。連不到時，畫面改用系統字型，其他功能不受影響。 |
+
+介面與匯出使用的元件（Tailwind、Font Awesome 與匯出工具）由 R Slide 的伺服器提供，不需要連外網。
+匯出的 HTML 檔也內嵌這些元件，離線開啟也能正常顯示。
 
 系統不保存上傳的檔案與匯出的簡報。
-如果要完全在內網使用，你要改接內部的 AI 端點，並自己提供前端資源。
+如果要完全在內網使用，設定 `OPENAI_BASE_URL` 連到內部的 AI 端點。請參考「公司內部的 AI 端點」。
 
 ## 開發
 

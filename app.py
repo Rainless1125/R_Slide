@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import base64
 import hashlib
@@ -36,6 +37,7 @@ STATIC_DIR = BASE_DIR / "static"   # 以本檔所在位置為基準，從其他�
 load_dotenv()
 MY_GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 MY_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+DEFAULT_OPENAI_MODELS = ["gpt-6-luna"]
 
 
 def parse_model_list(value: str | None) -> list[str]:
@@ -55,6 +57,42 @@ def databricks_base_url(host: str | None, base_url: str | None = None) -> str | 
     return host + "/serving-endpoints"
 
 
+# HTTP 標頭名稱（RFC 9110 token）；值只允許可見的 ASCII 字元與空白
+HEADER_NAME_RE = re.compile(r"^[!#$%&'*+.^_`|~0-9A-Za-z-]+$")
+HEADER_VALUE_RE = re.compile(r"^[\x20-\x7e]*$")
+
+
+def parse_extra_headers(value: str | None) -> dict[str, str]:
+    """LLM_EXTRA_HEADERS：呼叫 LLM 時附加的 HTTP 標頭（JSON 物件），例如公司 AI 閘道要求的
+    {"system_name": "R_Slide", "use_area": "F12"}。格式錯誤時啟動失敗並說明原因，避免呼叫時才被閘道拒絕。"""
+    if not value or not value.strip():
+        return {}
+    try:
+        headers = json.loads(value)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"LLM_EXTRA_HEADERS 必須是 JSON 物件，例如 {{\"system_name\": \"R_Slide\"}}：{e}") from e
+    if not isinstance(headers, dict):
+        raise ValueError("LLM_EXTRA_HEADERS 必須是 JSON 物件，例如 {\"system_name\": \"R_Slide\"}")
+    out = {}
+    for name, val in headers.items():
+        val = val if isinstance(val, str) else json.dumps(val) if isinstance(val, (int, float)) else None
+        if val is None:
+            raise ValueError(f"LLM_EXTRA_HEADERS 的 {name} 必須是文字或數字")
+        if not HEADER_NAME_RE.match(name):
+            raise ValueError(f"LLM_EXTRA_HEADERS 的標頭名稱「{name}」只能使用英數字與 - _ . 等符號")
+        if not HEADER_VALUE_RE.match(val):
+            raise ValueError(f"LLM_EXTRA_HEADERS 的 {name} 只能使用英數字與符號（HTTP 標頭不支援中文）")
+        out[name] = val
+    return out
+
+
+LLM_EXTRA_HEADERS = parse_extra_headers(os.getenv("LLM_EXTRA_HEADERS"))
+
+# OpenAI 或 OpenAI 相容端點（Azure OpenAI、公司內部 AI 閘道、vLLM、Ollama 等）：
+# 設定 OPENAI_BASE_URL 時改連該網址，模型清單由 OPENAI_MODELS 決定
+OPENAI_BASE_URL = (os.getenv("OPENAI_BASE_URL") or "").strip().rstrip("/") or None
+OPENAI_MODELS = parse_model_list(os.getenv("OPENAI_MODELS")) or DEFAULT_OPENAI_MODELS
+
 # Databricks AI Gateway（Model Serving 端點）：以 OpenAI SDK 呼叫，模型名稱即端點名稱
 DATABRICKS_TOKEN = os.getenv("DATABRICKS_TOKEN")
 DATABRICKS_BASE_URL = databricks_base_url(os.getenv("DATABRICKS_HOST"), os.getenv("DATABRICKS_BASE_URL"))
@@ -65,15 +103,19 @@ if not MY_GEMINI_API_KEY and not MY_OPENAI_API_KEY and not DATABRICKS_READY:
     raise ValueError("找不到 API Key，請在 .env 檔案中至少設定 GEMINI_API_KEY、OPENAI_API_KEY，"
                      "或 Databricks 的 DATABRICKS_HOST + DATABRICKS_TOKEN + DATABRICKS_MODELS！")
 
-gemini_client = genai.Client(api_key=MY_GEMINI_API_KEY) if MY_GEMINI_API_KEY else None
-openai_client = OpenAI(api_key=MY_OPENAI_API_KEY) if MY_OPENAI_API_KEY else None
-databricks_client = OpenAI(api_key=DATABRICKS_TOKEN, base_url=DATABRICKS_BASE_URL) if DATABRICKS_READY else None
+_headers = LLM_EXTRA_HEADERS or None
+gemini_client = (genai.Client(api_key=MY_GEMINI_API_KEY, http_options=types.HttpOptions(headers=_headers))
+                 if MY_GEMINI_API_KEY else None)
+openai_client = (OpenAI(api_key=MY_OPENAI_API_KEY, base_url=OPENAI_BASE_URL, default_headers=_headers)
+                 if MY_OPENAI_API_KEY else None)
+databricks_client = (OpenAI(api_key=DATABRICKS_TOKEN, base_url=DATABRICKS_BASE_URL, default_headers=_headers)
+                     if DATABRICKS_READY else None)
 app = FastAPI(title="R Slide")
 
 # 各平台可選模型（第一個為預設）；Databricks 的模型清單由 .env 的 DATABRICKS_MODELS 決定
 MODEL_CATALOG = {
     "gemini": ["gemini-3.5-flash", "gemini-3.7-flash", "gemini-3.8-flash"],
-    "openai": ["gpt-6-luna"],
+    "openai": OPENAI_MODELS,
     "databricks": DATABRICKS_MODELS,
 }
 MISSING_KEY_MSG = {
@@ -191,6 +233,8 @@ def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
         raise HTTPException(status_code=400, detail=MISSING_KEY_MSG[provider])
     if provider == "databricks" and model and model not in MODEL_CATALOG["databricks"]:
         raise HTTPException(status_code=400, detail=f"未開放的 Databricks 模型: {model}")
+    if provider == "openai" and model and model not in MODEL_CATALOG["openai"]:
+        raise HTTPException(status_code=400, detail=f"未開放的 OpenAI 模型: {model}")
     model = model or MODEL_CATALOG[provider][0]
     usage.update(provider=provider, model=model)
 
@@ -210,8 +254,10 @@ def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
     if images:
         prompt = [{"type": "text", "text": prompt}, *({"type": "image_url", "image_url": {
             "url": f"data:{m};base64,{base64.b64encode(d).decode()}", "detail": "high"}} for d, m in images)]
+    # Databricks 與自訂的 OpenAI 相容端點不一定支援嚴格的結構化輸出，失敗時改用提示詞附 schema 的方式
     return call_openai_compatible(client, model, system_instruction, prompt, schema,
-                                  allow_fallback=provider == "databricks", usage=usage)
+                                  allow_fallback=provider == "databricks" or (provider == "openai" and bool(OPENAI_BASE_URL)),
+                                  usage=usage)
 
 
 @contextmanager

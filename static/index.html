@@ -7,11 +7,13 @@
     <title>R Slide - Rapid & Responsive AI Presentation Engine</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+    <!-- Tailwind 與 Font Awesome 由本機提供（static/vendor），不能連外網的內網也能使用 -->
+    <link rel="stylesheet" href="/static/vendor/fontawesome-6.5.1/css/all.min.css">
+    <!-- Google Fonts 不阻擋畫面：連不到時（例如內網）改用系統字型 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
-    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" media="print" onload="this.media='all'">
+    <script src="/static/vendor/tailwindcss-3.4.17.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -1057,8 +1059,8 @@
 
     <script src="/static/charts.js?v=5"></script>
     <script src="/static/chart-grid.js?v=1"></script>
-    <script src="/static/export.js?v=10"></script>
-    <script src="/static/presenter.js?v=4"></script>
+    <script src="/static/export.js?v=11"></script>
+    <script src="/static/presenter.js?v=5"></script>
     <script src="/static/icons.js?v=2"></script>
     <script src="/static/app/core.js?v=10"></script>
     <script src="/static/app/input.js?v=7"></script>
