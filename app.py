@@ -38,6 +38,7 @@ load_dotenv()
 MY_GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 MY_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 DEFAULT_OPENAI_MODELS = ["gpt-6-luna"]
+DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 
 
 def parse_model_list(value: str | None) -> list[str]:
@@ -95,7 +96,10 @@ if not MY_GEMINI_API_KEY and not MY_OPENAI_API_KEY:
 _headers = LLM_EXTRA_HEADERS or None
 gemini_client = (genai.Client(api_key=MY_GEMINI_API_KEY, http_options=types.HttpOptions(headers=_headers))
                  if MY_GEMINI_API_KEY else None)
-openai_client = (OpenAI(api_key=MY_OPENAI_API_KEY, base_url=OPENAI_BASE_URL, default_headers=_headers)
+# base_url 一定要明確給值：傳 None 時 OpenAI SDK 會自己讀環境變數 OPENAI_BASE_URL，
+# .env 中留空的 OPENAI_BASE_URL= 會讓它拿空字串當網址，每次呼叫都是「Connection error.」
+openai_client = (OpenAI(api_key=MY_OPENAI_API_KEY, base_url=OPENAI_BASE_URL or DEFAULT_OPENAI_BASE_URL,
+                        default_headers=_headers)
                  if MY_OPENAI_API_KEY else None)
 app = FastAPI(title="R Slide")
 

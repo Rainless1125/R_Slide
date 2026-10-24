@@ -111,3 +111,12 @@ def test_invalid_extra_headers_stop_startup():
     env = {**os.environ, "LLM_EXTRA_HEADERS": '{"use_area": "研發部"}'}
     out = subprocess.run([sys.executable, "-c", "import app"], cwd=ROOT, env=env, capture_output=True, text=True, timeout=60)
     assert out.returncode != 0 and "不支援中文" in out.stderr
+
+
+def test_empty_base_url_in_env_uses_openai():
+    """.env 中留空的 OPENAI_BASE_URL= 視為未設定，連到 OpenAI 官方（OpenAI SDK 自己讀到空字串時會連線失敗）。"""
+    env = {**os.environ, "OPENAI_API_KEY": "sk-test", "OPENAI_BASE_URL": "", "OPENAI_MODELS": ""}
+    code = "import app; print(app.openai_client.base_url, app.MODEL_CATALOG['openai'], app.OPENAI_DISPLAY_NAME)"
+    out = subprocess.run([sys.executable, "-c", code], cwd=ROOT, env=env, capture_output=True, text=True, timeout=60)
+    assert out.returncode == 0, out.stderr[-2000:]
+    assert out.stdout.strip().splitlines()[-1] == "https://api.openai.com/v1/ ['gpt-6-luna'] OpenAI"
