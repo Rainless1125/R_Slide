@@ -246,12 +246,14 @@ async function loadUsage() {
             <td class="num ${r.rate_limited ? 'text-amber-500' : ''}">${num(r.rate_limited)}</td>
             <td class="num">${num(r.generates)}</td>
             <td class="num">${num(r.regenerates)}</td>
+            <td class="num">${num(r.outlines)}</td>
+            <td class="num">${num(r.extracts)}</td>
             <td class="num">${num(r.input_tokens)}</td>
             <td class="num">${num(r.output_tokens)}</td>
             <td class="num font-semibold">${num(r.total_tokens)}</td>
             <td class="num">${num(r.max_same_content)}</td>
             <td>${fmtTime(r.last_used)}</td>
-        </tr>`).join('') : emptyRow(11, `${daysLabel()}沒有 LLM 使用紀錄`);
+        </tr>`).join('') : emptyRow(13, `${daysLabel()}沒有 LLM 使用紀錄`);
 }
 
 $('usageRows').addEventListener('click', async e => {
@@ -266,7 +268,7 @@ $('usageRows').addEventListener('click', async e => {
     chevron.style.transform = 'rotate(90deg)';
     const detail = document.createElement('tr');
     detail.className = 'detail';
-    detail.innerHTML = `<td colspan="11"><div class="px-6 py-3 text-xs text-zinc-400">載入中…</div></td>`;
+    detail.innerHTML = `<td colspan="13"><div class="px-6 py-3 text-xs text-zinc-400">載入中…</div></td>`;
     tr.after(detail);
     try {
         const rows = await api(`/usage/${encodeURIComponent(tr.dataset.user)}?days=${days()}`);

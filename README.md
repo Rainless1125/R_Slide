@@ -216,7 +216,7 @@ ADMIN_PASSWORD=<密碼>
 |------|------|
 | 總覽 | 查看帳號數、用量與意見回饋的統計。 |
 | 帳號 | 建立帳號、重設密碼、刪除帳號。 |
-| LLM 用量 | 查看每個帳號的用量。 |
+| LLM 用量 | 查看每個帳號的用量：生成、重產、大綱與匯入辨識的次數，以及 token 數。 |
 | 意見回饋 | 查看使用者的評分與意見。 |
 | IP 鎖定 | 解除被鎖定的 IP。 |
 
@@ -240,6 +240,7 @@ python manage_users.py unlock <IP>           # 解除 IP 鎖定
 ### 安全規則
 
 - 同一個 IP 登入失敗 5 次，該 IP 鎖定 30 分鐘。
+- 後台登入與一般登入使用相同的鎖定。IP 被鎖定時，管理者也不能從該 IP 登入後台。
 - 同一個 IP 在 24 小時內只能註冊 1 個帳號。
 - 生成、重產、匯入檔案與匯出 PPTX 都要先登入。
 
@@ -259,13 +260,26 @@ python manage_users.py unlock <IP>           # 解除 IP 鎖定
 3. 啟用 HTTPS。
 4. 在 `.env` 設定 `COOKIE_SECURE=true`。
 5. 在 uvicorn 指令加上 `--forwarded-allow-ips <代理的 IP>`。
-6. 如果使用 Nginx，加上這一行：
+6. 如果使用 Nginx，加上這兩行：
 
    ```nginx
    client_max_body_size 40m;
+   proxy_read_timeout 300s;
    ```
 
+   說明：
+   - `client_max_body_size`：允許上傳 30 MB 的 PDF 與 PowerPoint 檔。
+   - `proxy_read_timeout`：生成頁數多的簡報，或匯入圖片多的檔案，可能需要 1 分鐘以上。Nginx 的預設值是 60 秒，超過時使用者看到錯誤，但 AI 用量已經計算。
+   - 使用其他反向代理時，做相同的設定。
+
 警告：如果沒有做第 5 步，系統把所有使用者當成同一個 IP。一個人登入失敗 5 次，所有人都不能登入。
+
+如果 IP 被鎖定，管理者也不能登入後台。在伺服器上執行以下指令解除鎖定：
+
+```bash
+python manage_users.py lockouts       # 查看被鎖定的 IP
+python manage_users.py unlock <IP>    # 解除鎖定
+```
 
 ### 對外開放時
 
