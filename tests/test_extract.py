@@ -129,8 +129,15 @@ def test_long_content_is_truncated():
 
 
 def test_unsupported_extension_is_rejected():
-    res = upload("slides.pptx", b"anything")
+    res = upload("data.xlsx", b"anything")
     assert res.status_code == 415
+
+
+@pytest.mark.parametrize("name, hint", [("old.ppt", ".pptx"), ("old.doc", ".docx")])
+def test_old_office_formats_explain_how_to_convert(name, hint):
+    res = upload(name, b"anything")
+    assert res.status_code == 415
+    assert hint in res.json()["detail"]
 
 
 def test_empty_file_is_rejected():
