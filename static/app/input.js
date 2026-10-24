@@ -31,13 +31,26 @@ document.getElementById('inputContent').addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') startGeneration();
 });
 
-/* ===================== 檔案匯入（PDF / DOCX / Markdown / TXT） ===================== */
-const IMPORT_EXTS = ['.pdf', '.docx', '.md', '.markdown', '.txt'];
-const IMPORT_MAX_BYTES = 10 * 1024 * 1024;
+/* ===================== 檔案匯入（PDF / DOCX / PPTX / Markdown / TXT） ===================== */
+const IMPORT_EXTS = ['.pdf', '.docx', '.pptx', '.md', '.markdown', '.txt'];
+const IMPORT_MAX_MB = { '.pptx': 30 };      // 其他格式 10 MB；簡報常內嵌大量截圖，上限較大
+const OLD_OFFICE_HINT = { '.ppt': 'PowerPoint 檔請先另存為 .pptx', '.doc': 'Word 檔請先另存為 .docx' };
 let importing = false;
+let importTimer = null;
 
 function setImporting(on, name = '') {
     importing = on;
+    clearInterval(importTimer);
+    // PPTX 的圖片會交給 AI 辨識，可能需要數十秒：顯示已等待的秒數
+    if (on && /\.pptx$/i.test(name)) {
+        const start = Date.now();
+        const tick = () => {
+            const sec = Math.floor((Date.now() - start) / 1000);
+            document.getElementById('importLabel').textContent = `讀取中… ${sec} 秒`;
+            document.getElementById('dropOverlayLabel').textContent = `正在讀取 ${name}，含圖片辨識（${sec} 秒）`;
+        };
+        importTimer = setInterval(tick, 1000);
+    }
     document.getElementById('inputDropZone').classList.toggle('importing', on);
     document.getElementById('inputContent').readOnly = on;
     document.getElementById('importBtn').disabled = on;
@@ -51,17 +64,25 @@ async function importFile(file) {
     if (!file || importing) return;
     if (isGenerating()) { showToast('生成中，請稍候再匯入檔案', 'info'); return; }
     const ext = (file.name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
-    if (!IMPORT_EXTS.includes(ext)) { showToast('不支援的檔案格式，目前支援 PDF、DOCX、Markdown、TXT', 'error', 5000); return; }
-    if (file.size > IMPORT_MAX_BYTES) { showToast('檔案過大（上限 10 MB）', 'error', 5000); return; }
+    if (OLD_OFFICE_HINT[ext]) { showToast(`不支援舊版格式，${OLD_OFFICE_HINT[ext]}後再上傳`, 'error', 5000); return; }
+    if (!IMPORT_EXTS.includes(ext)) { showToast('不支援的檔案格式，目前支援 PDF、DOCX、PPTX、Markdown、TXT', 'error', 5000); return; }
+    const maxMb = IMPORT_MAX_MB[ext] || 10;
+    if (file.size > maxMb * 1024 * 1024) { showToast(`檔案過大（上限 ${maxMb} MB）`, 'error', 5000); return; }
 
     setImporting(true, file.name);
     try {
         const form = new FormData();
         form.append('file', file);
+        // PPTX 中的圖片用目前選擇的模型辨識
+        const llm = getLlmChoice();
+        form.append('provider', llm.provider);
+        form.append('model', llm.model);
         const res = await fetch('/api/extract', { method: 'POST', body: form });
         throwIfSessionExpired(res);
         if (!res.ok) throw await readApiError(res);
-        applyImportedText(await res.json());
+        const data = await res.json();
+        applyImportedText(data);
+        if (data.images) refreshQuota();   // 圖片辨識算一次 AI 用量
     } catch (err) {
         if (!err.handled) showToast(friendlyError(err), 'error', 6000);
     } finally {
@@ -77,7 +98,8 @@ function applyImportedText(data) {
     updateCount();
     saveDraft();
     ta.scrollTop = 0;
-    const meta = [data.pages ? `${data.pages} 頁` : '', `${data.text.length.toLocaleString()} 字`].filter(Boolean).join('，');
+    const meta = [data.pages ? `${data.pages} 頁` : '', `${data.text.length.toLocaleString()} 字`,
+        data.images_read ? `辨識 ${data.images_read} 張圖片` : ''].filter(Boolean).join('，');
     const undoAction = prev.trim() ? {
         label: '復原', onClick: () => { ta.value = prev; updateCount(); saveDraft(); }
     } : null;
@@ -85,6 +107,8 @@ function applyImportedText(data) {
     if (data.truncated) {
         showToast(`原文共 ${data.chars.toLocaleString()} 字，超過上限，已截斷至前 ${data.text.length.toLocaleString()} 字`, 'info', 7000);
     }
+    (data.notices || []).forEach(n => showToast(n, 'info', 7000));
+    if (data.images_read) showToast('AI 辨識的圖片內容標有「AI 辨識」，生成前請核對數字', 'info', 7000);
 }
 
 (function initFileImport() {

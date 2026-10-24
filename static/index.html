@@ -176,7 +176,7 @@
                         <div id="inputDropZone" class="relative">
                             <textarea id="inputContent" rows="10" maxlength="50000"
                                 class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 pb-8 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow resize-none"
-                                placeholder="輸入素材內容，或拖放 PDF / Word / Markdown / TXT 檔案至此...（Ctrl / ⌘ + Enter 快速生成）"></textarea>
+                                placeholder="輸入素材內容，或拖放 PDF / Word / PowerPoint / Markdown / TXT 檔案至此...（Ctrl / ⌘ + Enter 快速生成）"></textarea>
                             <span id="charCount"
                                 class="absolute bottom-2 right-3 text-[11px] text-zinc-400 dark:text-zinc-500 tabular-nums transition-colors">0
                                 字</span>
@@ -199,11 +199,11 @@
                                 class="chip text-xs px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"><i
                                     class="fa-solid fa-graduation-cap mr-1"></i>教學課程</button>
                             <button type="button" id="importBtn" onclick="document.getElementById('fileInput').click()"
-                                title="支援 PDF、DOCX、Markdown、TXT，上限 10 MB"
+                                title="支援 PDF、DOCX、PPTX、Markdown、TXT，上限 10 MB（PPTX 30 MB）"
                                 class="chip text-xs px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 ml-auto"><i
                                     id="importIcon" class="fa-solid fa-file-arrow-up mr-1"></i><span id="importLabel">上傳檔案</span></button>
                             <input type="file" id="fileInput" class="hidden"
-                                accept=".pdf,.docx,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/markdown,text/plain">
+                                accept=".pdf,.docx,.pptx,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/markdown,text/plain">
                             <button type="button" onclick="clearInput()"
                                 class="chip text-xs px-3 py-1 rounded-full text-zinc-400 hover:text-red-500"><i
                                     class="fa-solid fa-eraser mr-1"></i>清除</button>
@@ -786,7 +786,7 @@
                         <h4>輸入素材</h4>
                         <ul>
                             <li><b>輸入文字</b>：直接在輸入框貼上內容（上限 50,000 字），或點「試試範例」快速體驗。</li>
-                            <li><b>匯入檔案</b>：點「上傳檔案」、拖放或貼上 PDF、Word（.docx）、Markdown、TXT（單檔 10 MB）；文字抽出後會先填入輸入框，可檢查、修改再生成。掃描影像型 PDF 與舊版 .doc 不支援。</li>
+                            <li><b>匯入檔案</b>：點「上傳檔案」、拖放或貼上 PDF、Word（.docx）、PowerPoint（.pptx）、Markdown、TXT（單檔 10 MB，PowerPoint 30 MB）；文字抽出後會先填入輸入框，可檢查、修改再生成。PowerPoint 中的截圖與圖表圖片會用目前選擇的模型辨識，結果標有「AI 辨識」，生成前請核對數字；有圖片要辨識時，整個檔案算一次用量。掃描影像型 PDF 與舊版 .doc、.ppt 不支援。</li>
                             <li><b>AI 模型</b>：右上角的模型選單可切換 Gemini、OpenAI 或 Databricks 的模型（依伺服器設定而定）。</li>
                         </ul>
                         <h5>簡報模式</h5>
@@ -1061,8 +1061,8 @@
     <script src="/static/presenter.js?v=4"></script>
     <script src="/static/icons.js?v=2"></script>
     <script src="/static/app/core.js?v=10"></script>
-    <script src="/static/app/input.js?v=5"></script>
-    <script src="/static/app/generate.js?v=20"></script>
+    <script src="/static/app/input.js?v=6"></script>
+    <script src="/static/app/generate.js?v=21"></script>
     <script src="/static/app/outline.js?v=1"></script>
     <script src="/static/app/shapes.js?v=2"></script>
     <script src="/static/app/editor.js?v=11"></script>

@@ -528,7 +528,7 @@ def begin_llm_call(entry: dict) -> int:
         for _, env_name, window, label in RATE_WINDOWS:
             quota = _window_quota(conn, user_id, now, env_name, window)
             if quota and not quota["remaining"]:
-                error = LlmRateLimited(f"本帳號{label}最多可使用 AI 生成 {quota['limit']} 次（生成、大綱與重產合併計算），已達上限，"
+                error = LlmRateLimited(f"本帳號{label}最多可使用 AI 生成 {quota['limit']} 次（生成、大綱、重產與圖片辨識合併計算），已達上限，"
                                        f"請於 {fmt_wait(quota['reset_in'])}後再試", quota["reset_in"])
                 break
         concurrent = llm_limit("LLM_MAX_CONCURRENT")
@@ -536,7 +536,7 @@ def begin_llm_call(entry: dict) -> int:
             running = conn.execute("SELECT COUNT(*) FROM llm_usage WHERE user_id = ? AND created_at > ? "
                                    "AND status = 'pending'", (user_id, now - PENDING_STALE_MS)).fetchone()[0]
             if running >= concurrent:
-                error = LlmRateLimited(f"本帳號同時最多進行 {concurrent} 個 AI 生成（生成、大綱或重產），請等目前的完成後再試", 5)
+                error = LlmRateLimited(f"本帳號同時最多進行 {concurrent} 個 AI 工作（生成、大綱、重產或圖片辨識），請等目前的完成後再試", 5)
         if error is None:
             return _insert_usage(conn, {**entry, "status": "pending"})
         _insert_usage(conn, {**entry, "status": "rate_limited", "http_status": 429, "error": str(error)[:200]})

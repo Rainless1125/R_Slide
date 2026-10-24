@@ -28,7 +28,8 @@ accounts.py       登入、註冊、歷史記錄與意見回饋的 API（/api/au
 admin.py          後台管理的 API（/api/admin/*）
 store.py          SQLite 資料存取：帳號、session、登入鎖定、註冊次數、歷史記錄、用量紀錄、意見回饋
 manage_users.py   帳號管理指令
-extract.py        讀取上傳檔案的文字（PDF、DOCX、Markdown、TXT）
+extract.py        讀取上傳檔案的文字（PDF、DOCX、PPTX、Markdown、TXT）
+slide_images.py   匯入 PPTX 時用 AI 辨識投影片中的圖片：提示規則、逐頁呼叫與併發
 exporter.py       把投影片圖片組成 PPTX
 .env_example      環境變數範本
 ```

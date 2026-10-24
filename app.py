@@ -1,5 +1,6 @@
 import os
 import json
+import base64
 import hashlib
 import logging
 import time
@@ -18,13 +19,14 @@ from openai import BadRequestError, OpenAI
 from starlette.datastructures import UploadFile
 
 import store
-from accounts import current_user, router as accounts_router
+from accounts import current_user, env_flag, router as accounts_router
 from deck_design import (CONTENT_ACCURACY_RULES, DECK_RHYTHM_RULES, LAYOUT_CATALOG, THEME_RULES, DeckTheme,
                          format_theme, theme_from_input)
 from admin import router as admin_router
 from charts import CHART_RULES, MAX_CHARTS_PER_SLIDE, ChartSpec, normalize_charts
 from exporter import ExportError, build_pptx
-from extract import MAX_UPLOAD_BYTES, ExtractError, extract_text
+from extract import MAX_REQUEST_BYTES, ExtractError, extract_text
+from slide_images import SlideImageReadings, read_slide_images
 
 logger = logging.getLogger("rslide")
 
@@ -121,7 +123,7 @@ def gemini_usage(response) -> dict:
                        getattr(u, "thoughts_token_count", None))
 
 
-def call_openai_compatible(client: OpenAI, model: str, system_instruction: str, prompt: str,
+def call_openai_compatible(client: OpenAI, model: str, system_instruction: str, prompt: str | list,
                            schema: type[BaseModel], allow_fallback: bool, usage: dict | None = None) -> dict:
     usage = {} if usage is None else usage
     messages = [
@@ -176,8 +178,10 @@ def gemini_response_text(response) -> str:
 
 
 def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
-             schema: type[BaseModel], temperature: float, usage: dict | None = None) -> dict:
-    """依平台呼叫 LLM，回傳符合 schema 的 dict。傳入 usage 時會填入實際使用的模型與 token 數（供使用紀錄）。"""
+             schema: type[BaseModel], temperature: float, usage: dict | None = None,
+             images: list[tuple[bytes, str]] | None = None) -> dict:
+    """依平台呼叫 LLM，回傳符合 schema 的 dict。傳入 usage 時會填入實際使用的模型與 token 數（供使用紀錄）。
+    images 為 [(圖片資料, MIME)]，依序附在提示之後（模型需支援圖片輸入）。"""
     usage = {} if usage is None else usage
     provider = (provider or "gemini").lower()
     if provider not in MODEL_CATALOG:
@@ -198,10 +202,14 @@ def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
             thinking_config=types.ThinkingConfig(thinking_budget=0),
             system_instruction=system_instruction
         )
-        response = client.models.generate_content(model=model, contents=prompt, config=config)
+        contents = [prompt, *(types.Part.from_bytes(data=d, mime_type=m) for d, m in images)] if images else prompt
+        response = client.models.generate_content(model=model, contents=contents, config=config)
         usage.update(gemini_usage(response))   # 先記用量：被擋下或輸出被截斷時 token 也已經用掉了
         return json.loads(gemini_response_text(response))
 
+    if images:
+        prompt = [{"type": "text", "text": prompt}, *({"type": "image_url", "image_url": {
+            "url": f"data:{m};base64,{base64.b64encode(d).decode()}", "detail": "high"}} for d, m in images)]
     return call_openai_compatible(client, model, system_instruction, prompt, schema,
                                   allow_fallback=provider == "databricks", usage=usage)
 
@@ -569,7 +577,48 @@ def generate_outline(req: GenerateRequest, request: Request, user: dict = Depend
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
-# 檔案解析與 PPTX 匯出不呼叫 LLM，但會佔用伺服器的 CPU 與記憶體，同樣只開放給已登入的使用者
+class ExtractUsage(BaseModel):
+    """llm_usage_log 需要的欄位：PPTX 圖片辨識記為一次 extract 用量。"""
+    provider: str
+    model: str
+    content: str
+    deck_mode: str | None = None
+    num_pages: int | None = None
+
+
+def pptx_image_reader(request: Request, user: dict, provider: str, model: str):
+    """回傳給 extract_text 的圖片辨識函式：整個檔案的辨識記為一次 AI 用量（各頁的 token 數加總）。
+    EXTRACT_IMAGES=false 時不辨識圖片；超過次數上限時改為只匯入文字，並提示原因。"""
+    if not env_flag("EXTRACT_IMAGES", True):
+        return None
+
+    def read(slides):
+        if provider_client(provider) is None:
+            return {}, [f"圖片未辨識：{MISSING_KEY_MSG.get(provider, f'不支援的平台 {provider}')}"]
+        usages = []
+        call = lambda system, prompt, images, usage: call_llm(provider, model, system, prompt, SlideImageReadings,
+                                                              0.2, usage, images=images)
+        req = ExtractUsage(provider=provider, model=model, content="\n".join(s.text() for s in slides),
+                           num_pages=len(slides))
+        try:
+            with llm_usage_log(request, user, "extract", req) as usage:
+                readings, notices = read_slide_images(slides, call, usages)
+                for key in ("input_tokens", "output_tokens", "total_tokens", "cached_tokens", "reasoning_tokens"):
+                    values = [u[key] for u in usages if u.get(key) is not None]
+                    usage[key] = sum(values) if values else None
+                usage["model"] = next((u["model"] for u in usages if u.get("model")), model)
+                usage["slides_returned"] = len(readings)
+                return readings, notices
+        except HTTPException as e:
+            if e.status_code == 429:
+                return {}, [f"圖片未辨識：{e.detail}"]
+            raise
+
+    return read
+
+
+# 檔案解析與 PPTX 匯出會佔用伺服器的 CPU 與記憶體，只開放給已登入的使用者；
+# PPTX 中的圖片會用 AI 辨識，算進該帳號的 AI 使用次數
 @app.post("/api/extract")
 async def extract_file(request: Request, user: dict = Depends(current_user)):
     """抽取上傳檔案的文字，供前端填入輸入框。檔案不會被保存。"""
@@ -577,21 +626,23 @@ async def extract_file(request: Request, user: dict = Depends(current_user)):
     length = request.headers.get("content-length")
     if not length or not length.isdigit():
         raise HTTPException(status_code=411, detail="缺少 Content-Length")
-    if int(length) > MAX_UPLOAD_BYTES + 64 * 1024:
-        raise HTTPException(status_code=413, detail=f"檔案過大（上限 {MAX_UPLOAD_BYTES // 1024 // 1024} MB）")
+    if int(length) > MAX_REQUEST_BYTES + 64 * 1024:
+        raise HTTPException(status_code=413, detail=f"檔案過大（上限 {MAX_REQUEST_BYTES // 1024 // 1024} MB）")
 
-    form = await request.form(max_files=1, max_fields=1)
+    form = await request.form(max_files=1, max_fields=3)
     try:
         upload = form.get("file")
         if not isinstance(upload, UploadFile):
             raise HTTPException(status_code=400, detail="請選擇要上傳的檔案")
-        data = await upload.read(MAX_UPLOAD_BYTES + 1)
+        data = await upload.read(MAX_REQUEST_BYTES + 1)
         filename = upload.filename or ""
+        provider, model = str(form.get("provider") or "gemini"), str(form.get("model") or "")
     finally:
         await form.close()
 
+    reader = pptx_image_reader(request, user, provider, model)
     try:
-        return await run_in_threadpool(extract_text, filename, data, MAX_CONTENT_CHARS)
+        return await run_in_threadpool(extract_text, filename, data, MAX_CONTENT_CHARS, reader)
     except ExtractError as e:
         raise HTTPException(status_code=e.status_code, detail=str(e))
     except Exception:
