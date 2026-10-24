@@ -320,7 +320,7 @@ async function generateDeck(input, outline = null) {
 }
 
 /* ===================== 剩餘次數 =====================
- * 伺服器限制每個帳號 1 小時內與 24 小時內的 AI 使用次數（生成、大綱、重產與匯入 PPTX 的圖片辨識合併計算，
+ * 伺服器限制每個帳號 1 小時內與 24 小時內的 AI 使用次數（生成、大綱、重產與匯入檔案時的 AI 辨識合併計算，
  * 失敗的呼叫也算；見 store.begin_llm_call），
  * 剩餘次數顯示在生成按鈕旁與重產視窗。上限設為 0（不限制）的區間伺服器回傳 null，不顯示 */
 let llmQuota = null;
@@ -373,7 +373,7 @@ function renderQuota() {
 <div class="quota-pop" role="tooltip">
   <div class="quota-pop-title"><i class="fa-regular fa-clock text-violet-500" aria-hidden="true"></i>用量限制</div>
   ${rows.map(([label, q]) => quotaRow(label, q)).join('')}
-  <p class="quota-note">生成、大綱、重產與匯入 PowerPoint 的圖片辨識合併計算（一個檔案算一次），失敗的也會算一次</p>
+  <p class="quota-note">生成、大綱、重產與匯入檔案時的 AI 辨識合併計算（一個檔案算一次），失敗的也會算一次</p>
 </div>` : '';
     ['quotaInfo', 'regenQuotaInfo'].forEach(id => {
         const el = document.getElementById(id);

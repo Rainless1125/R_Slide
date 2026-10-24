@@ -5,6 +5,7 @@ google-genai
 openai
 python-multipart
 pypdf
+pypdfium2
 python-docx
 python-pptx
 Pillow

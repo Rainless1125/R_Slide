@@ -63,6 +63,10 @@ R Slide 用 AI 把文字素材做成簡報。
   - 系統讀出每頁的文字、表格、圖表數據與講者備註。
   - 投影片中的截圖與圖表圖片，用目前選擇的模型辨識。辨識結果放在圖片原本的位置，標示「AI 辨識」。
   - 生成前，核對 AI 辨識的數字。
+- 匯入掃描的 PDF：
+  - 系統直接讀出有文字的頁面。
+  - 沒有文字的頁面（掃描頁），用目前選擇的模型辨識整頁內容，標示「AI 辨識」。空白頁不辨識。
+  - 生成前，核對 AI 辨識的內容。
 - 講者備註：AI 為每頁寫一份講稿。按 `N` 顯示備註。
 - 講者檢視：按 `P` 開啟。講者檢視顯示目前頁、下一頁、備註與計時器。
 - 匯出：PDF、PowerPoint（PPTX）與 HTML。
@@ -75,11 +79,11 @@ R Slide 用 AI 把文字素材做成簡報。
 
 - PDF 與 PPTX 的每一頁是圖片。匯出後，你不能編輯文字。
 - 版面元素只能等比例縮放。你不能只改寬度。
-- 掃描的 PDF 沒有文字，R Slide 不能讀取。
 - 舊的 `.doc` 檔不能讀取。先把它另存為 `.docx`。
 - 舊的 `.ppt` 檔不能讀取。先把它另存為 `.pptx`。
 - PowerPoint 的 EMF、WMF 向量圖不能辨識。
-- 辨識圖片的模型必須支援圖片輸入。Databricks 的部分模型不支援。
+- 辨識圖片與掃描頁的模型必須支援圖片輸入。Databricks 的部分模型不支援。
+- PDF 中有文字的頁面，系統不辨識頁面上的圖片。
 
 ## 安裝與啟動
 
@@ -178,22 +182,22 @@ DATABRICKS_MODELS=databricks-claude-sonnet-4-5,databricks-gpt-oss-120b
 說明：
 
 - 生成、大綱與重產都算一次用量。失敗的工作也算。
-- 匯入 PowerPoint 時，辨識整個檔案的圖片算一次用量。
+- 匯入 PowerPoint 或掃描的 PDF 時，辨識整個檔案算一次用量。
 - 一個帳號最多保留 200 筆歷史記錄。系統自動刪除最舊的記錄。
 - 系統不保存素材與 AI 回覆的內容。系統只記錄字數與用量。
 
-### 匯入 PowerPoint
+### 匯入 PowerPoint 與掃描的 PDF
 
 | 變數 | 說明 | 預設值 |
 |------|------|--------|
-| `EXTRACT_IMAGES` | 是否用 AI 辨識投影片中的圖片。設為 `false` 時，只匯入文字。 | `true` |
-| `EXTRACT_IMAGE_MAX` | 一個檔案最多辨識幾張圖片。`0` 表示沒有限制。 | `0` |
+| `EXTRACT_IMAGES` | 是否用 AI 辨識投影片中的圖片與 PDF 的掃描頁。設為 `false` 時，只匯入文字。 | `true` |
+| `EXTRACT_IMAGE_MAX` | 一個檔案最多辨識幾張圖片。PDF 的一個掃描頁算一張。`0` 表示沒有限制。 | `0` |
 | `EXTRACT_IMAGE_CONCURRENCY` | 同時辨識幾頁。 | `4` |
 
 說明：
 
 - 系統不辨識太小的圖片（例如圖示），也不辨識在 3 頁以上重複出現的圖片（例如 Logo）。
-- PowerPoint 檔的上限是 30 MB。其他檔案的上限是 10 MB。
+- PDF 與 PowerPoint 檔的上限是 30 MB。其他檔案的上限是 10 MB。
 
 ### 後台管理
 
@@ -285,7 +289,7 @@ R Slide 需要以下連線：
 
 | 項目 | 連線對象 |
 |------|----------|
-| AI 呼叫 | 伺服器連到 Gemini、OpenAI 或 Databricks。匯入 PowerPoint 時，投影片中的圖片也傳送到 AI 平台。 |
+| AI 呼叫 | 伺服器連到 Gemini、OpenAI 或 Databricks。匯入 PowerPoint 或掃描的 PDF 時，圖片與掃描頁也傳送到 AI 平台。 |
 | 介面 | 瀏覽器連到 Tailwind 與 Font Awesome 的 CDN。 |
 | 匯出 PDF 與 PPTX | 瀏覽器從 cdnjs 下載匯出工具。 |
 

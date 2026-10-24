@@ -199,7 +199,7 @@
                                 class="chip text-xs px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"><i
                                     class="fa-solid fa-graduation-cap mr-1"></i>教學課程</button>
                             <button type="button" id="importBtn" onclick="document.getElementById('fileInput').click()"
-                                title="支援 PDF、DOCX、PPTX、Markdown、TXT，上限 10 MB（PPTX 30 MB）"
+                                title="支援 PDF、DOCX、PPTX、Markdown、TXT，上限 10 MB（PDF、PPTX 30 MB）"
                                 class="chip text-xs px-3 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 ml-auto"><i
                                     id="importIcon" class="fa-solid fa-file-arrow-up mr-1"></i><span id="importLabel">上傳檔案</span></button>
                             <input type="file" id="fileInput" class="hidden"
@@ -786,7 +786,7 @@
                         <h4>輸入素材</h4>
                         <ul>
                             <li><b>輸入文字</b>：直接在輸入框貼上內容（上限 50,000 字），或點「試試範例」快速體驗。</li>
-                            <li><b>匯入檔案</b>：點「上傳檔案」、拖放或貼上 PDF、Word（.docx）、PowerPoint（.pptx）、Markdown、TXT（單檔 10 MB，PowerPoint 30 MB）；文字抽出後會先填入輸入框，可檢查、修改再生成。PowerPoint 中的截圖與圖表圖片會用目前選擇的模型辨識，結果標有「AI 辨識」，生成前請核對數字；有圖片要辨識時，整個檔案算一次用量。掃描影像型 PDF 與舊版 .doc、.ppt 不支援。</li>
+                            <li><b>匯入檔案</b>：點「上傳檔案」、拖放或貼上 PDF、Word（.docx）、PowerPoint（.pptx）、Markdown、TXT（單檔 10 MB，PDF、PowerPoint 30 MB）；文字抽出後會先填入輸入框，可檢查、修改再生成。PowerPoint 中的截圖與圖表圖片、PDF 的掃描頁會用目前選擇的模型辨識，結果標有「AI 辨識」，生成前請核對數字；有內容要辨識時，整個檔案算一次用量。舊版 .doc、.ppt 不支援。</li>
                             <li><b>AI 模型</b>：右上角的模型選單可切換 Gemini、OpenAI 或 Databricks 的模型（依伺服器設定而定）。</li>
                         </ul>
                         <h5>簡報模式</h5>
@@ -1061,8 +1061,8 @@
     <script src="/static/presenter.js?v=4"></script>
     <script src="/static/icons.js?v=2"></script>
     <script src="/static/app/core.js?v=10"></script>
-    <script src="/static/app/input.js?v=6"></script>
-    <script src="/static/app/generate.js?v=21"></script>
+    <script src="/static/app/input.js?v=7"></script>
+    <script src="/static/app/generate.js?v=22"></script>
     <script src="/static/app/outline.js?v=1"></script>
     <script src="/static/app/shapes.js?v=2"></script>
     <script src="/static/app/editor.js?v=11"></script>

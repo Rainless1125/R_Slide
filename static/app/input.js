@@ -33,7 +33,7 @@ document.getElementById('inputContent').addEventListener('keydown', e => {
 
 /* ===================== 檔案匯入（PDF / DOCX / PPTX / Markdown / TXT） ===================== */
 const IMPORT_EXTS = ['.pdf', '.docx', '.pptx', '.md', '.markdown', '.txt'];
-const IMPORT_MAX_MB = { '.pptx': 30 };      // 其他格式 10 MB；簡報常內嵌大量截圖，上限較大
+const IMPORT_MAX_MB = { '.pptx': 30, '.pdf': 30 };   // 其他格式 10 MB；簡報常內嵌大量截圖、掃描的 PDF 每頁都是圖片，上限較大
 const OLD_OFFICE_HINT = { '.ppt': 'PowerPoint 檔請先另存為 .pptx', '.doc': 'Word 檔請先另存為 .docx' };
 let importing = false;
 let importTimer = null;
@@ -41,13 +41,13 @@ let importTimer = null;
 function setImporting(on, name = '') {
     importing = on;
     clearInterval(importTimer);
-    // PPTX 的圖片會交給 AI 辨識，可能需要數十秒：顯示已等待的秒數
-    if (on && /\.pptx$/i.test(name)) {
+    // PPTX 的圖片與 PDF 的掃描頁會交給 AI 辨識，可能需要數十秒：顯示已等待的秒數
+    if (on && /\.(pptx|pdf)$/i.test(name)) {
         const start = Date.now();
         const tick = () => {
             const sec = Math.floor((Date.now() - start) / 1000);
             document.getElementById('importLabel').textContent = `讀取中… ${sec} 秒`;
-            document.getElementById('dropOverlayLabel').textContent = `正在讀取 ${name}，含圖片辨識（${sec} 秒）`;
+            document.getElementById('dropOverlayLabel').textContent = `正在讀取 ${name}（${sec} 秒）`;
         };
         importTimer = setInterval(tick, 1000);
     }
@@ -73,7 +73,7 @@ async function importFile(file) {
     try {
         const form = new FormData();
         form.append('file', file);
-        // PPTX 中的圖片用目前選擇的模型辨識
+        // PPTX 中的圖片與 PDF 的掃描頁用目前選擇的模型辨識
         const llm = getLlmChoice();
         form.append('provider', llm.provider);
         form.append('model', llm.model);
@@ -99,7 +99,7 @@ function applyImportedText(data) {
     saveDraft();
     ta.scrollTop = 0;
     const meta = [data.pages ? `${data.pages} 頁` : '', `${data.text.length.toLocaleString()} 字`,
-        data.images_read ? `辨識 ${data.images_read} 張圖片` : ''].filter(Boolean).join('，');
+        data.images_read ? `AI 辨識 ${data.images_read} ${/\.pdf$/i.test(data.filename) ? '頁掃描頁' : '張圖片'}` : ''].filter(Boolean).join('，');
     const undoAction = prev.trim() ? {
         label: '復原', onClick: () => { ta.value = prev; updateCount(); saveDraft(); }
     } : null;
@@ -108,7 +108,7 @@ function applyImportedText(data) {
         showToast(`原文共 ${data.chars.toLocaleString()} 字，超過上限，已截斷至前 ${data.text.length.toLocaleString()} 字`, 'info', 7000);
     }
     (data.notices || []).forEach(n => showToast(n, 'info', 7000));
-    if (data.images_read) showToast('AI 辨識的圖片內容標有「AI 辨識」，生成前請核對數字', 'info', 7000);
+    if (data.images_read) showToast('AI 辨識的內容標有「AI 辨識」，生成前請核對數字', 'info', 7000);
 }
 
 (function initFileImport() {

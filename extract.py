@@ -2,6 +2,7 @@
 
 PPTX 的文字、表格與原生圖表數據直接從檔案讀出；投影片中的圖片（截圖）交給呼叫端傳入的
 read_images 辨識（見 app.py），辨識結果依圖片在頁面上的位置插回同一頁，避免與其他內容錯置。
+PDF 有文字的頁面直接讀文字；沒有文字的頁面（掃描頁）轉成圖片，同樣交給 read_images 辨識整頁內容。
 """
 import hashlib
 import io
@@ -14,18 +15,20 @@ from typing import Callable
 
 from docx import Document
 from docx.table import Table
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageStat, UnidentifiedImageError
 from pptx import Presentation
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.enum.shapes import MSO_SHAPE_TYPE, PP_PLACEHOLDER
 from pptx.shapes.graphfrm import GraphicFrame
+import pypdfium2 as pdfium
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
-# 簡報常內嵌大量截圖，上限較大；仍低於 README 建議的反向代理上限（client_max_body_size 40m）
-MAX_PPTX_BYTES = 30 * 1024 * 1024
-MAX_REQUEST_BYTES = max(MAX_UPLOAD_BYTES, MAX_PPTX_BYTES)
+# 簡報常內嵌大量截圖、掃描的 PDF 每頁都是圖片，上限較大；仍低於 README 建議的反向代理上限（client_max_body_size 40m）
+MAX_LARGE_UPLOAD_BYTES = 30 * 1024 * 1024
+LARGE_UPLOAD_EXTENSIONS = {".pdf", ".pptx"}
+MAX_REQUEST_BYTES = max(MAX_UPLOAD_BYTES, MAX_LARGE_UPLOAD_BYTES)
 # .docx / .pptx 是 zip 壓縮檔：解壓縮後的總大小上限，避免很小的檔案解壓出數 GB 的資料（zip bomb）把記憶體用光。
 # 一般文件解壓後多在數 MB 以內，內嵌大量圖片時才會較大
 MAX_DOCX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
@@ -112,7 +115,8 @@ def _strip_page_numbers(pages: list[str]) -> list[str]:
     return out
 
 
-def _extract_pdf(data: bytes) -> tuple[str, int]:
+def _read_pdf_pages(data: bytes) -> list[str]:
+    """每頁的文字（已移除頁碼）；掃描頁為空字串或只有零星文字。"""
     try:
         reader = PdfReader(io.BytesIO(data))
         if reader.is_encrypted and not reader.decrypt(""):
@@ -122,10 +126,7 @@ def _extract_pdf(data: bytes) -> tuple[str, int]:
         raise
     except (PdfReadError, ValueError, KeyError, TypeError) as e:
         raise ExtractError("無法讀取此 PDF，檔案可能已損毀") from e
-    text = "\n\n".join(p for p in _strip_page_numbers(pages) if p)
-    if not text:
-        raise ExtractError("此 PDF 抽不到文字，可能是掃描影像檔，目前不支援", 422)
-    return text, len(pages)
+    return _strip_page_numbers(pages)
 
 
 def _table_to_text(table: Table) -> str:
@@ -215,7 +216,7 @@ class SlideImage:
 
 
 @dataclass
-class PptxSlide:
+class SourcePage:
     number: int
     title: str = ""
     blocks: list = field(default_factory=list)   # str 或 SlideImage，依畫面位置排序
@@ -363,7 +364,7 @@ def _sorted_shapes(shapes: list, slide_height: int | None) -> list:
     return sorted(shapes, key=lambda s: ((s.top or 0) // tol, s.left or 0))
 
 
-def parse_pptx(data: bytes) -> tuple[list[PptxSlide], int]:
+def parse_pptx(data: bytes) -> tuple[list[SourcePage], int]:
     """回傳 (各頁內容, 略過的隱藏頁數)。圖片先保留原始資料，由 prepare_pptx_images 篩選與轉檔。"""
     try:
         _check_zip_size(data, MAX_PPTX_UNCOMPRESSED_BYTES, "PowerPoint 檔")
@@ -377,7 +378,7 @@ def parse_pptx(data: bytes) -> tuple[list[PptxSlide], int]:
         if slide._element.get("show") in ("0", "false"):
             hidden += 1
             continue
-        page = PptxSlide(number=len(slides) + 1)
+        page = SourcePage(number=len(slides) + 1)
         counter = [0]
         for shape in _sorted_shapes(list(slide.shapes), prs.slide_height):
             if (not page.title and shape.is_placeholder and shape.has_text_frame
@@ -391,7 +392,7 @@ def parse_pptx(data: bytes) -> tuple[list[PptxSlide], int]:
     return slides, hidden
 
 
-def prepare_pptx_images(slides: list[PptxSlide]):
+def prepare_pptx_images(slides: list[SourcePage]):
     """篩選要辨識的圖片：略過太小、格式不支援，以及在多頁重複出現的圖片（Logo、背景）。"""
     images = [b for s in slides for b in s.blocks if isinstance(b, SlideImage)]
     seen = Counter()
@@ -406,7 +407,7 @@ def prepare_pptx_images(slides: list[PptxSlide]):
         img.data, img.mime, img.skip = _prepare_image(img.data)
 
 
-def render_pptx(slides: list[PptxSlide], readings: dict[str, str]) -> str:
+def render_pptx(slides: list[SourcePage], readings: dict[str, str]) -> str:
     """組成文字：每頁一段，圖片的辨識結果放在圖片原本的位置。readings 為空字串表示裝飾圖片，不輸出。"""
     out = []
     for s in slides:
@@ -431,7 +432,7 @@ def render_pptx(slides: list[PptxSlide], readings: dict[str, str]) -> str:
 
 
 # read_images(slides) → (辨識結果 {圖片 key: 文字}, 提示訊息)；None 表示不辨識圖片
-ImageReader = Callable[[list[PptxSlide]], tuple[dict[str, str], list[str]]]
+ImageReader = Callable[[list[SourcePage]], tuple[dict[str, str], list[str]]]
 
 
 def _extract_pptx(data: bytes, read_images: ImageReader | None) -> tuple[str, int, dict]:
@@ -448,13 +449,74 @@ def _extract_pptx(data: bytes, read_images: ImageReader | None) -> tuple[str, in
     return render_pptx(slides, readings), len(slides), info
 
 
+# ===================== PDF 掃描頁 =====================
+# 移除頁碼後少於這個字數的頁面視為掃描頁（整頁是圖片），改用 AI 辨識整頁畫面
+MIN_PDF_PAGE_CHARS = 10
+# 掃描頁轉成圖片時的長邊像素：A4 約 240 dpi，小字也看得清楚
+PDF_RENDER_SIDE = 2000
+# 灰階標準差低於此值的頁面視為空白頁，不送辨識
+BLANK_PAGE_STDDEV = 2.0
+
+
+def _render_pdf_pages(data: bytes, numbers: list[int]) -> dict[int, bytes]:
+    """把指定頁面（從 1 起算）轉成 JPEG；空白頁不回傳。"""
+    out = {}
+    pdf = pdfium.PdfDocument(data)
+    try:
+        for n in numbers:
+            page = pdf[n - 1]
+            try:
+                w, h = page.get_size()
+                im = page.render(scale=PDF_RENDER_SIDE / max(w, h, 1)).to_pil().convert("RGB")
+            finally:
+                page.close()
+            if ImageStat.Stat(im.convert("L")).stddev[0] < BLANK_PAGE_STDDEV:
+                continue
+            buf = io.BytesIO()
+            im.save(buf, "JPEG", quality=85)
+            out[n] = buf.getvalue()
+    finally:
+        pdf.close()
+    return out
+
+
+def _extract_pdf(data: bytes, read_images: ImageReader | None) -> tuple[str, int, dict]:
+    pages = _read_pdf_pages(data)
+    scanned = [i for i, t in enumerate(pages, 1) if len(t) < MIN_PDF_PAGE_CHARS]
+    readings, info = {}, {}
+    if scanned and read_images:
+        try:
+            images = _render_pdf_pages(data, scanned)
+        except pdfium.PdfiumError as e:
+            raise ExtractError("無法讀取此 PDF，檔案可能已損毀") from e
+        jobs = [SourcePage(number=n, blocks=[SlideImage(key=f"p{n}", data=img, mime="image/jpeg")])
+                for n, img in images.items()]
+        readings, notices = read_images(jobs) if jobs else ({}, [])
+        info = {"images": len(jobs), "images_read": sum(1 for j in jobs if f"p{j.number}" in readings),
+                "notices": notices}
+    out = []
+    for i, text in enumerate(pages, 1):
+        reading = readings.get(f"p{i}")
+        # 掃描頁的零星文字（例如浮水印）已包含在辨識結果中，有辨識結果時只用辨識結果
+        out.append(f"【第 {i} 頁（AI 辨識）】\n{reading}" if reading else text)
+    text = "\n\n".join(p for p in out if p)
+    if not text.strip():
+        if not read_images:
+            raise ExtractError("此 PDF 抽不到文字，可能是掃描影像檔；系統未開啟圖片辨識，無法讀取", 422)
+        if not info.get("images"):
+            raise ExtractError("此 PDF 抽不到文字，掃描頁也沒有可辨識的內容（頁面可能是空白的）", 422)
+        reason = "；".join(info.get("notices") or []) or "沒有辨識出內容"
+        raise ExtractError(f"此 PDF 是掃描影像檔，AI 辨識失敗：{reason}", 422)
+    return text, len(pages), info
+
+
 def extract_text(filename: str, data: bytes, max_chars: int, read_images: ImageReader | None = None) -> dict:
     ext = os.path.splitext(filename or "")[1].lower()
     if ext in OLD_FORMATS:
         raise ExtractError(f"不支援舊版格式，{OLD_FORMATS[ext]}後再上傳", 415)
     if ext not in ALLOWED_EXTENSIONS:
         raise ExtractError("不支援的檔案格式，目前支援 PDF、DOCX、PPTX、Markdown、TXT", 415)
-    limit = MAX_PPTX_BYTES if ext == ".pptx" else MAX_UPLOAD_BYTES
+    limit = MAX_LARGE_UPLOAD_BYTES if ext in LARGE_UPLOAD_EXTENSIONS else MAX_UPLOAD_BYTES
     if len(data) > limit:
         raise ExtractError(f"檔案過大（上限 {limit // 1024 // 1024} MB）", 413)
     if not data:
@@ -462,7 +524,7 @@ def extract_text(filename: str, data: bytes, max_chars: int, read_images: ImageR
 
     info = {}
     if ext == ".pdf":
-        text, pages = _extract_pdf(data)
+        text, pages, info = _extract_pdf(data, read_images)
     elif ext == ".pptx":
         text, pages, info = _extract_pptx(data, read_images)
     elif ext == ".docx":
