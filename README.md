@@ -89,7 +89,7 @@ R Slide 用 AI 把文字素材做成簡報。
 
 ### 需求
 
-- Python 3.10 或更新版本。
+- Python 3.11 或更新版本。
 - 一組 AI 平台設定：Gemini、OpenAI，或公司內部的 OpenAI 相容端點。
 
 ### 步驟
@@ -348,3 +348,9 @@ R Slide 需要以下連線：
 ## 開發
 
 專案結構、測試方法與開發規則在 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
+
+## 授權
+
+R Slide 以 [MIT 授權](LICENSE)釋出。你可以免費使用、修改與散布，包含商業用途。散布時保留 `LICENSE` 中的版權聲明。
+
+`static/vendor/` 中的前端元件有各自的授權，請參考 [static/vendor/README.md](static/vendor/README.md)。
