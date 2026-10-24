@@ -1,0 +1,3 @@
+# 前端元件（static/vendor）保持原始內容，不做換行轉換：
+# Windows 上的 Git 預設會把 LF 轉成 CRLF，改變檔案內容與雜湊值
+static/vendor/** -text
