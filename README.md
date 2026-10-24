@@ -89,7 +89,7 @@ R Slide 用 AI 把文字素材做成簡報。
 
 ### 需求
 
-- Python 3.10 或更新版本。
+- Python 3.11 或更新版本。
 - 一組 AI 平台設定：Gemini、OpenAI，或公司內部的 OpenAI 相容端點。
 
 ### 步驟
