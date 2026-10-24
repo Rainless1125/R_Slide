@@ -80,7 +80,9 @@ async function importFile(file) {
         const res = await fetch('/api/extract', { method: 'POST', body: form });
         throwIfSessionExpired(res);
         if (!res.ok) throw await readApiError(res);
-        applyImportedText(await res.json());
+        const data = await res.json();
+        applyImportedText(data);
+        if (data.images) refreshQuota();   // 圖片辨識算一次 AI 用量
     } catch (err) {
         if (!err.handled) showToast(friendlyError(err), 'error', 6000);
     } finally {
