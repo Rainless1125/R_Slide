@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS llm_usage (
     http_status      INTEGER,
     error            TEXT,
     latency_ms       INTEGER,
-    fallback         INTEGER NOT NULL DEFAULT 0, -- Databricks 改用提示詞附 schema 的備援路徑
+    fallback         INTEGER NOT NULL DEFAULT 0, -- OpenAI 相容端點改用提示詞附 schema 的備援路徑
     client_ip        TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_llm_usage_user_time ON llm_usage(user_id, created_at);

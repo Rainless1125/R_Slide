@@ -77,7 +77,8 @@ def test_openai_compatible_endpoint_with_extra_headers():
     server = HTTPServer(("127.0.0.1", 0), _Gateway)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     env = {**os.environ, "OPENAI_API_KEY": "internal", "OPENAI_BASE_URL": f"http://127.0.0.1:{server.server_port}/v1/",
-           "OPENAI_MODELS": "corp-llm-large, corp-llm-small",
+           "OPENAI_MODELS": "corp-llm-large, corp-llm-small", "OPENAI_DISPLAY_NAME": "公司 AI 閘道",
+           "DATABRICKS_TOKEN": "old-setting",
            "LLM_EXTRA_HEADERS": '{"system_name": "R_Slide", "use_area": "F12"}', "NO_PROXY": "127.0.0.1"}
     code = """
 import json, app
@@ -94,7 +95,9 @@ print(json.dumps({
         server.shutdown()
     assert out.returncode == 0, out.stderr[-2000:]
     result = json.loads(out.stdout.strip().splitlines()[-1])
-    assert result["catalog"] == {"available": True, "models": ["corp-llm-large", "corp-llm-small"]}
+    assert result["catalog"] == {"available": True, "models": ["corp-llm-large", "corp-llm-small"],
+                                 "name": "公司 AI 閘道", "custom": True}
+    assert "DATABRICKS_* 設定已不再使用" in out.stderr                # 舊設定提示改用 OPENAI_*
     assert result["reply"] == {"images": []}                         # 不支援結構化輸出時改用提示詞附 schema
     assert [r["path"] for r in _Gateway.requests] == ["/v1/chat/completions"] * 2
     assert all(r["body"]["model"] == "corp-llm-large" for r in _Gateway.requests)   # 未指定時用清單第一個

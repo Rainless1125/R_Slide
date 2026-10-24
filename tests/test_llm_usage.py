@@ -111,14 +111,14 @@ def test_gemini_usage():
 def test_openai_usage_computes_missing_total():
     completion = SimpleNamespace(usage=SimpleNamespace(prompt_tokens=7, completion_tokens=3, total_tokens=None))
     assert app_module.openai_usage(completion)["total_tokens"] == 10
-    assert app_module.openai_usage(SimpleNamespace(usage=None)) == {}   # Databricks 部分模型不回傳 usage
+    assert app_module.openai_usage(SimpleNamespace(usage=None)) == {}   # 部分 OpenAI 相容端點不回傳 usage
 
 
 class Reply(BaseModel):
     title: str
 
 
-def test_call_llm_fills_usage_for_databricks_fallback(monkeypatch):
+def test_call_llm_fills_usage_for_compatible_endpoint_fallback(monkeypatch):
     import httpx
     from openai import BadRequestError
 
@@ -132,11 +132,12 @@ def test_call_llm_fills_usage_for_databricks_fallback(monkeypatch):
 
     client = SimpleNamespace(beta=SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(parse=parse))),
                              chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
-    monkeypatch.setattr(app_module, "databricks_client", client)
-    monkeypatch.setitem(app_module.MODEL_CATALOG, "databricks", ["system.ai.model-a"])
+    monkeypatch.setattr(app_module, "openai_client", client)
+    monkeypatch.setattr(app_module, "OPENAI_BASE_URL", "https://ai-gateway.example.com/v1")
+    monkeypatch.setitem(app_module.MODEL_CATALOG, "openai", ["corp-llm-a"])
     usage = {}
-    assert app_module.call_llm("databricks", "", "sys", "prompt", Reply, 0.6, usage) == {"title": "ok"}
-    assert usage["model"] == "system.ai.model-a" and usage["fallback"] == 1 and usage["total_tokens"] == 28
+    assert app_module.call_llm("openai", "", "sys", "prompt", Reply, 0.6, usage) == {"title": "ok"}
+    assert usage["model"] == "corp-llm-a" and usage["fallback"] == 1 and usage["total_tokens"] == 28
 
 
 # ===================== 查詢與保留期限 =====================
