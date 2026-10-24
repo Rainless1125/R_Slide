@@ -156,11 +156,14 @@ def test_usage_by_user_sorts_by_tokens_and_counts_repeated_content():
     for _ in range(3):
         log(bob["id"], "bob")                                   # 同一份素材生成 3 次
     log(bob["id"], "bob", action="regenerate")                  # 重產沿用原素材，不算重複
+    log(bob["id"], "bob", action="outline")
+    log(bob["id"], "bob", action="extract")
     log(bob["id"], "bob", status="error", input_tokens=None, output_tokens=None, total_tokens=None)
     rows = store.usage_by_user(0)
     assert [r["username"] for r in rows] == ["bob", "alice"]
-    assert rows[0]["calls"] == 5 and rows[0]["errors"] == 1 and rows[0]["regenerates"] == 1
-    assert rows[0]["total_tokens"] == 600 and rows[0]["max_same_content"] == 4   # 失敗的生成也算
+    assert rows[0]["calls"] == 7 and rows[0]["errors"] == 1 and rows[0]["regenerates"] == 1
+    assert rows[0]["outlines"] == 1 and rows[0]["extracts"] == 1
+    assert rows[0]["total_tokens"] == 900 and rows[0]["max_same_content"] == 4   # 失敗的生成也算；大綱與匯入不算同素材生成
     assert rows[1]["max_same_content"] == 1
 
 

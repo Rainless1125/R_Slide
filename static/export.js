@@ -432,6 +432,35 @@ function _exportLoadLib(name) {
     return _exportLibLoading[name];
 }
 
+// 圖片載入失敗（例如 AI 寫了不存在的相對路徑 <img src="logo.png">）時 html-to-image 會整份失敗：
+// 轉圖前先等每張圖片載入完，失敗或逾時的換成佔位圖，只影響那一張圖片
+const EXPORT_IMAGE_WAIT_MS = 8000;
+
+async function _exportReplaceBrokenImages(root) {
+    const imgs = Array.from(root.querySelectorAll('img'));
+    await Promise.all(imgs.map(img => {
+        if (img.complete) return null;
+        return new Promise(resolve => {
+            const done = () => { clearTimeout(timer); resolve(); };
+            const timer = setTimeout(done, EXPORT_IMAGE_WAIT_MS);
+            img.addEventListener('load', done, { once: true });
+            img.addEventListener('error', done, { once: true });
+        });
+    }));
+    let broken = 0;
+    imgs.forEach(img => {
+        if (img.complete && img.naturalWidth > 0) return;
+        broken++;
+        // 佔位圖沿用壞圖片在版面上的大小，避免撐開版面；太小（只剩破圖示）時直接隱藏、保留原本的位置
+        const w = img.offsetWidth, h = img.offsetHeight;
+        img.removeAttribute('srcset');
+        if (w < 24 || h < 24) { img.style.visibility = 'hidden'; img.src = EXPORT_PLACEHOLDER_IMG; img.style.width = w + 'px'; img.style.height = h + 'px'; return; }
+        Object.assign(img.style, { width: w + 'px', height: h + 'px', objectFit: 'contain' });
+        img.src = EXPORT_PLACEHOLDER_IMG;
+    });
+    return broken;
+}
+
 async function _exportRenderSlides(slides, onProgress) {
     const h2i = await _exportLoadLib('htmlToImage');
     const host = document.createElement('div');
@@ -440,7 +469,7 @@ async function _exportRenderSlides(slides, onProgress) {
     document.body.appendChild(host);
     try {
         await document.fonts.ready;
-        let fontEmbedCSS;
+        let fontEmbedCSS, brokenImages = 0;
         const images = [];
         for (let i = 0; i < slides.length; i++) {
             onProgress(i + 1, slides.length);
@@ -451,13 +480,15 @@ async function _exportRenderSlides(slides, onProgress) {
             host.replaceChildren(frame);
             // 等 Tailwind CDN 產生新 class 的樣式（背景分頁中 requestAnimationFrame 不會觸發，因此用 setTimeout）
             await new Promise(r => setTimeout(r, 80));
+            brokenImages += await _exportReplaceBrokenImages(frame);
             // 字型（Font Awesome 圖示等）只需內嵌一次，之後各頁共用
             if (fontEmbedCSS === undefined) fontEmbedCSS = await h2i.getFontEmbedCSS(frame).catch(() => '');
             images.push(await h2i.toJpeg(frame, {
                 width: EXPORT_W, height: EXPORT_H, pixelRatio: 2, quality: 0.92,
-                backgroundColor: '#ffffff', fontEmbedCSS
+                backgroundColor: '#ffffff', fontEmbedCSS, imagePlaceholder: EXPORT_PLACEHOLDER_IMG
             }));
         }
+        if (brokenImages) showToast(`有 ${brokenImages} 張圖片無法載入，匯出時已用佔位圖取代或略過`, 'info', 6000);
         return images;
     } finally {
         host.remove();
@@ -491,7 +522,11 @@ async function _exportRun(kind, build) {
         _exportDownload(blob, title, kind.toLowerCase());
         showToast(`已匯出 ${kind}`, 'success', 1800);
     } catch (err) {
-        if (!err?.handled) showToast(typeof friendlyError === 'function' ? friendlyError(err) : String(err?.message || err), 'error', 6000);
+        // 轉圖失敗時 html-to-image 丟出的是載入失敗的 Event，不是 Error，訊息只有「[object Event]」
+        if (err instanceof Event) {
+            console.error('[R Slide] 匯出時資源載入失敗', err.target?.src || err.target?.href || err);
+            showToast(`匯出 ${kind} 失敗：投影片中有圖片或字型無法載入，請稍後再試`, 'error', 6000);
+        } else if (!err?.handled) showToast(typeof friendlyError === 'function' ? friendlyError(err) : String(err?.message || err), 'error', 6000);
     } finally {
         _exportSetBusy(false);
     }
