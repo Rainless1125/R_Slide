@@ -82,7 +82,7 @@ R Slide 用 AI 把文字素材做成簡報。
 - 舊的 `.doc` 檔不能讀取。先把它另存為 `.docx`。
 - 舊的 `.ppt` 檔不能讀取。先把它另存為 `.pptx`。
 - PowerPoint 的 EMF、WMF 向量圖不能辨識。
-- 辨識圖片與掃描頁的模型必須支援圖片輸入。Databricks 的部分模型不支援。
+- 辨識圖片與掃描頁的模型必須支援圖片輸入。公司內部端點的部分模型不支援。
 - PDF 中有文字的頁面，系統不辨識頁面上的圖片。
 
 ## 安裝與啟動
@@ -90,7 +90,7 @@ R Slide 用 AI 把文字素材做成簡報。
 ### 需求
 
 - Python 3.10 或更新版本。
-- 一組 AI 平台設定：Gemini、OpenAI 或 Databricks。
+- 一組 AI 平台設定：Gemini、OpenAI，或公司內部的 OpenAI 相容端點。
 
 ### 步驟
 
@@ -139,32 +139,65 @@ R Slide 用 AI 把文字素材做成簡報。
 
 ### AI 平台
 
-設定以下其中一組：
+設定以下其中一個，或兩個都設定：
 
 | 變數 | 說明 |
 |------|------|
 | `GEMINI_API_KEY` | Gemini 的 API Key。 |
-| `OPENAI_API_KEY` | OpenAI 的 API Key。 |
-| `DATABRICKS_HOST` | Databricks 的網址。 |
-| `DATABRICKS_TOKEN` | Databricks 的存取權杖。 |
-| `DATABRICKS_MODELS` | 可用的模型名稱。用逗號分開。第一個是預設模型。 |
-| `DATABRICKS_BASE_URL` | 選填。另一個端點網址。 |
+| `OPENAI_API_KEY` | OpenAI 或公司內部 AI 端點的 API Key。 |
 
-使用 Databricks 時，三個必填變數都要設定：`DATABRICKS_HOST`、`DATABRICKS_TOKEN`、`DATABRICKS_MODELS`。
+### 公司內部的 AI 端點
+
+R Slide 可以連到 OpenAI 相容的端點，例如公司內部的 AI 閘道、Azure OpenAI、Databricks、vLLM 或 Ollama。
+
+| 變數 | 說明 | 預設值 |
+|------|------|--------|
+| `OPENAI_BASE_URL` | 端點網址，通常以 `/v1` 結尾。不填時連到 OpenAI。 | 無 |
+| `OPENAI_MODELS` | 可用的模型名稱。用逗號分開。第一個是預設模型。 | `gpt-6-luna` |
+| `OPENAI_DISPLAY_NAME` | 模型選單上顯示的平台名稱。 | 有設定 `OPENAI_BASE_URL` 時為「OpenAI 相容端點」，否則為「OpenAI」 |
+| `OPENAI_API_KEY` | 端點的 API Key。端點不需要 Key 時，填任意文字。 | 無 |
 
 範例：
 
 ```env
-DATABRICKS_HOST=https://<workspace>.cloud.databricks.com
-DATABRICKS_TOKEN=<token>
-DATABRICKS_MODELS=databricks-claude-sonnet-4-5,databricks-gpt-oss-120b
+OPENAI_API_KEY=<token>
+OPENAI_BASE_URL=https://ai-gateway.example.com/v1
+OPENAI_MODELS=corp-llm-large,corp-llm-small
+OPENAI_DISPLAY_NAME=公司 AI 閘道
+```
+
+連到 Databricks 的範例：
+
+```env
+OPENAI_API_KEY=<Databricks 權杖>
+OPENAI_BASE_URL=https://<workspace>.cloud.databricks.com/serving-endpoints
+OPENAI_MODELS=databricks-claude-sonnet-4-5,databricks-gpt-oss-120b
+OPENAI_DISPLAY_NAME=Databricks
 ```
 
 說明：
 
-- 模型名稱是 Databricks「Serving」頁面上的 endpoint 名稱。
-- 正式環境使用 service principal 的權杖。不要使用個人權杖。
-- 如果模型不支援結構化輸出，系統自動改用另一種方式。
+- 使用者只能選擇 `OPENAI_MODELS` 中的模型。
+- 如果端點不支援結構化輸出，系統自動改用另一種方式。
+- 匯入 PowerPoint 或掃描的 PDF 時，辨識圖片的模型必須支援圖片輸入。
+- 使用 Databricks 時：
+  - 模型名稱是 Databricks「Serving」頁面上的 endpoint 名稱。
+  - 正式環境使用 service principal 的權杖。不要使用個人權杖。
+
+### 呼叫 AI 時附加的標頭
+
+有些公司的 AI 閘道要求每次呼叫附加識別資料，例如系統名稱與使用區域。在 `LLM_EXTRA_HEADERS` 設定這些 HTTP 標頭：
+
+```env
+LLM_EXTRA_HEADERS={"system_name": "R_Slide", "use_area": "F12"}
+```
+
+說明：
+
+- 格式是 JSON 物件。標頭名稱與值依公司 AI 閘道的規定填寫。
+- 值只能使用英數字與符號。HTTP 標頭不支援中文。
+- 所有 AI 平台的每一次呼叫都附加這些標頭，包含生成、大綱、重產與圖片辨識。
+- 格式錯誤時，服務不會啟動，並顯示錯誤原因。
 
 ### 帳號與用量
 
@@ -303,12 +336,14 @@ R Slide 需要以下連線：
 
 | 項目 | 連線對象 |
 |------|----------|
-| AI 呼叫 | 伺服器連到 Gemini、OpenAI 或 Databricks。匯入 PowerPoint 或掃描的 PDF 時，圖片與掃描頁也傳送到 AI 平台。 |
-| 介面 | 瀏覽器連到 Tailwind 與 Font Awesome 的 CDN。 |
-| 匯出 PDF 與 PPTX | 瀏覽器從 cdnjs 下載匯出工具。 |
+| AI 呼叫 | 伺服器連到 Gemini、OpenAI，或 `OPENAI_BASE_URL` 設定的端點。匯入 PowerPoint 或掃描的 PDF 時，圖片與掃描頁也傳送到 AI 平台。 |
+| 字型 | 瀏覽器連到 Google Fonts。連不到時，畫面改用系統字型，其他功能不受影響。 |
+
+介面與匯出使用的元件（Tailwind、Font Awesome 與匯出工具）由 R Slide 的伺服器提供，不需要連外網。
+匯出的 HTML 檔也內嵌這些元件，離線開啟也能正常顯示。
 
 系統不保存上傳的檔案與匯出的簡報。
-如果要完全在內網使用，你要改接內部的 AI 端點，並自己提供前端資源。
+如果要完全在內網使用，設定 `OPENAI_BASE_URL` 連到內部的 AI 端點。請參考「公司內部的 AI 端點」。
 
 ## 開發
 

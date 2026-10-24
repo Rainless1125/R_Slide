@@ -44,6 +44,7 @@ static/chart-grid.js  圖表數據的表格輸入
 static/export.js      匯出 HTML、PDF、PPTX，與 HTML 清理（sanitizeSlideHtml）
 static/presenter.js   講者備註與講者檢視
 static/icons.js       插入圖示的清單（分組與搜尋關鍵字）
+static/vendor/        本機提供的前端元件：Tailwind（瀏覽器版）、Font Awesome、html-to-image、jsPDF
 static/app/           主畫面的樣式與程式：
   app.css             樣式
   core.js             主題、全域狀態、提示訊息、錯誤訊息、歷史記錄、側邊欄
@@ -76,6 +77,15 @@ tests/            後端測試（pytest）
 - 修改 `static/` 的檔案後，把 `static/index.html` 中該檔案的版本號加 1，例如 `editor.js?v=11` 改為 `editor.js?v=12`。
 
 注意：如果沒有更新版本號，使用者的瀏覽器可能繼續使用舊的檔案。
+
+### 前端元件
+
+- 前端元件放在 `static/vendor/`，不從 CDN 載入，讓不能連外網的內網也能使用。
+- 升級元件時：
+  1. 下載新版檔案，放進 `static/vendor/`。檔名包含版本號。
+  2. 更新引用的路徑：`static/index.html`、`static/admin.html`、`static/export.js` 的 `RS_VENDOR` 與 `EXPORT_LIBS`。
+  3. 更新 `EXPORT_LIBS` 的 `integrity`（SRI 雜湊值）。
+  4. 更新 `static/vendor/README.md` 的版本與來源。
 
 ### AI 輸出的規則
 

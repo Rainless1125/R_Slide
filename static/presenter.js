@@ -74,9 +74,9 @@ const PRESENTER_HTML = `<!DOCTYPE html>
 <meta charset="UTF-8">
 <title>講者檢視 - R Slide</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+<link rel="stylesheet" href="${location.origin}${RS_VENDOR.fontAwesome}">
 ${RS_FONT_LINKS}
-<script src="https://cdn.tailwindcss.com/3.4.17"><\/script>
+<script src="${location.origin}${RS_VENDOR.tailwind}"><\/script>
 <script>
 ${RS_TAILWIND_FONT_CONFIG}
 <\/script>

@@ -7,11 +7,13 @@
     <title>R Slide - Rapid & Responsive AI Presentation Engine</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous">
+    <!-- Tailwind 與 Font Awesome 由本機提供（static/vendor），不能連外網的內網也能使用 -->
+    <link rel="stylesheet" href="/static/vendor/fontawesome-6.5.1/css/all.min.css">
+    <!-- Google Fonts 不阻擋畫面：連不到時（例如內網）改用系統字型 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap">
-    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" media="print" onload="this.media='all'">
+    <script src="/static/vendor/tailwindcss-3.4.17.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -164,7 +166,6 @@
                         <select id="providerSelect" class="hidden" tabindex="-1" aria-hidden="true">
                             <option value="gemini">Gemini</option>
                             <option value="openai">OpenAI</option>
-                            <option value="databricks">Databricks</option>
                         </select>
                         <select id="modelSelect" class="hidden" tabindex="-1" aria-hidden="true"></select>
                     </div>
@@ -787,7 +788,7 @@
                         <ul>
                             <li><b>輸入文字</b>：直接在輸入框貼上內容（上限 50,000 字），或點「試試範例」快速體驗。</li>
                             <li><b>匯入檔案</b>：點「上傳檔案」、拖放或貼上 PDF、Word（.docx）、PowerPoint（.pptx）、Markdown、TXT（單檔 10 MB，PDF、PowerPoint 30 MB）；文字抽出後會先填入輸入框，可檢查、修改再生成。PowerPoint 中的截圖與圖表圖片、PDF 的掃描頁會用目前選擇的模型辨識，結果標有「AI 辨識」，生成前請核對數字；有內容要辨識時，整個檔案算一次用量。舊版 .doc、.ppt 不支援。</li>
-                            <li><b>AI 模型</b>：右上角的模型選單可切換 Gemini、OpenAI 或 Databricks 的模型（依伺服器設定而定）。</li>
+                            <li><b>AI 模型</b>：右上角的模型選單可切換 Gemini、OpenAI 或公司內部 AI 端點的模型（依伺服器設定而定）。</li>
                         </ul>
                         <h5>簡報模式</h5>
                         <div class="guide-grid">
@@ -1057,12 +1058,12 @@
 
     <script src="/static/charts.js?v=5"></script>
     <script src="/static/chart-grid.js?v=1"></script>
-    <script src="/static/export.js?v=10"></script>
-    <script src="/static/presenter.js?v=4"></script>
+    <script src="/static/export.js?v=12"></script>
+    <script src="/static/presenter.js?v=5"></script>
     <script src="/static/icons.js?v=2"></script>
     <script src="/static/app/core.js?v=10"></script>
     <script src="/static/app/input.js?v=7"></script>
-    <script src="/static/app/generate.js?v=22"></script>
+    <script src="/static/app/generate.js?v=23"></script>
     <script src="/static/app/outline.js?v=1"></script>
     <script src="/static/app/shapes.js?v=2"></script>
     <script src="/static/app/editor.js?v=11"></script>
