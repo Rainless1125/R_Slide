@@ -261,6 +261,27 @@ def _pptx_table_text(table) -> str:
     return "\n".join(rows)
 
 
+def _series_format(ser) -> str:
+    """系列數值的格式（來源 Excel 儲存格的格式，例如 0%、0"萬"）。"""
+    codes = ser._element.xpath("./c:val//c:formatCode/text()")
+    return codes[0] if codes and codes[0] != "General" else ""
+
+
+def _format_unit(fmt: str) -> str:
+    """格式中的單位：百分比為 %，引號內的文字（例如 0"萬"）為該文字。"""
+    if "%" in fmt:
+        return "%"
+    literal = re.findall(r'"([^"]+)"', fmt or "")
+    return "".join(literal).strip()
+
+
+def _axis_title(axis) -> str:
+    try:
+        return axis.axis_title.text_frame.text.strip() if axis.has_title else ""
+    except (ValueError, AttributeError, KeyError):
+        return ""
+
+
 def _chart_text(chart) -> str:
     """原生圖表：直接讀出類別與每個系列的數值（PowerPoint 檔中存的實際數字）。"""
     type_name = getattr(chart.chart_type, "name", "") or ""
@@ -268,28 +289,46 @@ def _chart_text(chart) -> str:
     title = ""
     if chart.has_title and chart.chart_title.has_text_frame:
         title = chart.chart_title.text_frame.text.strip()
-    percent = False
-    try:
-        percent = "%" in (chart.value_axis.tick_labels.number_format or "")
-    except (ValueError, AttributeError, KeyError):
-        pass                                     # 圓餅圖等沒有數值軸
+    axis_format, axis_lines = "", []
+    for label, getter in (("類別軸", lambda: chart.category_axis), ("數值軸", lambda: chart.value_axis)):
+        try:
+            axis = getter()
+        except (ValueError, AttributeError, KeyError):
+            continue                             # 圓餅圖等沒有座標軸
+        if label == "數值軸":
+            axis_format = axis.tick_labels.number_format or ""
+        if _axis_title(axis):
+            axis_lines.append(f"{label}：{_axis_title(axis)}")
+    head = f"【圖表：{title}（{kind}）】" if title else f"【圖表（{kind}）】"
+
+    if "XY_SCATTER" in type_name or "BUBBLE" in type_name:
+        # 散佈圖每個點有自己的 X 值，逐點列出
+        rows = ["系列 | X | Y"]
+        for plot in chart.plots:
+            for n, ser in enumerate(plot.series, 1):
+                xs = [float(v) for v in ser._element.xpath("./c:xVal//c:pt/c:v/text()")]
+                for x, y in zip(xs, ser.values):
+                    rows.append(f"{ser.name or f'系列{n}'} | {_fmt_number(x)} | {_fmt_number(y)}")
+        return head + "\n" + "\n".join(axis_lines + rows) if len(rows) > 1 else ""
+
     series, categories = [], []
     for plot in chart.plots:
         if not categories:
             categories = [str(c) for c in plot.categories]
-        for s in plot.series:
-            values = list(s.values)
-            if percent:
+        for ser in plot.series:
+            # 儲存格格式為百分比時，檔案中存的是 0.85 這類小數：換算成 85 並標示 %
+            unit = _format_unit(_series_format(ser) or axis_format)
+            values = list(ser.values)
+            if unit == "%":
                 values = [None if v is None else round(v * 100, 4) for v in values]
-            series.append((s.name or f"系列{len(series) + 1}", values))
+            name = ser.name or f"系列{len(series) + 1}"
+            series.append((f"{name}（{unit}）" if unit else name, values))
     if not series:
         return ""
-    unit = "（%）" if percent else ""
-    head = f"【圖表：{title}（{kind}）】" if title else f"【圖表（{kind}）】"
-    rows = ["類別 | " + " | ".join(name + unit for name, _ in series)]
+    rows = ["類別 | " + " | ".join(name for name, _ in series)]
     for i, category in enumerate(categories or [str(i + 1) for i in range(len(series[0][1]))]):
         rows.append(category + " | " + " | ".join(_fmt_number(v[i]) if i < len(v) else "" for _, v in series))
-    return head + "\n" + "\n".join(rows)
+    return head + "\n" + "\n".join(axis_lines + rows)
 
 
 def _diagram_text(shape, slide) -> str:

@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 from pptx import Presentation
-from pptx.chart.data import CategoryChartData
+from pptx.chart.data import CategoryChartData, XyChartData
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.util import Inches
 
@@ -226,3 +226,48 @@ def test_call_llm_sends_images_to_openai(monkeypatch):
     content = sent["messages"][1]["content"]
     assert content[0] == {"type": "text", "text": "看圖"}
     assert content[1]["image_url"]["url"].startswith("data:image/png;base64,")
+
+
+def chart_pptx(add) -> bytes:
+    prs = Presentation()
+    add(prs.slides.add_slide(prs.slide_layouts[6]).shapes)
+    buf = io.BytesIO()
+    prs.save(buf)
+    return buf.getvalue()
+
+
+def test_percent_chart_values_are_converted(fake_vision):
+    def add(shapes):
+        data = CategoryChartData(number_format="0%")
+        data.categories = ["北區", "南區"]
+        data.add_series("占比", (0.6, 0.4))
+        shapes.add_chart(XL_CHART_TYPE.PIE, 0, 0, Inches(4), Inches(3), data)
+    text = upload(chart_pptx(add)).json()["text"]
+    assert "類別 | 占比（%）\n北區 | 60\n南區 | 40" in text
+
+
+def test_chart_unit_and_axis_title_are_kept(fake_vision):
+    def add(shapes):
+        data = CategoryChartData()
+        data.categories = ["Q1", "Q2"]
+        data.add_series("營收", (100, 120))
+        data.add_series("成本", (80, 90))
+        chart = shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, 0, 0, Inches(4), Inches(3), data).chart
+        chart.value_axis.tick_labels.number_format = '0"萬"'
+        chart.value_axis.tick_labels.number_format_is_linked = False
+        chart.value_axis.has_title = True
+        chart.value_axis.axis_title.text_frame.text = "金額"
+    text = upload(chart_pptx(add)).json()["text"]
+    assert "數值軸：金額" in text
+    assert "類別 | 營收（萬） | 成本（萬）\nQ1 | 100 | 80\nQ2 | 120 | 90" in text
+
+
+def test_scatter_chart_lists_x_and_y(fake_vision):
+    def add(shapes):
+        data = XyChartData()
+        series = data.add_series("門市")
+        series.add_data_point(1.5, 20)
+        series.add_data_point(3, 45)
+        shapes.add_chart(XL_CHART_TYPE.XY_SCATTER, 0, 0, Inches(4), Inches(3), data)
+    text = upload(chart_pptx(add)).json()["text"]
+    assert "系列 | X | Y\n門市 | 1.5 | 20\n門市 | 3 | 45" in text
