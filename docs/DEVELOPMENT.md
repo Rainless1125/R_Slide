@@ -70,6 +70,14 @@ tests/            後端測試（pytest）
 
 ## 開發規則
 
+### 套件版本
+
+- `requirements.txt` 的版本固定為測試過的組合，支援 Python 3.10~3.14。
+- 升級套件時：
+  1. 在新版本執行 `python -m pytest`，確認全部通過。
+  2. 確認新版本仍支援 Python 3.10。例如 Pillow 13 起不支援 Python 3.10，所以固定在 12.2.0。
+  3. 更新 `requirements.txt`。
+
 ### 前端程式
 
 - `static/app/` 的檔案是一般的 `<script>`，不是 ES module。所有檔案共用全域變數。

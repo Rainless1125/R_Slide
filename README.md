@@ -348,3 +348,9 @@ R Slide 需要以下連線：
 ## 開發
 
 專案結構、測試方法與開發規則在 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
+
+## 授權
+
+R Slide 以 [MIT 授權](LICENSE)釋出。你可以免費使用、修改與散布，包含商業用途。散布時保留 `LICENSE` 中的版權聲明。
+
+`static/vendor/` 中的前端元件有各自的授權，請參考 [static/vendor/README.md](static/vendor/README.md)。
