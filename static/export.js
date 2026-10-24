@@ -20,6 +20,9 @@ const RS_GOOGLE_FONTS = 'https://fonts.googleapis.com/css2?family=Inter:wght@400
  * 匯出 HTML 與講者檢視都載入同一組 Google Fonts，投影片字形才會與主畫面相同 */
 const RS_FONT_STACK = ['Inter', '"Noto Sans TC"', '"PingFang TC"', '"Microsoft JhengHei"', 'sans-serif'];
 const RS_FONT_CSS = RS_FONT_STACK.join(',');
+// 匯出 PDF / PPTX 時投影片轉成圖片，圖片裡只能用系統字型（Google Fonts 的網頁字型不會帶進去）
+const RS_WEB_FONTS = ['Inter', '"Noto Sans TC"'];
+const RS_EXPORT_FONT_CSS = RS_FONT_STACK.filter(f => !RS_WEB_FONTS.includes(f)).join(',');
 const RS_FONT_LINKS = `<link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="${RS_GOOGLE_FONTS}" media="print" onload="this.media='all'">`;
@@ -502,14 +505,20 @@ async function _exportRenderSlides(slides, onProgress) {
     try {
         await document.fonts.ready;
         let fontEmbedCSS, brokenImages = 0;
+        // 轉圖時每個元素沿用排版時量到的寬度，但字是用圖片裡的系統字型畫的：
+        // 排版用網頁字型（例如 Noto Sans TC）、畫的時候用系統字型（例如蘋方）時，字寬只要差一點，
+        // 剛好放得下的短標題就會被擠到下一行、疊到下面的內容。排版時就改用同一組系統字型
+        const exportFontStyle = document.createElement('style');
+        exportFontStyle.textContent = `.rs-export-frame, .rs-export-frame .font-sans { font-family: ${RS_EXPORT_FONT_CSS} !important; }`;
         const images = [];
         for (let i = 0; i < slides.length; i++) {
             onProgress(i + 1, slides.length);
             // 與 HTML 匯出相同：白底、預設深灰字
             const frame = document.createElement('div');
+            frame.className = 'rs-export-frame';
             frame.style.cssText = `width:${EXPORT_W}px;height:${EXPORT_H}px;overflow:hidden;background:#fff;color:#18181b`;
             frame.innerHTML = '<div class="slide-scaler">' + slides[i].html_content + '</div>';
-            host.replaceChildren(frame);
+            host.replaceChildren(exportFontStyle, frame);
             // 等 Tailwind CDN 產生新 class 的樣式（背景分頁中 requestAnimationFrame 不會觸發，因此用 setTimeout）
             await new Promise(r => setTimeout(r, 80));
             brokenImages += await _exportReplaceBrokenImages(frame);
