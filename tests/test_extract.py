@@ -74,7 +74,7 @@ def test_short_pdf_is_accepted():
     assert res.json()["text"] == "Hi"
 
 
-def test_scanned_pdf_without_text_is_rejected():
+def test_pdf_without_text_or_scanned_content_is_rejected():
     res = upload("scan.pdf", make_pdf([[]]))
     assert res.status_code == 422
     assert "掃描" in res.json()["detail"]

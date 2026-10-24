@@ -578,7 +578,7 @@ def generate_outline(req: GenerateRequest, request: Request, user: dict = Depend
             raise HTTPException(status_code=500, detail=str(e))
 
 class ExtractUsage(BaseModel):
-    """llm_usage_log 需要的欄位：PPTX 圖片辨識記為一次 extract 用量。"""
+    """llm_usage_log 需要的欄位：匯入檔案時的圖片辨識（PPTX 圖片、PDF 掃描頁）記為一次 extract 用量。"""
     provider: str
     model: str
     content: str
@@ -586,7 +586,7 @@ class ExtractUsage(BaseModel):
     num_pages: int | None = None
 
 
-def pptx_image_reader(request: Request, user: dict, provider: str, model: str):
+def image_reader(request: Request, user: dict, provider: str, model: str):
     """回傳給 extract_text 的圖片辨識函式：整個檔案的辨識記為一次 AI 用量（各頁的 token 數加總）。
     EXTRACT_IMAGES=false 時不辨識圖片；超過次數上限時改為只匯入文字，並提示原因。"""
     if not env_flag("EXTRACT_IMAGES", True):
@@ -618,7 +618,7 @@ def pptx_image_reader(request: Request, user: dict, provider: str, model: str):
 
 
 # 檔案解析與 PPTX 匯出會佔用伺服器的 CPU 與記憶體，只開放給已登入的使用者；
-# PPTX 中的圖片會用 AI 辨識，算進該帳號的 AI 使用次數
+# PPTX 中的圖片與 PDF 的掃描頁會用 AI 辨識，算進該帳號的 AI 使用次數
 @app.post("/api/extract")
 async def extract_file(request: Request, user: dict = Depends(current_user)):
     """抽取上傳檔案的文字，供前端填入輸入框。檔案不會被保存。"""
@@ -640,7 +640,7 @@ async def extract_file(request: Request, user: dict = Depends(current_user)):
     finally:
         await form.close()
 
-    reader = pptx_image_reader(request, user, provider, model)
+    reader = image_reader(request, user, provider, model)
     try:
         return await run_in_threadpool(extract_text, filename, data, MAX_CONTENT_CHARS, reader)
     except ExtractError as e:

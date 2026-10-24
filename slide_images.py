@@ -1,4 +1,4 @@
-"""PPTX 匯入時辨識投影片中的圖片（截圖、圖表圖片）：每頁呼叫一次 AI，附上該頁的文字當作上下文。
+"""匯入檔案時辨識圖片：PPTX 投影片中的截圖與圖表圖片、PDF 的掃描頁。每頁呼叫一次 AI，附上該頁的文字當作上下文。
 
 結果以圖片的 key 對回原本的位置（見 extract.render_pptx），所以同一頁的原生文字與辨識結果不會錯置。
 AI 呼叫由呼叫端傳入（app.py 的 call_llm），本模組只負責提示規則、分頁與併發。
@@ -9,7 +9,7 @@ from typing import Callable
 
 from pydantic import BaseModel, Field
 
-from extract import PptxSlide
+from extract import SourcePage
 
 DEFAULT_CONCURRENCY = 4
 MAX_CONTEXT_CHARS = 2000      # 附給 AI 的本頁文字上限
@@ -43,7 +43,8 @@ class SlideImageReadings(BaseModel):
     images: list[ImageReading] = Field(description="依圖片順序，每張圖片一筆，數量必須與圖片數量相同")
 
 
-SYSTEM_INSTRUCTION = """你是簡報內容整理助手。使用者會提供一頁投影片的文字，以及這一頁中的圖片（依序附上）。
+SYSTEM_INSTRUCTION = """你是簡報內容整理助手。使用者會提供一頁投影片或文件的文字，以及這一頁中的圖片（依序附上）。
+整頁掃描的文件也是一張圖片。
 請把每張圖片中的資訊轉成文字，讓之後能依這些文字重新製作簡報。
 
 規則：
@@ -51,7 +52,7 @@ SYSTEM_INSTRUCTION = """你是簡報內容整理助手。使用者會提供一�
 2. 圖表：第一行寫圖表類型、標題與單位，接著每個類別一行，格式為「類別 | 數值」；有多個系列時，第一行加上表頭「類別 | 系列A | 系列B」。
    圖上沒有標出數值時，依座標軸讀出近似值並在數值前加「約」。有參考線或目標線時另外寫一行。
 3. 表格：保留欄與列，欄位以「 | 」分隔，第一列為表頭。
-4. 文字截圖：完整抄寫文字，保留標題、段落與條列。
+4. 文字截圖與掃描的文件頁：依原本的版面順序完整抄寫文字，保留標題、段落、條列與表格。
 5. 流程圖、架構圖：依順序寫出每個步驟或元件，以及它們之間的關係。
 6. 照片：一句話描述與簡報主題相關的內容。
 7. Logo、背景、裝飾圖示：kind 填 decoration，content 填空字串。
@@ -61,9 +62,9 @@ SYSTEM_INSTRUCTION = """你是簡報內容整理助手。使用者會提供一�
 """
 
 
-def slide_prompt(slide: PptxSlide, count: int) -> str:
+def slide_prompt(slide: SourcePage, count: int) -> str:
     context = slide.text()[:MAX_CONTEXT_CHARS] or "（本頁沒有文字）"
-    return (f"第 {slide.number} 頁投影片的文字（參考用，幫助你判斷圖片的內容）：\n{context}\n\n"
+    return (f"第 {slide.number} 頁的文字（參考用，幫助你判斷圖片的內容）：\n{context}\n\n"
             f"本頁共有 {count} 張圖片，依序附上。")
 
 
@@ -71,7 +72,7 @@ def slide_prompt(slide: PptxSlide, count: int) -> str:
 VisionCall = Callable[[str, str, list[tuple[bytes, str]], dict], dict]
 
 
-def read_slide_images(slides: list[PptxSlide], call: VisionCall, usages: list[dict]) -> tuple[dict[str, str], list[str]]:
+def read_slide_images(slides: list[SourcePage], call: VisionCall, usages: list[dict]) -> tuple[dict[str, str], list[str]]:
     """逐頁辨識圖片，回傳 ({圖片 key: 文字}, 提示訊息)。單頁失敗不影響其他頁，失敗的圖片標為未辨識。
     每次呼叫的 token 用量附加到 usages（由呼叫端加總記錄）。"""
     limit = image_limit()
