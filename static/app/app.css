@@ -1506,7 +1506,7 @@ body:has(#slideCanvas.editing) #toastRoot {
 #floatBox .fh[data-h="sw"] { left: 0; top: 100%; cursor: nesw-resize; }
 #floatBox .fh[data-h="se"] { left: 100%; top: 100%; cursor: nwse-resize; }
 
-/* 四邊中點：只調整寬或高（不鎖定比例），只在圖片顯示（media.js 的 positionFloatBox） */
+/* 四邊中點：只調整寬或高（不鎖定比例），只在圖片與圖案顯示（media.js 的 positionFloatBox） */
 #floatBox .fh-side { display: none; border-radius: 6px; }
 #floatBox.sides .fh-side { display: block; }
 #floatBox .fh[data-h="n"] { left: 50%; top: 0; cursor: ns-resize; }
