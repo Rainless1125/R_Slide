@@ -340,7 +340,7 @@ function resetImgRatio(el) {
 (function buildFloatBox() {
     const box = document.createElement('div');
     box.id = 'floatBox';
-    // 四角：等比例縮放（圖片、圖示）；四邊中點：只調整寬或高，只在圖片與圖案顯示
+    // 四角：等比例縮放（圖片、圖示）；四邊中點：只調整寬或高，只在圖片、圖案與圖表顯示
     box.innerHTML = ['nw', 'ne', 'sw', 'se'].map(h => `<span class="fh" data-h="${h}"></span>`).join('') +
         ['n', 'e', 's', 'w'].map(h => `<span class="fh fh-side" data-h="${h}" title="拖曳只調整${'ns'.includes(h) ? '高度' : '寬度'}（不鎖定長寬比例）"></span>`).join('') +
         '<span class="fsize"></span>';
@@ -363,7 +363,7 @@ function positionFloatBox() {
     const r = el.getBoundingClientRect();
     Object.assign(box.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
     box.querySelector('.fsize').textContent = float ? `${el.offsetWidth} × ${el.offsetHeight}` : `${Math.round(getScale(el) * 100)}%`;
-    box.classList.toggle('sides', float && (el.hasAttribute('data-rs-img') || el.hasAttribute('data-rs-shape')));
+    box.classList.toggle('sides', float && ['data-rs-img', 'data-rs-shape', 'data-rs-chart'].some(a => el.hasAttribute(a)));
     box.classList.add('open');
 }
 
@@ -417,9 +417,9 @@ function onFloatDragMove(e) {
         const isImg = d.el.hasAttribute('data-rs-img');
         // 圖片拉四邊、或按住 Shift 拉角落時不鎖定長寬比例，改用固定高度拉伸
         const freeImg = isImg && (!horiz || !vert || e.shiftKey);
-        // 圖案預設不鎖定比例，按住 Shift 拉角落時等比例縮放（例如畫正圓、正方形）
-        const lockShape = d.el.hasAttribute('data-rs-shape') && horiz && vert && e.shiftKey;
-        const keepRatio = d.el.hasAttribute('data-rs-icon') || (isImg && !freeImg) || lockShape;
+        // 圖案與圖表預設不鎖定比例，按住 Shift 拉角落時等比例縮放（例如畫正圓、正方形）
+        const lockFree = (d.el.hasAttribute('data-rs-shape') || d.el.hasAttribute('data-rs-chart')) && horiz && vert && e.shiftKey;
+        const keepRatio = d.el.hasAttribute('data-rs-icon') || (isImg && !freeImg) || lockFree;
         const autoH = isText || (isImg && !freeImg && !isImgStretched(d.el));
         if (snapOn) {
             // 只吸附正在拖動的那一側邊線；等比縮放與文字方塊的高度由寬度決定，不另外吸附
@@ -983,5 +983,5 @@ function applyChartEditor() {
     commitSlideEdit(false);
     closeChartEditor();
     selectElement(el);
-    showToast(target ? '已更新圖表' : '已插入圖表，可拖曳移動、拉角落調整大小', 'success', 2200);
+    showToast(target ? '已更新圖表' : '已插入圖表，可拖曳移動；拉角落或四邊中點調整大小', 'success', 2200);
 }
