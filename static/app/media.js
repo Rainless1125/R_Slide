@@ -124,7 +124,7 @@ async function insertSlideImage(file, at) {
     root.appendChild(img);
     commitSlideEdit();
     selectElement(img);
-    showToast('已插入圖片，可拖曳移動、拉角落調整大小', 'success', 2200);
+    showToast('已插入圖片，可拖曳移動；拉角落等比例縮放，拉四邊中點可只改寬或高', 'success', 2600);
 }
 
 // 拖放 / 貼上圖片到投影片（僅編輯模式）
@@ -329,11 +329,21 @@ function floatRect(el) {
     return { x: parseFloat(el.style.left) || 0, y: parseFloat(el.style.top) || 0, w: el.offsetWidth, h: el.offsetHeight };
 }
 function isFloat(el) { return !!el && el.hasAttribute('data-rs-float') && el.style.position === 'absolute'; }
+// 圖片預設高度為 auto（依原圖比例）；拉四邊或按住 Shift 拉角落後改為固定高度並拉伸填滿（object-fit: fill）
+function isImgStretched(el) { return !!el && el.hasAttribute('data-rs-img') && !!el.style.height && el.style.height !== 'auto'; }
+function resetImgRatio(el) {
+    if (!isImgStretched(el)) return;
+    el.style.height = 'auto';
+    el.style.objectFit = 'contain';
+}
 
 (function buildFloatBox() {
     const box = document.createElement('div');
     box.id = 'floatBox';
-    box.innerHTML = ['nw', 'ne', 'sw', 'se'].map(h => `<span class="fh" data-h="${h}"></span>`).join('') + '<span class="fsize"></span>';
+    // 四角：等比例縮放（圖片、圖示）；四邊中點：只調整寬或高，只在圖片、圖案與圖表顯示
+    box.innerHTML = ['nw', 'ne', 'sw', 'se'].map(h => `<span class="fh" data-h="${h}"></span>`).join('') +
+        ['n', 'e', 's', 'w'].map(h => `<span class="fh fh-side" data-h="${h}" title="拖曳只調整${'ns'.includes(h) ? '高度' : '寬度'}（不鎖定長寬比例）"></span>`).join('') +
+        '<span class="fsize"></span>';
     document.body.appendChild(box);
     box.addEventListener('pointerdown', e => {
         const h = e.target.closest('.fh');
@@ -353,6 +363,7 @@ function positionFloatBox() {
     const r = el.getBoundingClientRect();
     Object.assign(box.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
     box.querySelector('.fsize').textContent = float ? `${el.offsetWidth} × ${el.offsetHeight}` : `${Math.round(getScale(el) * 100)}%`;
+    box.classList.toggle('sides', float && ['data-rs-img', 'data-rs-shape', 'data-rs-chart'].some(a => el.hasAttribute(a)));
     box.classList.add('open');
 }
 
@@ -363,7 +374,7 @@ function startFloatDrag(e, handle) {
     e.preventDefault();
     e.stopPropagation();
     stopTextEdit();
-    floatDrag = { el, handle, sx: e.clientX, sy: e.clientY, r: floatRect(el), s: slideScale(), moved: false, keepRatio: el.hasAttribute('data-rs-img') || el.hasAttribute('data-rs-icon'), snap: collectSnapTargets(el) };
+    floatDrag = { el, handle, sx: e.clientX, sy: e.clientY, r: floatRect(el), s: slideScale(), moved: false, snap: collectSnapTargets(el) };
     e.target.setPointerCapture?.(e.pointerId);
     e.target.addEventListener('pointermove', onFloatDragMove);
     e.target.addEventListener('pointerup', endFloatDrag, { once: true });
@@ -399,23 +410,33 @@ function onFloatDragMove(e) {
         d.el.style.top = Math.round(ny) + 'px';
     } else {
         const west = d.handle.includes('w'), north = d.handle.includes('n');
-        let nw = Math.max(MIN, w + (west ? -dx : dx));
-        let nh = Math.max(MIN, h + (north ? -dy : dy));
+        const horiz = /[ew]/.test(d.handle), vert = /[ns]/.test(d.handle);   // 四邊中點只動一個方向
+        let nw = horiz ? Math.max(MIN, w + (west ? -dx : dx)) : w;
+        let nh = vert ? Math.max(MIN, h + (north ? -dy : dy)) : h;
         const isText = d.el.hasAttribute('data-rs-text');                 // 文字方塊只調寬度，高度隨文字
-        const autoH = isText || d.el.hasAttribute('data-rs-img');
+        const isImg = d.el.hasAttribute('data-rs-img');
+        // 圖片拉四邊、或按住 Shift 拉角落時不鎖定長寬比例，改用固定高度拉伸
+        const freeImg = isImg && (!horiz || !vert || e.shiftKey);
+        // 圖案與圖表預設不鎖定比例，按住 Shift 拉角落時等比例縮放（例如畫正圓、正方形）
+        const lockFree = (d.el.hasAttribute('data-rs-shape') || d.el.hasAttribute('data-rs-chart')) && horiz && vert && e.shiftKey;
+        const keepRatio = d.el.hasAttribute('data-rs-icon') || (isImg && !freeImg) || lockFree;
+        const autoH = isText || (isImg && !freeImg && !isImgStretched(d.el));
         if (snapOn) {
             // 只吸附正在拖動的那一側邊線；等比縮放與文字方塊的高度由寬度決定，不另外吸附
-            const sx = snapAxis([west ? x + w - nw : x + nw], d.snap.x, th);
-            nw = Math.max(MIN, nw + (west ? -sx.delta : sx.delta));
-            guides.x = sx.lines;
-            if (!d.keepRatio && !autoH) {
+            if (horiz) {
+                const sx = snapAxis([west ? x + w - nw : x + nw], d.snap.x, th);
+                nw = Math.max(MIN, nw + (west ? -sx.delta : sx.delta));
+                guides.x = sx.lines;
+            }
+            if (vert && !keepRatio && !isText) {
                 const sy = snapAxis([north ? y + h - nh : y + nh], d.snap.y, th);
                 nh = Math.max(MIN, nh + (north ? -sy.delta : sy.delta));
                 guides.y = sy.lines;
             }
         }
-        if (d.keepRatio) nh = nw * h / w;
+        if (keepRatio) nh = nw * h / w;
         if (isText) nh = h;
+        if (freeImg) d.el.style.objectFit = 'fill';
         // 從左 / 上方的控制點縮放時，對側固定不動
         setFloatRect(d.el, west ? x + w - nw : x, north ? y + h - nh : y, nw, autoH ? null : nh);
         if (d.el.hasAttribute('data-rs-icon')) d.el.style.fontSize = iconFontPx(nw);
@@ -962,5 +983,5 @@ function applyChartEditor() {
     commitSlideEdit(false);
     closeChartEditor();
     selectElement(el);
-    showToast(target ? '已更新圖表' : '已插入圖表，可拖曳移動、拉角落調整大小', 'success', 2200);
+    showToast(target ? '已更新圖表' : '已插入圖表，可拖曳移動；拉角落或四邊中點調整大小', 'success', 2200);
 }

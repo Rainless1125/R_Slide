@@ -369,6 +369,7 @@ const FMT_ACTIONS = {
     shapeProp(prop, v) { const s = shapeOf(selectedEl); if (s) setShapeStyle(s, prop, v); },
     resetPos() { setOffset(selectedEl, 0, 0); },
     resetScale() { setScale(selectedEl, 1); },      // 縮放以左上角為基準，還原後左上角位置不變
+    resetRatio() { resetImgRatio(selectedEl); },    // 保留寬度，高度依原圖比例
     moveUp() { moveSibling(-1); },
     moveDown() { moveSibling(1); }
 };
@@ -463,6 +464,8 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
   <select id="fmtBorderStyle" data-ctl="border" title="邊框樣式" aria-label="邊框樣式">${IMG_BORDER_STYLES.map(d => `<option value="${d[0]}">${d[1]}</option>`).join('')}</select>
   <span class="sep"></span>
   ${btn('chart', '<i class="fa-solid fa-chart-column text-[11px]"></i><span>圖表資料</span>', '編輯圖表資料', '', 'chart')}
+  <span class="sep"></span>
+  ${btn('resetRatio', '<i class="fa-solid fa-expand text-[11px]"></i><span>還原比例</span>', '還原為原圖的長寬比例（保留目前寬度）', '', 'imgRatio')}
   <span class="sep"></span>
   ${btn('resetPos', '<i class="fa-solid fa-arrows-to-dot text-[11px]"></i><span>還原位置</span>', '移回 AI 版面的原始位置', '', 'aiReset')}
   ${btn('resetScale', '<i class="fa-solid fa-compress text-[11px]"></i><span>還原大小</span>', '還原為 AI 版面的原始大小（100%）', '', 'aiReset')}
@@ -598,7 +601,7 @@ function hideMoreMenu() {
  * 圖表：SVG 文字用 currentColor 與固定字重，對齊與粗細看不出差別。 */
 const TOOLBAR_CTLS = {
     text: ['size', 'weight', 'align', 'text', 'bg', 'radius'],     // 文字方塊與 AI 版面元素
-    image: ['bg', 'radius', 'border'],
+    image: ['bg', 'radius', 'border', 'imgRatio'],
     icon: ['size', 'text', 'bg', 'radius'],
     chart: ['size', 'text', 'bg', 'radius', 'chart'],
     shape: ['size', 'weight', 'align', 'text', 'shape'],
@@ -670,6 +673,7 @@ function refreshToolbar() {
     applyToolbarCtls(tb, kind, ai ? ['aiReset'] : []);
     fmtEl('resetPos').disabled = !ai || !getOffset(el).some(Boolean);
     fmtEl('resetScale').disabled = !ai || getScale(el) === 1;
+    fmtEl('resetRatio').disabled = !isImgStretched(el);
     // 圖案：填滿 / 外框；線條沒有填滿，沒有轉角的圖案沒有圓角
     const shape = kind === 'shape' ? shapeOf(el) : null;
     if (shape) {
