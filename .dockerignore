@@ -1,0 +1,15 @@
+# 不放進映像檔：API Key 由 docker compose 的 env_file 在執行時帶入
+.env
+run.bat
+.git
+.gitattributes
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+data/
+tests/
+docs/
+Dockerfile
+docker-compose.yml
+.dockerignore

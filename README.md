@@ -134,6 +134,42 @@ R Slide 用 AI 把文字素材做成簡報。
 7. 在瀏覽器開啟 <http://127.0.0.1:8000>。
 8. 註冊一個帳號。
 
+### 用 Docker 啟動
+
+如果你已安裝 Docker Desktop，可以不安裝 Python，改用 Docker 啟動。
+
+1. 下載專案，並進入專案目錄。
+2. 建立設定檔，並在 `.env` 填入 API Key：
+
+   ```bash
+   cp .env_example .env
+   ```
+
+   在 Windows 的 PowerShell 上，改用 `copy .env_example .env`。
+
+3. 建立映像檔並啟動服務：
+
+   ```bash
+   docker compose up -d --build
+   ```
+
+4. 在瀏覽器開啟 <http://127.0.0.1:8000>。
+
+常用指令：
+
+```bash
+docker compose logs -f        # 查看服務的輸出訊息，按 Ctrl + C 離開
+docker compose down           # 停止服務
+docker compose up -d --build  # 修改程式碼或 .env 後，重新建立並啟動
+docker compose exec rslide python manage_users.py list   # 在容器中執行管理指令
+```
+
+注意：
+
+- 帳號與歷史記錄存在 Docker volume `rslide-data`。停止或重建容器，資料不會消失。
+- `docker compose down -v` 會一併刪除 volume。刪除後，資料無法復原。
+- 服務啟動後立即結束時，用 `docker compose logs` 查看原因。最常見的原因是 `.env` 沒有填 API Key。
+
 ## 設定
 
 所有設定都在專案根目錄的 `.env` 檔。
