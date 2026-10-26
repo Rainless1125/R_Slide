@@ -1,0 +1,18 @@
+services:
+  rslide:
+    build: .
+    image: rslide
+    container_name: rslide
+    ports:
+      - "8000:8000"
+    # API Key 等設定從 .env 讀取（先複製 .env_example 為 .env 再填寫）
+    env_file: .env
+    environment:
+      RSLIDE_DB_PATH: /app/data/rslide.db
+    volumes:
+      # 帳號與歷史記錄存在 named volume，重建容器也不會遺失
+      - rslide-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  rslide-data:
