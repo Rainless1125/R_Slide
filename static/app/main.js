@@ -23,7 +23,7 @@ document.addEventListener('keydown', (e) => {
         return;                                   // 圖表視窗開啟時不觸發換頁 / 刪除等快捷鍵
     }
     if (isIconPickerOpen()) {
-        if (e.key === 'Escape') { e.preventDefault(); closeIconPicker(); document.getElementById('iconPickerBtn').focus(); return; }
+        if (e.key === 'Escape') { e.preventDefault(); closeIconPicker(); document.getElementById('insertBtn').focus(); return; }
         if (e.target.closest?.('#iconPicker')) return;   // 面板內的輸入 / 方向鍵不觸發換頁等快捷鍵
     }
     if (isAiEditModalOpen()) {
@@ -31,11 +31,11 @@ document.addEventListener('keydown', (e) => {
         return;                                   // 視窗開啟時不觸發換頁、刪除元素等快捷鍵
     }
     if (isBrandPickerOpen()) {
-        if (e.key === 'Escape') { e.preventDefault(); closeBrandPicker(); document.getElementById('brandPickerBtn').focus(); return; }
+        if (e.key === 'Escape') { e.preventDefault(); closeBrandPicker(); document.getElementById('insertBtn').focus(); return; }
         if (e.target.closest?.('#brandPicker')) return;
     }
     if (isShapePickerOpen()) {
-        if (e.key === 'Escape') { e.preventDefault(); closeShapePicker(); document.getElementById('shapePickerBtn').focus(); return; }
+        if (e.key === 'Escape') { e.preventDefault(); closeShapePicker(); document.getElementById('insertBtn').focus(); return; }
         if (e.target.closest?.('#shapePicker')) return;
     }
     if (isVersionModalOpen()) {

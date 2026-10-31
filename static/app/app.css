@@ -1309,6 +1309,32 @@ body:has(#slideCanvas.editing) #toastRoot {
     color: #fff;
 }
 
+#editBtn[aria-pressed="true"]:hover {
+    background: #2563eb;
+}
+
+/* 播放器控制列：三個區塊（頁面導覽 / 播放或插入 / 動作），以分隔線隔開 */
+#playerBar .bar-zone {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+#playerBar .bar-zone[hidden] {
+    display: none;
+}
+
+#playerBar .bar-sep {
+    width: 1px;
+    height: 20px;
+    margin: 0 4px;
+    background: rgb(228 228 231);
+}
+
+.dark #playerBar .bar-sep {
+    background: rgb(63 63 70);
+}
+
 /* ---------- 圖片 / 圖表：可拖曳移動、拖曳控制點縮放 ---------- */
 #slideCanvas.editing [data-rs-float] {
     cursor: move !important;

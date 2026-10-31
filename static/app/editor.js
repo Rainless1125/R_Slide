@@ -97,6 +97,7 @@ function toggleEditMode(force) {
         closeIconPicker();
         closeShapePicker();
         closeBrandPicker();
+        setInsertMenuOpen(false);
         stopTextEdit();
         clearSelection();
         commitSlideEdit();
@@ -109,6 +110,9 @@ function toggleEditMode(force) {
     document.getElementById('editLabel').textContent = editMode ? '完成編輯' : '編輯';
     document.getElementById('editIcon').className = 'fa-solid text-[11px] ' + (editMode ? 'fa-check' : 'fa-pen-to-square');
     document.querySelectorAll('[data-edit-only]').forEach(b => { b.classList.toggle('hidden', !editMode); b.classList.toggle('flex', editMode); });
+    // 控制列中間區：一般模式顯示播放與簡報，編輯模式改為插入、撤銷、重做
+    document.querySelectorAll('[data-view-only]').forEach(z => { z.hidden = editMode; });
+    document.querySelectorAll('[data-edit-zone]').forEach(z => { z.hidden = !editMode; });
     if (editMode) {
         prepareEditing();   // 操作提示顯示在投影片上方的編輯列（#fmtDockHint），不另外跳出提示
         revealFmtDock();
