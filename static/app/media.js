@@ -340,7 +340,7 @@ function resetImgRatio(el) {
 (function buildFloatBox() {
     const box = document.createElement('div');
     box.id = 'floatBox';
-    // 四角：等比例縮放（圖片、圖示）；四邊中點：只調整寬或高，只在圖片、圖案與圖表顯示
+    // 四角：等比例縮放（圖片、圖示、AI 版面元素）；四邊中點：只調整寬或高，在圖片、圖案、圖表與 AI 版面元素顯示
     box.innerHTML = ['nw', 'ne', 'sw', 'se'].map(h => `<span class="fh" data-h="${h}"></span>`).join('') +
         ['n', 'e', 's', 'w'].map(h => `<span class="fh fh-side" data-h="${h}" title="拖曳只調整${'ns'.includes(h) ? '高度' : '寬度'}（不鎖定長寬比例）"></span>`).join('') +
         '<span class="fsize"></span>';
@@ -349,7 +349,7 @@ function resetImgRatio(el) {
         const h = e.target.closest('.fh');
         if (!h) return;
         if (isFloat(selectedEl)) startFloatDrag(e, h.dataset.h);
-        else startScaleDrag(e, h.dataset.h);        // AI 版面元素：等比例縮放
+        else startScaleDrag(e, h.dataset.h);        // AI 版面元素：角落等比例縮放，四邊（或 Shift + 角落）調整寬高
     });
 })();
 
@@ -362,8 +362,10 @@ function positionFloatBox() {
     if (!editMode || !el || !el.isConnected || (!float && (!canScale(el) || editingEl === el))) { box.classList.remove('open'); return; }
     const r = el.getBoundingClientRect();
     Object.assign(box.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
-    box.querySelector('.fsize').textContent = float ? `${el.offsetWidth} × ${el.offsetHeight}` : `${Math.round(getScale(el) * 100)}%`;
-    box.classList.toggle('sides', float && ['data-rs-img', 'data-rs-shape', 'data-rs-chart'].some(a => el.hasAttribute(a)));
+    const pct = getScale(el) === 1 ? '' : ` · ${Math.round(getScale(el) * 100)}%`;
+    box.querySelector('.fsize').textContent = float ? `${el.offsetWidth} × ${el.offsetHeight}`
+        : isSized(el) ? `${el.offsetWidth} × ${el.offsetHeight}${pct}` : `${Math.round(getScale(el) * 100)}%`;
+    box.classList.toggle('sides', !float || ['data-rs-img', 'data-rs-shape', 'data-rs-chart'].some(a => el.hasAttribute(a)));
     box.classList.add('open');
 }
 
@@ -586,7 +588,7 @@ function endOffsetDrag() {
 
 /* ----- AI 版面元素：等比例縮放 ----- */
 // 與原地位移相同，不改變排版：以 CSS scale 等比例放大縮小（文字、邊框、圓角一起縮放），旁邊的元素不受影響。
-// 只支援等比例：只拉寬或拉高會把文字壓扁。transform-origin 固定為左上角，
+// scale 只用於等比例縮放（只拉寬或拉高會把文字壓扁）；只調寬或高時改變實際寬高，見下方的「自由調整寬高」。transform-origin 固定為左上角，
 // 元素外框的左上角 = 原位置 + translate，從任一角縮放時以 translate 補償，讓對角固定不動。
 const SCALE_MIN = 0.3, SCALE_MAX = 3;
 const SCALE_RE = /^\d*\.?\d+$/;
@@ -604,6 +606,38 @@ function setScale(el, s) {
 // AI 自己寫了非數字的 scale（例如兩個方向不同）就不動
 function canScale(el) { return canOffset(el) && (!el.style.scale || SCALE_RE.test(el.style.scale.trim())); }
 
+/* ----- AI 版面元素：自由調整寬高 ----- */
+// 拉四邊中點（或按住 Shift 拉角落）時改變元素實際的寬高（inline width / height），文字依新寬度換行而不會被壓扁。
+// 與移動、等比例縮放相同，旁邊的元素不跟著變動：以右側與下方的 margin 補足（或抵銷）寬高的變化，元素在版面中佔的空間不變。
+// 第一次調整時記下原本的大小、margin 與 inline 值（data-rs-size），之後只改拖動的方向；「還原大小」時放回原狀。
+const SIZE_PROPS = ['width', 'height', 'flex', 'max-width', 'max-height', 'min-width', 'min-height', 'margin-right', 'margin-bottom'];
+function isSized(el) { return !!el && el.hasAttribute('data-rs-size'); }
+function sizeBase(el) {
+    try { return JSON.parse(el.getAttribute('data-rs-size')) || {}; } catch (e) { return {}; }
+}
+function setElementSize(el, w, h) {
+    if (!isSized(el)) {
+        const cs = getComputedStyle(el);
+        el.setAttribute('data-rs-size', JSON.stringify({
+            orig: Object.fromEntries(SIZE_PROPS.map(p => [p, el.style.getPropertyValue(p)])),
+            w: el.offsetWidth, h: el.offsetHeight, mr: parseFloat(cs.marginRight) || 0, mb: parseFloat(cs.marginBottom) || 0
+        }));
+        Object.assign(el.style, { flex: 'none', maxWidth: 'none', maxHeight: 'none', minWidth: '0', minHeight: '0', width: el.offsetWidth + 'px', height: el.offsetHeight + 'px' });
+    }
+    const b = sizeBase(el);
+    if (w != null) el.style.width = Math.round(w) + 'px';
+    if (h != null) el.style.height = Math.round(h) + 'px';
+    el.style.marginRight = Math.round(b.mr + b.w - parseFloat(el.style.width)) + 'px';
+    el.style.marginBottom = Math.round(b.mb + b.h - parseFloat(el.style.height)) + 'px';
+}
+function resetElementSize(el) {
+    if (!isSized(el)) return;
+    const orig = sizeBase(el).orig || {};
+    SIZE_PROPS.forEach(p => { if (orig[p]) el.style.setProperty(p, orig[p]); else el.style.removeProperty(p); });
+    el.removeAttribute('data-rs-size');
+    if (!el.getAttribute('style')) el.removeAttribute('style');
+}
+
 let scaleDrag = null;
 function startScaleDrag(e, handle) {
     const el = selectedEl;
@@ -612,7 +646,9 @@ function startScaleDrag(e, handle) {
     e.stopPropagation();
     stopTextEdit();
     const [ox, oy] = getOffset(el);
-    scaleDrag = { el, handle, sx: e.clientX, sy: e.clientY, s: getScale(el), ox, oy, r: slideRectOf(el), k: slideScale(), moved: false, snap: collectSnapTargets(el) };
+    // 四邊中點只動一個方向；按住 Shift 拉角落時兩個方向各自調整
+    const free = !/^(?:nw|ne|sw|se)$/.test(handle) || e.shiftKey;
+    scaleDrag = { el, handle, free, sx: e.clientX, sy: e.clientY, s: getScale(el), ox, oy, r: slideRectOf(el), k: slideScale(), moved: false, snap: collectSnapTargets(el) };
     e.target.setPointerCapture?.(e.pointerId);
     e.target.addEventListener('pointermove', onScaleDragMove);
     e.target.addEventListener('pointerup', endScaleDrag, { once: true });
@@ -624,6 +660,7 @@ function onScaleDragMove(e) {
     const dx = (e.clientX - d.sx) / d.k, dy = (e.clientY - d.sy) / d.k;
     if (!d.moved && Math.abs(dx) + Math.abs(dy) < 2) return;
     d.moved = true;
+    if (d.free) { onFreeSizeMove(d, dx, dy, e); return; }
     const { x, y, w, h } = d.r;
     const west = d.handle.includes('w'), north = d.handle.includes('n');
     // 等比例：取水平、垂直兩個方向中放大（或縮小）較多的比例
@@ -642,6 +679,36 @@ function onScaleDragMove(e) {
     showSnapGuides(guides);
     positionToolbar();
 }
+// 自由調整寬高：d.r 是畫面上的外框（含 scale），寫回 CSS 寬高時除以 scale；
+// 改變大小後版面可能重新排列（例如置中的內容），因此量測新位置，以 translate 讓對側邊線固定不動
+function onFreeSizeMove(d, dx, dy, e) {
+    const { x, y, w, h } = d.r;
+    const MIN = 24;
+    const west = d.handle.includes('w'), north = d.handle.includes('n');
+    const horiz = /[ew]/.test(d.handle), vert = /[ns]/.test(d.handle);
+    let nw = horiz ? Math.max(MIN, w + (west ? -dx : dx)) : w;
+    let nh = vert ? Math.max(MIN, h + (north ? -dy : dy)) : h;
+    const guides = { x: [], y: [] };
+    if (!e.altKey) {
+        const th = SNAP_PX / d.k;
+        if (horiz) {
+            const sx = snapAxis([west ? x + w - nw : x + nw], d.snap.x, th);
+            nw = Math.max(MIN, nw + (west ? -sx.delta : sx.delta));
+            guides.x = sx.lines;
+        }
+        if (vert) {
+            const sy = snapAxis([north ? y + h - nh : y + nh], d.snap.y, th);
+            nh = Math.max(MIN, nh + (north ? -sy.delta : sy.delta));
+            guides.y = sy.lines;
+        }
+    }
+    setElementSize(d.el, horiz ? nw / d.s : null, vert ? nh / d.s : null);
+    const now = slideRectOf(d.el);
+    const [cx, cy] = getOffset(d.el);
+    setOffset(d.el, cx + (west ? x + w - nw : x) - now.x, cy + (north ? y + h - nh : y) - now.y);
+    showSnapGuides(guides);
+    positionToolbar();
+}
 function endScaleDrag(e) {
     e.target.removeEventListener('pointermove', onScaleDragMove);
     showSnapGuides(null);
@@ -650,6 +717,7 @@ function endScaleDrag(e) {
     if (!d || !d.moved) return;
     suppressNextClick = true;
     setTimeout(() => { suppressNextClick = false; }, 0);
+    if (d.free && d.el.hasAttribute('data-rs-chart')) rerenderChart(d.el);   // 依新尺寸重畫圖表
     commitSlideEdit();
     refreshToolbar();
 }

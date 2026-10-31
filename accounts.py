@@ -8,11 +8,14 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, ValidationError
 
 import store
+from ldap_auth import LdapUnavailable, auth_mode, ldap_authenticate
 
 router = APIRouter()
 
 SESSION_COOKIE = "rslide_session"
 USERNAME_RE = re.compile(r"^[\w.@-]{2,32}$")
+# 公司 LDAP 帳號（AUTH_MODE=ldap）：可能是工號、AD 帳號或 email，字數放寬；字元限制與本機帳號相同，避免 LDAP 注入
+LDAP_USERNAME_RE = re.compile(r"^[\w.@-]{1,64}$")
 MIN_PASSWORD, MAX_PASSWORD = 8, 128
 PASSWORD_RULE = f"密碼需為 {MIN_PASSWORD}~{MAX_PASSWORD} 個字元，且至少包含一個英文字母與一個數字"
 # 投影片可能內嵌圖片（data URL），單筆紀錄上限與匯出 PPTX 相同
@@ -52,8 +55,13 @@ def start_session(response: Response, user: dict) -> dict:
 @router.get("/api/auth/me")
 def auth_me(request: Request):
     user = store.session_user(request.cookies.get(SESSION_COOKIE))
-    return {"username": user["username"] if user else None,
-            "allow_registration": env_flag("ALLOW_REGISTRATION", True)}
+    return {"username": user["username"] if user else None, "auth_mode": auth_mode(),
+            "allow_registration": registration_open()}
+
+
+def registration_open() -> bool:
+    # 公司 LDAP 登入時帳號由公司管理，不開放自行註冊
+    return auth_mode() == "system" and env_flag("ALLOW_REGISTRATION", True)
 
 
 def client_ip(request: Request) -> str:
@@ -63,7 +71,9 @@ def client_ip(request: Request) -> str:
 
 @router.post("/api/auth/register")
 def auth_register(body: Credentials, request: Request, response: Response):
-    if not env_flag("ALLOW_REGISTRATION", True):
+    if auth_mode() == "ldap":
+        raise HTTPException(status_code=403, detail="請直接以公司帳號登入，不需要註冊")
+    if not registration_open():
         raise HTTPException(status_code=403, detail="目前未開放註冊，請聯絡管理員建立帳號")
     username = body.username.strip()
     if not USERNAME_RE.match(username):
@@ -94,7 +104,12 @@ def auth_login(body: Credentials, request: Request, response: Response):
         attempt_id, remaining = store.begin_login_attempt(ip)
     except store.LoginLocked as e:
         raise locked_error(e.locked_until)
-    user = store.authenticate(body.username.strip(), body.password[:MAX_PASSWORD + 1])
+    try:
+        user = authenticate(body.username.strip(), body.password[:MAX_PASSWORD + 1])
+    except LdapUnavailable as e:
+        # 伺服器連不上不是密碼錯誤：撤銷這次預先登記的失敗，不讓使用者因此被鎖定
+        store.end_login_attempt(ip, attempt_id)
+        raise HTTPException(status_code=503, detail=str(e))
     if user is None:
         lock_minutes = store.LOGIN_LOCKOUT_MS // 60000
         detail = (f"帳號或密碼錯誤，再錯 {remaining} 次此 IP 將鎖定 {lock_minutes} 分鐘" if remaining
@@ -102,6 +117,15 @@ def auth_login(body: Credentials, request: Request, response: Response):
         raise HTTPException(status_code=401 if remaining else 429, detail=detail)
     store.end_login_attempt(ip, attempt_id)
     return start_session(response, user)
+
+
+def authenticate(username: str, password: str) -> dict | None:
+    """依 AUTH_MODE 驗證帳號密碼，成功時回傳本機帳號（LDAP 帳號第一次登入時自動建立）。"""
+    if auth_mode() != "ldap":
+        return store.authenticate(username, password)
+    if not LDAP_USERNAME_RE.match(username) or not ldap_authenticate(username, password):
+        return None
+    return store.get_or_create_external_user(username)
 
 
 @router.post("/api/auth/logout")

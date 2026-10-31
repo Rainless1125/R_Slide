@@ -27,7 +27,7 @@
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/app/app.css?v=26">
+    <link rel="stylesheet" href="/static/app/app.css?v=28">
 </head>
 
 <body
@@ -156,6 +156,16 @@
                 class="reveal relative z-20 card-elevated bg-white/90 dark:bg-zinc-900/90 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-[1.25rem] p-8 transition-all duration-300">
                 <div class="flex flex-wrap items-center justify-between gap-3 mb-1">
                     <h2 class="text-2xl font-bold tracking-tight">構思您的簡報</h2>
+                    <div class="flex flex-wrap items-center gap-2">
+                    <!-- 思考長度：送出時以 thinking（medium / high）傳給後端，見 generate.js 的 getLlmChoice() -->
+                    <div id="thinkingToggle" role="radiogroup" aria-label="思考長度" title="思考長度：更高時 AI 想得更久，品質較好但需要較長時間"
+                        class="flex items-center gap-0.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-full p-1 text-xs">
+                        <span class="pl-2 pr-1 text-zinc-500 dark:text-zinc-400"><i class="fa-solid fa-brain mr-1"></i>思考長度</span>
+                        <button type="button" role="radio" data-thinking="medium" aria-checked="true"
+                            class="px-3 py-1 rounded-full font-medium text-zinc-500 dark:text-zinc-400 aria-checked:bg-black aria-checked:text-white dark:aria-checked:bg-white dark:aria-checked:text-black transition-colors">中等</button>
+                        <button type="button" role="radio" data-thinking="high" aria-checked="false"
+                            class="px-3 py-1 rounded-full font-medium text-zinc-500 dark:text-zinc-400 aria-checked:bg-black aria-checked:text-white dark:aria-checked:bg-white dark:aria-checked:text-black transition-colors">更高</button>
+                    </div>
                     <div id="modelDropdown" class="relative">
                         <button type="button" id="modelBtn" aria-haspopup="listbox" aria-expanded="false" aria-controls="modelList"
                             aria-label="選擇 AI 模型"
@@ -168,6 +178,7 @@
                             <option value="openai">OpenAI</option>
                         </select>
                         <select id="modelSelect" class="hidden" tabindex="-1" aria-hidden="true"></select>
+                    </div>
                     </div>
                 </div>
                 <p class="text-sm text-zinc-500 dark:text-zinc-400 mb-6">輸入文字素材，選擇簡報模式與視覺風格，AI 會動態設計最適切的簡報排版。</p>
@@ -267,6 +278,7 @@
                             <select id="numPages"
                                 class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow appearance-none cursor-pointer">
                                 <option value="0">由 AI 決定</option>
+                                <option value="1">1 頁（一頁式報告）</option>
                                 <option value="2" selected>2 頁 (2 Pages)</option>
                                 <option value="3">3 頁 (3 Pages)</option>
                                 <option value="4">4 頁 (4 Pages)</option>
@@ -629,10 +641,10 @@
                 <div class="w-9 h-9 bg-black dark:bg-white text-white dark:text-black rounded-md flex items-center justify-center font-black text-lg">R</div>
                 <div>
                     <h3 id="authTitle" class="text-lg font-bold leading-tight">登入 R Slide</h3>
-                    <p class="text-xs text-zinc-500 dark:text-zinc-400">歷史記錄會依帳號分開保存</p>
+                    <p id="authSubtitle" class="text-xs text-zinc-500 dark:text-zinc-400">歷史記錄會依帳號分開保存</p>
                 </div>
             </div>
-            <label for="authUsername" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">帳號</label>
+            <label id="authUsernameLabel" for="authUsername" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">帳號</label>
             <input id="authUsername" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="32"
                 class="mt-1.5 mb-4 w-full h-10 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow">
             <label for="authPassword" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">密碼</label>
@@ -789,6 +801,7 @@
                             <li><b>輸入文字</b>：直接在輸入框貼上內容（上限 50,000 字），或點「試試範例」快速體驗。</li>
                             <li><b>匯入檔案</b>：點「上傳檔案」、拖放或貼上 PDF、Word（.docx）、PowerPoint（.pptx）、Markdown、TXT（單檔 10 MB，PDF、PowerPoint 30 MB）；文字抽出後會先填入輸入框，可檢查、修改再生成。PowerPoint 中的截圖與圖表圖片、PDF 的掃描頁會用目前選擇的模型辨識，結果標有「AI 辨識」，生成前請核對數字；有內容要辨識時，整個檔案算一次用量。舊版 .doc、.ppt 不支援。</li>
                             <li><b>AI 模型</b>：右上角的模型選單可切換 Gemini、OpenAI 或公司內部 AI 端點的模型（依伺服器設定而定）。</li>
+                            <li><b>思考長度</b>：模型選單旁可選「中等」或「更高」；更高時 AI 想得更久，版面與內容較好，但需要較長時間。</li>
                         </ul>
                         <h5>簡報模式</h5>
                         <div class="guide-grid">
@@ -797,7 +810,7 @@
                         </div>
                         <h5>其他選項</h5>
                         <ul>
-                            <li><b>頁數</b>：可指定 2~12 頁或由 AI 決定；詳細模式資訊量較大，素材豐富時建議由 AI 決定。</li>
+                            <li><b>頁數</b>：可指定 2~12 頁或由 AI 決定；詳細模式資訊量較大，素材豐富時建議由 AI 決定。選「1 頁（一頁式報告）」時，AI 把整份素材濃縮成一頁摘要報告（結論、關鍵數據、發現與下一步）。</li>
                             <li><b>受眾與視覺風格</b>：例如「主管會議」「蘋果極簡白」「科技深色風」，AI 會依此調整語氣與配色。</li>
                         </ul>
                         <h5>先確認大綱（選用）</h5>
@@ -840,8 +853,8 @@
                         <p>在簡報頁按「編輯」進入編輯模式，直接修改投影片內容，不會呼叫 AI。</p>
                         <h5>修改 AI 生成的版面</h5>
                         <ul>
-                            <li>點擊文字即可修改；選取元素後，投影片上方的編輯列會顯示格式工具列，可調整字級、粗細、對齊、顏色與圓角，或刪除元素；AI 版面元素另有「還原位置」「還原大小」，複製與調整同層順序在「⋯」更多選單中。工具列只顯示該類元素有作用的設定，例如圖片沒有字級與對齊。</li>
-                            <li>AI 生成的元素可以移動與縮放：先單擊選取（必要時按「選取父層」選到整張卡片），按住拖曳或用方向鍵微調位置，拉四個角可等比例縮放（文字一起放大縮小），旁邊的元素不會跟著變動；工具列的「還原位置」「還原大小」可恢復原狀。AI 產生的圖表可修改數據。</li>
+                            <li>點擊文字即可修改；選取元素後，投影片上方的編輯列會顯示格式工具列，可調整字級、粗細、對齊、顏色、圓角與陰影，或刪除元素；AI 版面元素另有「還原位置」「還原大小」，複製與圖層順序（物件重疊時誰在上面：上移 / 下移一層、移到最上 / 最下層，快捷鍵 <kbd>Ctrl</kbd> + <kbd>↑</kbd> / <kbd>↓</kbd>，加 <kbd>Shift</kbd> 移到最上 / 最下層）在「更多」選單中。工具列只顯示該類元素有作用的設定，例如圖片沒有字級與對齊。</li>
+                            <li>AI 生成的元素可以移動與縮放：先單擊選取（必要時按「選取父層」選到整張卡片），按住拖曳或用方向鍵微調位置，拉四個角可等比例縮放（文字一起放大縮小），旁邊的元素不會跟著變動；拉四邊中點（或按住 <kbd>Shift</kbd> 拉角落）可不鎖定比例調整寬高（文字依新寬度換行，旁邊的元素同樣不變動）；工具列可設定外框（顏色、粗細、樣式）與陰影，「還原位置」「還原大小」可恢復原狀。AI 產生的圖表可修改數據。</li>
                             <li>元素被拖出所在的卡片或區塊時，超出的部分可能被裁掉，建議選取外層卡片整個移動。</li>
                         </ul>
                         <h5>插入內容</h5>
@@ -1063,17 +1076,17 @@
     <script src="/static/icons.js?v=2"></script>
     <script src="/static/app/core.js?v=10"></script>
     <script src="/static/app/input.js?v=7"></script>
-    <script src="/static/app/generate.js?v=23"></script>
+    <script src="/static/app/generate.js?v=24"></script>
     <script src="/static/app/outline.js?v=1"></script>
     <script src="/static/app/shapes.js?v=2"></script>
-    <script src="/static/app/editor.js?v=12"></script>
-    <script src="/static/app/media.js?v=13"></script>
+    <script src="/static/app/editor.js?v=16"></script>
+    <script src="/static/app/media.js?v=15"></script>
     <script src="/static/app/player.js?v=4"></script>
     <script src="/static/app/versions.js?v=2"></script>
-    <script src="/static/app/auth.js?v=3"></script>
+    <script src="/static/app/auth.js?v=4"></script>
     <script src="/static/app/guide.js?v=2"></script>
     <script src="/static/app/feedback.js?v=2"></script>
-    <script src="/static/app/main.js?v=9"></script>
+    <script src="/static/app/main.js?v=10"></script>
 </body>
 
 </html>

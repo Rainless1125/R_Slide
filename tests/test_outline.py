@@ -23,7 +23,7 @@ OUTLINE = {"presentation_title": "第三季報告", "slides": [
 def capture_llm(monkeypatch, result):
     captured = {}
 
-    def fake_llm(provider, model, system_instruction, prompt, schema, temperature, usage=None):
+    def fake_llm(provider, model, system_instruction, prompt, schema, temperature, usage=None, thinking=None):
         captured.update(system=system_instruction, prompt=prompt, schema=schema)
         return dict(result)
 

@@ -261,11 +261,26 @@ const RE = {
     items: /^items-(?:start|center|end)$/,
     textColor: new RegExp(`^text-${COLOR_BODY}$|^text-\\[(?:#|rgb|hsl)[^\\]]*\\]$`),
     bgColor: new RegExp(`^bg-${COLOR_BODY}$|^bg-\\[(?:#|rgb|hsl)[^\\]]*\\]$|^bg-gradient-to-\\w+$|^(?:from|via|to)-${COLOR_BODY}$`),
-    radius: /^rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full))?$|^rounded-\[[^\]]*\]$/
+    radius: /^rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full))?$|^rounded-\[[^\]]*\]$/,
+    // 陰影的大小（不含 shadow-blue-500/30 這類陰影顏色）
+    boxShadow: /^shadow(?:-(?:sm|md|lg|xl|2xl|inner|none))?$|^shadow-\[\d[^\]]*\]$/,
+    dropShadow: /^drop-shadow(?:-(?:sm|md|lg|xl|2xl|none))?$|^drop-shadow-\[[^\]]*\]$/
 };
 const SIZE_STEPS = ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl', '7xl', '8xl', '9xl'];
 const SIZE_PX = [12, 14, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96, 128];
 const WEIGHTS = [['thin', '極細', 100], ['light', '細', 300], ['normal', '標準', 400], ['medium', '中等', 500], ['semibold', '半粗', 600], ['bold', '粗', 700], ['extrabold', '特粗', 800], ['black', '黑', 900]];
+// 陰影分級：Tailwind 內建的陰影很淡（透明度約 0.1），在淺色投影片上幾乎看不出差別，
+// 因此改用自訂數值，每一級的距離、模糊與濃度都明顯不同。box：區塊外框的 box-shadow；drop：沿形狀與文字的 drop-shadow
+const SHADOWS = [
+    ['none', '無'],
+    ['sm', '極小', '0 1px 3px rgba(0,0,0,.25)', '0 1px 1.5px rgba(0,0,0,.4)'],
+    ['', '小', '0 3px 8px rgba(0,0,0,.28)', '0 2px 3px rgba(0,0,0,.45)'],
+    ['md', '中', '0 8px 18px rgba(0,0,0,.32)', '0 4px 6px rgba(0,0,0,.5)'],
+    ['lg', '大', '0 14px 30px rgba(0,0,0,.38)', '0 7px 10px rgba(0,0,0,.55)'],
+    ['xl', '特大', '0 22px 46px rgba(0,0,0,.45)', '0 11px 16px rgba(0,0,0,.6)'],
+    ['2xl', '最大', '0 34px 70px rgba(0,0,0,.55)', '0 16px 24px rgba(0,0,0,.65)'],
+    ['hard', '硬邊', '8px 8px 0 rgba(0,0,0,.9)', '5px 5px 0 rgba(0,0,0,.9)'],
+];
 const RADII = [['none', '無'], ['sm', '極小'], ['', '小'], ['md', '中'], ['lg', '大'], ['xl', '特大'], ['2xl', '2XL'], ['3xl', '3XL'], ['full', '圓形']];
 
 function removeClasses(el, ...res) {
@@ -305,6 +320,51 @@ function currentAlign(el) {
     return a === 'center' ? 'center' : (a === 'right' || a === 'end') ? 'right' : 'left';
 }
 
+/* ----- 陰影 ----- */
+// 有底色或邊框的區塊（卡片、圖片、圖表容器）用 box-shadow，陰影沿著外框；
+// 圖案、圖示與透明背景的文字用 drop-shadow（filter），陰影沿著實際畫出的形狀與文字，不會多出一個方框
+function shadowUsesFilter(el) {
+    const kind = elementKind(el);
+    if (kind === 'shape' || kind === 'icon') return true;
+    if (kind === 'image') return false;
+    const cs = getComputedStyle(el);
+    // 文字編輯中的淡藍底色（app.css 的 [contenteditable]）不算背景
+    const hasBg = cssColorToHex(cs.backgroundColor) !== 'none' || (cs.backgroundImage !== 'none' && !el.hasAttribute('contenteditable'));
+    const hasBorder = ['Top', 'Right', 'Bottom', 'Left'].some(s => parseFloat(cs['border' + s + 'Width']) > 0 && cs['border' + s + 'Style'] !== 'none');
+    return !hasBg && !hasBorder;
+}
+// 透過工具列設定的陰影以 inline style 存放，等級記在 data-rs-shadow；AI 用 Tailwind class 寫的陰影對應到最接近的等級
+function currentShadow(el) {
+    const saved = el.getAttribute('data-rs-shadow');
+    if (saved !== null && SHADOWS.some(d => d[0] === saved)) return saved;
+    const cls = [...el.classList].find(c => (RE.boxShadow.test(c) || RE.dropShadow.test(c)) && !/^(?:drop-)?shadow-none$/.test(c));
+    const m = cls?.match(/^(?:drop-)?shadow(?:-(sm|md|lg|xl|2xl))?$/);
+    if (m) return m[1] || '';
+    if (cls) return '__custom';
+    const cs = getComputedStyle(el);
+    // Tailwind 的 ring（外框光暈）也是 box-shadow，不算陰影
+    const ring = [...el.classList].some(c => /^ring(?:-|$)/.test(c));
+    return (cs.boxShadow !== 'none' && !ring) || /drop-shadow/.test(cs.filter) ? '__custom' : 'none';
+}
+function setShadow(el, v) {
+    const def = SHADOWS.find(d => d[0] === v);
+    if (!def) return;
+    removeClasses(el, RE.boxShadow, RE.dropShadow);
+    el.style.removeProperty('box-shadow');
+    if (/drop-shadow/.test(el.style.filter)) el.style.removeProperty('filter');
+    el.removeAttribute('data-rs-shadow');
+    if (v === 'none') {
+        // 去掉 class 後仍有陰影（例如其他樣式規則）時明確關閉
+        if (getComputedStyle(el).boxShadow !== 'none') el.style.boxShadow = 'none';
+    } else if (shadowUsesFilter(el)) {
+        el.style.filter = `drop-shadow(${def[3]})`;
+    } else {
+        el.style.boxShadow = def[2];
+    }
+    if (v !== 'none') el.setAttribute('data-rs-shadow', v);
+    if (!el.getAttribute('style')) el.removeAttribute('style');
+}
+
 // 套用樣式 → 寫回資料（一個撤銷步驟）→ 稍後更新工具列（等 Tailwind 產生新 class 的樣式）
 function fmtCommit() {
     commitSlideEdit();
@@ -326,10 +386,11 @@ const FMT_ACTIONS = {
     },
     weight(v) { setClass(selectedEl, [RE.weight], 'font-' + v); },
     radius(v) { if (v !== '__custom') setClass(selectedEl, [RE.radius], v === '' ? 'rounded' : 'rounded-' + v); },
+    shadow(v) { if (v !== '__custom') setShadow(selectedEl, v); },
     color(kind, c) {                         // c === '' → 移除；圖案的 fill / stroke 為 HEX 或 none
         const el = selectedEl;
         if (kind === 'fill' || kind === 'stroke') { const s = shapeOf(el); if (s) setShapeStyle(s, kind, c); return; }
-        if (kind === 'border') { setImgBorder(el, 'color', c); return; }
+        if (kind === 'border') { setBorder(el, 'color', c); return; }
         if (kind === 'text') { setClass(el, [RE.textColor], c ? 'text-' + c : ''); clearInlineStyle(el, 'color'); }
         else { setClass(el, [RE.bgColor], c ? 'bg-' + c : ''); clearInlineStyle(el, 'background', 'background-color', 'background-image'); }
     },
@@ -365,13 +426,15 @@ const FMT_ACTIONS = {
         el.after(c);
         selectElement(c);
     },
-    imgBorder(prop, v) { setImgBorder(selectedEl, prop, v); },
+    imgBorder(prop, v) { setBorder(selectedEl, prop, v); },
     shapeProp(prop, v) { const s = shapeOf(selectedEl); if (s) setShapeStyle(s, prop, v); },
     resetPos() { setOffset(selectedEl, 0, 0); },
-    resetScale() { setScale(selectedEl, 1); },      // 縮放以左上角為基準，還原後左上角位置不變
+    resetScale() { setScale(selectedEl, 1); resetElementSize(selectedEl); },   // 縮放以左上角為基準，還原後左上角位置不變
     resetRatio() { resetImgRatio(selectedEl); },    // 保留寬度，高度依原圖比例
-    moveUp() { moveSibling(-1); },
-    moveDown() { moveSibling(1); }
+    layerUp() { moveLayer('up'); },
+    layerDown() { moveLayer('down'); },
+    layerTop() { moveLayer('top'); },
+    layerBottom() { moveLayer('bottom'); }
 };
 
 function stepSize(dir) {
@@ -383,13 +446,71 @@ function stepSize(dir) {
     setClass(el, [RE.size], 'text-' + SIZE_STEPS[i]);
     if (isChart) { clearInlineStyle(el, 'font-size'); rerenderChart(el); }   // 圖表是 SVG，字級要重畫才會生效
 }
-function moveSibling(dir) {
+/* ----- 圖層順序（z-index） ----- */
+// 只調整與選取元素「有重疊」的其他物件之間的上下關係，不改變排版。
+// 參與排序的物件：選取元素自己，以及選取元素和它每一層外層的兄弟元素中、與選取元素重疊的（例如蓋在卡片上的圖片、文字方塊、圖案）。
+// 先依畫面上實際的上下順序排好，移動選取元素後，依新順序把 z-index 重新編為 1..n。
+function rectsOverlap(a, b) {
+    return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom && a.width && a.height && b.width && b.height;
+}
+function layerCandidates(el) {
+    const root = slideRoot(), r = el.getBoundingClientRect(), out = [];
+    for (let a = el; a && a !== root && a !== getScaler(); a = a.parentElement) {
+        for (const sib of a.parentElement?.children || []) {
+            if (sib !== a && rectsOverlap(r, sib.getBoundingClientRect())) out.push(sib);
+        }
+    }
+    return out;
+}
+// a 是否畫在 b 的上面：在兩者重疊區域的中心點查詢最上層的元素；查不到時以文件順序（後面的在上）判斷
+function paintedAbove(a, b) {
+    const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+    const x = (Math.max(ra.left, rb.left) + Math.min(ra.right, rb.right)) / 2;
+    const y = (Math.max(ra.top, rb.top) + Math.min(ra.bottom, rb.bottom)) / 2;
+    for (const hit of document.elementsFromPoint(x, y)) {
+        if (a.contains(hit)) return true;
+        if (b.contains(hit)) return false;
+    }
+    return !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_PRECEDING);
+}
+// z-index 只對定位元素或 flex / grid 子項有效；一般區塊加上 position: relative（不移動位置）
+function setLayerZ(el, z) {
+    const parent = el.parentElement && getComputedStyle(el.parentElement).display;
+    if (getComputedStyle(el).position === 'static' && !/flex|grid/.test(parent || '')) el.style.position = 'relative';
+    el.style.zIndex = String(z);
+}
+// 選取元素的外層若自成一個堆疊環境（例如被移動過而有 translate），z-index 出不了那一層，外層也一起調整
+function createsStackingContext(el) {
+    const cs = getComputedStyle(el);
+    return cs.transform !== 'none' || cs.translate !== 'none' || cs.scale !== 'none' || cs.filter !== 'none'
+        || Number(cs.opacity) < 1 || cs.isolation === 'isolate' || (cs.zIndex !== 'auto' && cs.position !== 'static');
+}
+// 回傳是否有變動（已在最上層 / 最下層、或沒有重疊的物件時不動）
+function moveLayer(dir) {
     const el = selectedEl;
-    if (isRootBlock(el)) return;
-    const other = dir < 0 ? el.previousElementSibling : el.nextElementSibling;
-    if (!other) return;
-    stopTextEdit();
-    if (dir < 0) other.before(el); else other.after(el);
+    if (isRootBlock(el)) return false;
+    const others = layerCandidates(el);
+    if (!others.length) { showToast('這個元素沒有和其他物件重疊，不需要調整圖層', 'info', 2600); return false; }
+    // 由下到上排序（插入排序：每次和已排好的元素逐一比較，畫在上面的往後放）
+    const order = [];
+    for (const n of [...others, el]) {
+        let i = order.length;
+        while (i > 0 && paintedAbove(order[i - 1], n)) i--;
+        order.splice(i, 0, n);
+    }
+    const i = order.indexOf(el);
+    const to = { up: i + 1, down: i - 1, top: order.length - 1, bottom: 0 }[dir];
+    if (to < 0 || to >= order.length || to === i) {
+        showToast(dir === 'up' || dir === 'top' ? '已經在最上層' : '已經在最下層', 'info', 1800);
+        return false;
+    }
+    order.splice(i, 1);
+    order.splice(to, 0, el);
+    order.forEach((n, z) => setLayerZ(n, z + 1));
+    for (let a = el.parentElement; a && a !== slideRoot() && a !== getScaler(); a = a.parentElement) {
+        if (others.some(o => o.parentElement === a.parentElement) && createsStackingContext(a)) setLayerZ(a, order.indexOf(el) + 1);
+    }
+    return true;
 }
 
 function runFmt(name, ...args) {
@@ -398,23 +519,30 @@ function runFmt(name, ...args) {
     fmtCommit();
 }
 
-/* ----- 圖片邊框 ----- */
-// 以 inline style 存在 <img> 上（border-width / style / color），匯出 HTML、PDF、PPTX 都沿用
+/* ----- 邊框（圖片、AI 版面元素、文字方塊、圖表） ----- */
+// 以 inline style 存在元素上（border-width / style / color），匯出 HTML、PDF、PPTX 都沿用；
+// 目前的邊框從計算後的樣式讀取，AI 以 Tailwind class 畫的邊框（例如 border border-slate-200）也能直接調整
 const IMG_BORDER_WIDTHS = [0, 1, 2, 3, 4, 6, 8, 12, 16];
 const IMG_BORDER_STYLES = [['solid', '實線'], ['dashed', '虛線'], ['dotted', '點線']];
-const IMG_BORDER_DEFAULT_W = 4;
-function readImgBorder(el) {
-    const w = parseFloat(el.style.borderWidth) || 0;
-    const style = IMG_BORDER_STYLES.some(d => d[0] === el.style.borderStyle) ? el.style.borderStyle : 'solid';
-    return { w, style, color: w ? cssColorToHex(el.style.borderColor) : 'none' };
+const IMG_BORDER_DEFAULT_W = 2;
+const BORDER_SIDES = ['Top', 'Right', 'Bottom', 'Left'];
+function readBorder(el) {
+    const cs = getComputedStyle(el);
+    // 四邊中最粗的一邊為準（AI 常只畫單邊，例如 border-l-4 的強調線）
+    const width = sd => cs['border' + sd + 'Style'] === 'none' ? 0 : parseFloat(cs['border' + sd + 'Width']) || 0;
+    const side = BORDER_SIDES.reduce((best, sd) => width(sd) > width(best) ? sd : best, 'Top');
+    const w = Math.round(width(side));
+    const st = cs['border' + side + 'Style'];
+    const style = IMG_BORDER_STYLES.some(d => d[0] === st) ? st : 'solid';
+    return { w, style, color: w ? cssColorToHex(cs['border' + side + 'Color']) : 'none' };
 }
 // 原本沒有邊框時調了粗細或樣式：預設用投影片的文字顏色，在淺色與深色背景都看得到
 function defaultImgBorderColor() {
     const c = cssColorToHex(getComputedStyle(slideRoot() || getScaler()).color);
     return c === 'none' ? '#18181b' : c;
 }
-function setImgBorder(el, prop, v) {
-    let { w, style, color } = readImgBorder(el);
+function setBorder(el, prop, v) {
+    let { w, style, color } = readBorder(el);
     if (prop === 'color') {
         color = /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : 'none';
         if (color === 'none') w = 0; else if (!w) w = IMG_BORDER_DEFAULT_W;
@@ -423,8 +551,10 @@ function setImgBorder(el, prop, v) {
         else { style = v; if (!w) w = IMG_BORDER_DEFAULT_W; }
         if (w && color === 'none') color = defaultImgBorderColor();
     }
+    ['border-width', 'border-style', 'border-color'].forEach(p => el.style.removeProperty(p));
     if (w) Object.assign(el.style, { borderWidth: w + 'px', borderStyle: style, borderColor: color });
-    else ['border-width', 'border-style', 'border-color'].forEach(p => el.style.removeProperty(p));
+    else if (readBorder(el).w) el.style.borderStyle = 'none';    // 邊框來自 Tailwind class：以 inline style 關閉
+    if (!el.getAttribute('style')) el.removeAttribute('style');
 }
 
 /* ----- 浮動工具列 ----- */
@@ -436,42 +566,43 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
     tb.setAttribute('aria-label', '文字與元素格式');
     const btn = (id, icon, title, extra, ctl) => `<button type="button" class="fb ${extra}" data-fmt="${id}" data-ctl="${ctl}" title="${title}" aria-label="${title}">${icon}</button>`;
     // data-ctl：控制項所屬的群組，依選取的元素類型顯示（見 TOOLBAR_CTLS）；分隔線由 refreshToolbar 依可見群組自動隱藏
+    // 兩行：第一行為文字（字級、粗細、對齊、顏色），第二行為外觀（背景、圓角、陰影、外框等）與位置；
+    // 每組控制項前有文字標籤（.fl），標籤依元素類型替換（見 TOOLBAR_LABELS），整組沒有可用的控制項時隱藏
+    const group = (label, inner, lbl = '') => `<div class="fg">${label ? `<span class="fl"${lbl ? ` data-lbl="${lbl}"` : ''}>${label}</span>` : ''}${inner}</div>`;
+    const colorBtn = (icon, id, text, lbl = '') => `${icon}<span class="bt"${lbl ? ` data-lbl="${lbl}"` : ''}>${text}</span><span id="${id}" class="chipbox"></span>`;
     tb.innerHTML = `
-  ${btn('parent', '<i class="fa-solid fa-turn-up text-[11px]"></i>', '選取父層元素', '', 'parent')}
-  <span class="sep"></span>
-  ${btn('sizeDown', '<i class="fa-solid fa-minus text-[9px]"></i><span>A</span>', '縮小字級', '', 'size')}
-  <span id="fmtSize" data-ctl="size" class="px-1 tabular-nums min-w-[2.2rem] text-center" title="目前字級"></span>
-  ${btn('sizeUp', '<span>A</span><i class="fa-solid fa-plus text-[9px]"></i>', '放大字級', '', 'size')}
-  <span class="sep"></span>
-  <select id="fmtWeight" data-ctl="weight" title="字體粗細" aria-label="字體粗細">${WEIGHTS.map(w => `<option value="${w[0]}">${w[1]}</option>`).join('')}</select>
-  <span class="sep"></span>
-  ${btn('align-left', '<i class="fa-solid fa-align-left text-[11px]"></i>', '靠左', '', 'align')}
-  ${btn('align-center', '<i class="fa-solid fa-align-center text-[11px]"></i>', '置中', '', 'align')}
-  ${btn('align-right', '<i class="fa-solid fa-align-right text-[11px]"></i>', '靠右', '', 'align')}
-  <span class="sep"></span>
-  ${btn('pal-text', '<span class="font-bold">A</span><span id="fmtTextChip" class="chipbox"></span>', '文字顏色', '', 'text')}
-  ${btn('pal-bg', '<i class="fa-solid fa-fill-drip text-[11px]"></i><span id="fmtBgChip" class="chipbox"></span>', '背景顏色', '', 'bg')}
-  <span class="sep"></span>
-  <select id="fmtRadius" data-ctl="radius" title="圓角" aria-label="圓角"><option value="__custom" disabled hidden>圓角</option>${RADII.map(r => `<option value="${r[0]}">圓角：${r[1]}</option>`).join('')}</select>
-  <span class="sep"></span>
-  ${btn('pal-fill', '<i class="fa-solid fa-fill-drip text-[11px]"></i><span id="fmtFillChip" class="chipbox"></span>', '圖案填滿顏色', 'shape-fill', 'shape')}
-  ${btn('pal-stroke', '<i class="fa-regular fa-square text-[11px]"></i><span id="fmtStrokeChip" class="chipbox"></span>', '外框顏色', '', 'shape')}
-  <select id="fmtStrokeW" data-ctl="shape" title="外框粗細" aria-label="外框粗細">${SHAPE_STROKE_WIDTHS.map(w => `<option value="${w}">${w ? `外框：${w}px` : '無外框'}</option>`).join('')}</select>
-  <select id="fmtShapeRadius" data-ctl="shape" class="shape-radius" title="圖案圓角（轉角倒圓）" aria-label="圖案圓角">${SHAPE_RADII.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
-  <select id="fmtDash" data-ctl="shape" title="外框樣式" aria-label="外框樣式">${SHAPE_DASHES.map(d => `<option value="${d[0]}">${d[1]}</option>`).join('')}</select>
-  ${btn('pal-border', '<i class="fa-regular fa-square text-[11px]"></i><span id="fmtBorderChip" class="chipbox"></span>', '邊框顏色', '', 'border')}
-  <select id="fmtBorderW" data-ctl="border" title="邊框粗細" aria-label="邊框粗細">${IMG_BORDER_WIDTHS.map(w => `<option value="${w}">${w ? `邊框：${w}px` : '無邊框'}</option>`).join('')}</select>
-  <select id="fmtBorderStyle" data-ctl="border" title="邊框樣式" aria-label="邊框樣式">${IMG_BORDER_STYLES.map(d => `<option value="${d[0]}">${d[1]}</option>`).join('')}</select>
-  <span class="sep"></span>
-  ${btn('chart', '<i class="fa-solid fa-chart-column text-[11px]"></i><span>圖表資料</span>', '編輯圖表資料', '', 'chart')}
-  <span class="sep"></span>
-  ${btn('resetRatio', '<i class="fa-solid fa-expand text-[11px]"></i><span>還原比例</span>', '還原為原圖的長寬比例（保留目前寬度）', '', 'imgRatio')}
-  <span class="sep"></span>
-  ${btn('resetPos', '<i class="fa-solid fa-arrows-to-dot text-[11px]"></i><span>還原位置</span>', '移回 AI 版面的原始位置', '', 'aiReset')}
-  ${btn('resetScale', '<i class="fa-solid fa-compress text-[11px]"></i><span>還原大小</span>', '還原為 AI 版面的原始大小（100%）', '', 'aiReset')}
-  <span class="sep"></span>
-  ${btn('more', '<i class="fa-solid fa-ellipsis text-[12px]"></i>', '更多操作（複製、同層排序）', '', 'common')}
-  ${btn('remove', '<i class="fa-regular fa-trash-can text-[11px]"></i>', '刪除元素（Delete）', 'danger', 'common')}`;
+<div class="frow">
+  ${group('', btn('parent', '<i class="fa-solid fa-turn-up text-[11px]"></i><span class="bt">選取外層</span>', '選取包住這個元素的外層元素（例如整張卡片）', '', 'parent'))}
+  ${group('字級', `${btn('sizeDown', '<i class="fa-solid fa-minus text-[10px]"></i>', '縮小字級', '', 'size')}
+    <span id="fmtSize" data-ctl="size" class="px-1 tabular-nums min-w-[2.6rem] text-center" title="目前字級"></span>
+    ${btn('sizeUp', '<i class="fa-solid fa-plus text-[10px]"></i>', '放大字級', '', 'size')}`, 'size')}
+  ${group('粗細', `<select id="fmtWeight" data-ctl="weight" title="字體粗細" aria-label="字體粗細">${WEIGHTS.map(w => `<option value="${w[0]}">${w[1]}</option>`).join('')}</select>`)}
+  ${group('對齊', `${btn('align-left', '<i class="fa-solid fa-align-left text-[11px]"></i>', '靠左對齊', '', 'align')}
+    ${btn('align-center', '<i class="fa-solid fa-align-center text-[11px]"></i>', '置中對齊', '', 'align')}
+    ${btn('align-right', '<i class="fa-solid fa-align-right text-[11px]"></i>', '靠右對齊', '', 'align')}`)}
+  ${group('', btn('pal-text', colorBtn('<i class="fa-solid fa-font text-[11px]"></i>', 'fmtTextChip', '文字顏色', 'textColor'), '文字顏色', '', 'text'))}
+  <span class="fspacer"></span>
+  ${group('', `${btn('more', '<i class="fa-solid fa-ellipsis text-[12px]"></i><span class="bt">更多</span>', '更多操作（複製、圖層順序）', '', 'common')}
+    ${btn('remove', '<i class="fa-regular fa-trash-can text-[11px]"></i><span class="bt">刪除</span>', '刪除元素（Delete）', 'danger', 'common')}`)}
+</div>
+<div class="frow">
+  ${group('', btn('pal-bg', colorBtn('<i class="fa-solid fa-fill-drip text-[11px]"></i>', 'fmtBgChip', '背景顏色', 'bgColor'), '背景顏色', '', 'bg'))}
+  ${group('圓角', `<select id="fmtRadius" data-ctl="radius" title="圓角" aria-label="圓角"><option value="__custom" disabled hidden>自訂</option>${RADII.map(r => `<option value="${r[0]}">${r[1]}</option>`).join('')}</select>`)}
+  ${group('陰影', `<select id="fmtShadow" data-ctl="shadow" title="陰影" aria-label="陰影"><option value="__custom" disabled hidden>自訂</option>${SHADOWS.map(r => `<option value="${r[0]}">${r[1]}</option>`).join('')}</select>`)}
+  ${group('外框', `${btn('pal-border', '<span class="bt">顏色</span><span id="fmtBorderChip" class="chipbox"></span>', '外框顏色', '', 'border')}
+    <select id="fmtBorderW" data-ctl="border" title="外框粗細" aria-label="外框粗細">${IMG_BORDER_WIDTHS.map(w => `<option value="${w}">${w ? `${w}px` : '無'}</option>`).join('')}</select>
+    <select id="fmtBorderStyle" data-ctl="border" title="外框樣式" aria-label="外框樣式">${IMG_BORDER_STYLES.map(d => `<option value="${d[0]}">${d[1]}</option>`).join('')}</select>`)}
+  ${group('圖案', `${btn('pal-fill', '<span class="bt">填滿</span><span id="fmtFillChip" class="chipbox"></span>', '圖案填滿顏色', 'shape-fill', 'shape')}
+    ${btn('pal-stroke', '<span class="bt">線條</span><span id="fmtStrokeChip" class="chipbox"></span>', '外框（線條）顏色', '', 'shape')}
+    <select id="fmtStrokeW" data-ctl="shape" title="外框粗細" aria-label="外框粗細">${SHAPE_STROKE_WIDTHS.map(w => `<option value="${w}">${w ? `粗細 ${w}px` : '無外框'}</option>`).join('')}</select>
+    <select id="fmtDash" data-ctl="shape" title="外框樣式" aria-label="外框樣式">${SHAPE_DASHES.map(d => `<option value="${d[0]}">${d[1]}</option>`).join('')}</select>
+    <select id="fmtShapeRadius" data-ctl="shape" class="shape-radius" title="圖案圓角（轉角倒圓）" aria-label="圖案圓角">${SHAPE_RADII.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>`)}
+  ${group('', btn('chart', '<i class="fa-solid fa-chart-column text-[11px]"></i><span class="bt">編輯圖表資料</span>', '編輯圖表資料', '', 'chart'))}
+  ${group('', btn('resetRatio', '<i class="fa-solid fa-expand text-[11px]"></i><span class="bt">還原圖片比例</span>', '還原為原圖的長寬比例（保留目前寬度）', '', 'imgRatio'))}
+  <span class="fspacer"></span>
+  ${group('', `${btn('resetPos', '<i class="fa-solid fa-arrows-to-dot text-[11px]"></i><span class="bt">還原位置</span>', '移回 AI 版面的原始位置', '', 'aiReset')}
+    ${btn('resetScale', '<i class="fa-solid fa-compress text-[11px]"></i><span class="bt">還原大小</span>', '還原為 AI 版面的原始大小與寬高', '', 'aiReset')}`)}
+</div>`;
     // 工具列固定在投影片上方的編輯列（#fmtDock）內，不會蓋住投影片內容
     document.getElementById('fmtDock').appendChild(tb);
     tb.querySelector('[data-fmt="more"]').setAttribute('aria-haspopup', 'menu');
@@ -484,8 +615,11 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
         `<i class="${icon}"></i><span>${label}</span>${key ? `<kbd>${key}</kbd>` : ''}</button>`;
     more.innerHTML = `
   ${item('duplicate', 'fa-regular fa-clone', '複製元素', 'common', 'Ctrl+D')}
-  ${item('moveUp', 'fa-solid fa-arrow-up', '同層上移（往前）', 'common')}
-  ${item('moveDown', 'fa-solid fa-arrow-down', '同層下移（往後）', 'common')}`;
+  <div class="mh">圖層順序（重疊時的上下）</div>
+  ${item('layerTop', 'fa-solid fa-angles-up', '移到最上層', 'common', 'Ctrl+Shift+↑')}
+  ${item('layerUp', 'fa-solid fa-arrow-up', '上移一層', 'common', 'Ctrl+↑')}
+  ${item('layerDown', 'fa-solid fa-arrow-down', '下移一層', 'common', 'Ctrl+↓')}
+  ${item('layerBottom', 'fa-solid fa-angles-down', '移到最下層', 'common', 'Ctrl+Shift+↓')}`;
     document.body.appendChild(more);
     more.addEventListener('mousedown', e => e.preventDefault());
     more.addEventListener('click', e => {
@@ -523,6 +657,7 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
     });
     tb.querySelector('#fmtWeight').addEventListener('change', e => runFmt('weight', e.target.value));
     tb.querySelector('#fmtRadius').addEventListener('change', e => runFmt('radius', e.target.value));
+    tb.querySelector('#fmtShadow').addEventListener('change', e => runFmt('shadow', e.target.value));
     tb.querySelector('#fmtStrokeW').addEventListener('change', e => runFmt('shapeProp', 'strokeW', e.target.value));
     tb.querySelector('#fmtShapeRadius').addEventListener('change', e => runFmt('shapeProp', 'radius', e.target.value));
     tb.querySelector('#fmtDash').addEventListener('change', e => runFmt('shapeProp', 'dash', e.target.value));
@@ -554,7 +689,7 @@ function togglePalette(mode, anchor) {
     palMode = mode;
     const isHexMode = HEX_PAL_MODES.includes(mode);
     pal.querySelector('[data-color=""]').textContent = isHexMode ? '無' : '預設（移除）';
-    const cur = mode === 'border' ? readImgBorder(selectedEl).color
+    const cur = mode === 'border' ? readBorder(selectedEl).color
         : isHexMode ? shapeOf(selectedEl)?.getAttribute('data-' + mode) : cssColorToHex(getComputedStyle(selectedEl)[mode === 'text' ? 'color' : 'backgroundColor']);
     pal.querySelector('#palCustom').value = /^#[0-9a-f]{6}$/i.test(cur || '') ? cur : '#3b82f6';
     pal.classList.add('open');
@@ -600,11 +735,17 @@ function hideMoreMenu() {
  * 圖示：<i> 的 Font Awesome class 自帶字重、外框固定置中，粗細與對齊無效；字級 ± 為縮放圖示。
  * 圖表：SVG 文字用 currentColor 與固定字重，對齊與粗細看不出差別。 */
 const TOOLBAR_CTLS = {
-    text: ['size', 'weight', 'align', 'text', 'bg', 'radius'],     // 文字方塊與 AI 版面元素
-    image: ['bg', 'radius', 'border', 'imgRatio'],
-    icon: ['size', 'text', 'bg', 'radius'],
-    chart: ['size', 'text', 'bg', 'radius', 'chart'],
-    shape: ['size', 'weight', 'align', 'text', 'shape'],
+    text: ['size', 'weight', 'align', 'text', 'bg', 'radius', 'border', 'shadow'],     // 文字方塊與 AI 版面元素
+    image: ['bg', 'radius', 'border', 'shadow', 'imgRatio'],
+    icon: ['size', 'text', 'bg', 'radius', 'shadow'],
+    chart: ['size', 'text', 'bg', 'radius', 'border', 'shadow', 'chart'],
+    shape: ['size', 'weight', 'align', 'text', 'shape', 'shadow'],
+};
+// 依元素類型替換的文字標籤（data-lbl，沒列出的沿用預設）
+const TOOLBAR_LABELS = {
+    image: { bgColor: '底色' },
+    icon: { size: '大小', textColor: '圖示顏色' },
+    chart: { size: '圖表文字', textColor: '標籤顏色' },
 };
 // 依元素類型替換的按鈕提示（沒列出的沿用預設）
 const TOOLBAR_TITLES = {
@@ -629,14 +770,17 @@ function applyToolbarCtls(tb, kind, extras = []) {
         b.title = t;
         b.setAttribute('aria-label', t);
     });
-    let last = null;
-    [...tb.children].forEach(n => {
-        if (!n.classList.contains('sep')) { if (n.style.display !== 'none') last = n; return; }
-        const visible = !!last && !last.classList.contains('sep');
-        n.style.display = visible ? '' : 'none';
-        if (visible) last = n;
+    tb.querySelectorAll('[data-lbl]').forEach(n => {
+        n.dataset.defaultLabel ??= n.textContent;
+        n.textContent = TOOLBAR_LABELS[kind]?.[n.dataset.lbl] || n.dataset.defaultLabel;
     });
-    if (last?.classList.contains('sep')) last.style.display = 'none';
+    // 整組的控制項都隱藏時隱藏該組；一行都沒有可用的組時隱藏整行
+    tb.querySelectorAll('.fg').forEach(g => {
+        g.style.display = [...g.querySelectorAll('[data-ctl]')].some(n => n.style.display !== 'none') ? '' : 'none';
+    });
+    tb.querySelectorAll('.frow').forEach(r => {
+        r.style.display = [...r.querySelectorAll('.fg')].some(g => g.style.display !== 'none') ? '' : 'none';
+    });
 }
 
 function refreshToolbar() {
@@ -648,12 +792,15 @@ function refreshToolbar() {
     const cs = getComputedStyle(el);
     const isIcon = kind === 'icon';
     const isChart = kind === 'chart';
-    document.getElementById('fmtSize').textContent = isIcon ? el.offsetWidth + 'px' : SIZE_STEPS[currentSizeIndex(el)];
+    document.getElementById('fmtSize').textContent = isIcon ? el.offsetWidth + 'px' : SIZE_PX[currentSizeIndex(el)] + 'px';
     document.getElementById('fmtWeight').value = currentWeight(el);
     const rad = currentRadius(el);
     const radSel = document.getElementById('fmtRadius');
     radSel.value = rad;
     if (radSel.value !== rad) radSel.value = '__custom';
+    const shadowSel = document.getElementById('fmtShadow');
+    shadowSel.value = currentShadow(el);
+    if (shadowSel.selectedIndex < 0) shadowSel.value = '__custom';
     const al = currentAlign(el);
     tb.querySelectorAll('[data-fmt^="align-"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.fmt === 'align-' + al)));
     document.getElementById('fmtTextChip').style.background = cs.color;
@@ -666,13 +813,12 @@ function refreshToolbar() {
     fmtEl('sizeUp').disabled = isIcon ? el.offsetWidth >= ICON_MAX : sizeIdx >= (isChart ? CHART_SIZE_MAX : SIZE_STEPS.length - 1);
     fmtEl('duplicate').disabled = root;
     fmtEl('remove').disabled = root;
-    fmtEl('moveUp').disabled = root || !el.previousElementSibling;
-    fmtEl('moveDown').disabled = root || !el.nextElementSibling;
+    ['layerTop', 'layerUp', 'layerDown', 'layerBottom'].forEach(id => { fmtEl(id).disabled = root; });
     // 還原位置 / 大小：AI 版面元素一律顯示在工具列，沒有移動或縮放過時停用（浮動物件沒有原始位置可還原）
     const ai = !isFloat(el);
     applyToolbarCtls(tb, kind, ai ? ['aiReset'] : []);
     fmtEl('resetPos').disabled = !ai || !getOffset(el).some(Boolean);
-    fmtEl('resetScale').disabled = !ai || getScale(el) === 1;
+    fmtEl('resetScale').disabled = !ai || (getScale(el) === 1 && !isSized(el));
     fmtEl('resetRatio').disabled = !isImgStretched(el);
     // 圖案：填滿 / 外框；線條沒有填滿，沒有轉角的圖案沒有圓角
     const shape = kind === 'shape' ? shapeOf(el) : null;
@@ -692,8 +838,8 @@ function refreshToolbar() {
         if (![...shapeRadSel.options].some(o => Number(o.value) === st.radius)) shapeRadSel.add(new Option(`圓角：${st.radius}px`, String(st.radius)));
         shapeRadSel.value = String(st.radius);
     }
-    if (kind === 'image') {
-        const b = readImgBorder(el);
+    if (kind === 'image' || kind === 'text' || kind === 'chart') {
+        const b = readBorder(el);
         document.getElementById('fmtBorderChip').style.background = b.w ? b.color : 'transparent';
         const wSel = document.getElementById('fmtBorderW');
         if (![...wSel.options].some(o => Number(o.value) === b.w)) wSel.add(new Option(`邊框：${b.w}px`, String(b.w)));

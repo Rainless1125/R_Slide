@@ -57,7 +57,7 @@ function buildSkeletonCards(kind = 'deck', pages) {
 const LOADING_PHASES = [[0, '分析內容中…'], [3, '正在規劃版面…'], [8, '設計配色與排版…'], [15, '生成每頁版面…']];
 const OUTLINE_LOADING_PHASES = [[0, '分析內容中…'], [3, '規劃故事線…'], [8, '整理每頁重點…']];
 // 等待較久時的補充說明
-const LOADING_SLOW_HINTS = [[40, '頁數較多、詳細模式或較慢的模型需要較長時間，請稍候'], [120, '等待時間比平常久，仍在等候 AI 回應']];
+const LOADING_SLOW_HINTS = [[40, '頁數較多、詳細模式、思考長度「更高」或較慢的模型需要較長時間，請稍候'], [120, '等待時間比平常久，仍在等候 AI 回應']];
 const pickByElapsed = (list, sec) => list.reduce((cur, [t, text]) => sec >= t ? text : cur, '');
 
 // kind：'deck' 生成整份簡報，'outline' 產生大綱；pages 為骨架屏的頁數（依大綱生成時以大綱頁數為準）
@@ -129,9 +129,45 @@ function saveModelPref() {
 function getLlmChoice() {
     return {
         provider: document.getElementById('providerSelect').value,
-        model: document.getElementById('modelSelect').value
+        model: document.getElementById('modelSelect').value,
+        thinking: getThinking()
     };
 }
+
+/* ---------- 思考長度（中等 / 更高）：對應後端的 thinking = medium / high ---------- */
+const THINKING_KEY = 'rslide_thinking';
+const THINKING_LEVELS = ['medium', 'high'];
+function getThinking() {
+    return document.querySelector('#thinkingToggle [aria-checked="true"]')?.dataset.thinking || 'medium';
+}
+function setThinking(level, save = true) {
+    if (!THINKING_LEVELS.includes(level)) level = 'medium';
+    document.querySelectorAll('#thinkingToggle [data-thinking]').forEach(b => {
+        const on = b.dataset.thinking === level;
+        b.setAttribute('aria-checked', String(on));
+        b.tabIndex = on ? 0 : -1;
+    });
+    if (save) try { localStorage.setItem(THINKING_KEY, level); } catch (e) { }
+}
+(function initThinkingToggle() {
+    const group = document.getElementById('thinkingToggle');
+    let saved = null;
+    try { saved = localStorage.getItem(THINKING_KEY); } catch (e) { }
+    setThinking(saved, false);
+    group.addEventListener('click', e => {
+        const b = e.target.closest('[data-thinking]');
+        if (b) setThinking(b.dataset.thinking);
+    });
+    // 方向鍵切換（radiogroup 的標準操作）
+    group.addEventListener('keydown', e => {
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+        e.preventDefault();
+        const i = THINKING_LEVELS.indexOf(getThinking());
+        const next = THINKING_LEVELS[(i + (e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? THINKING_LEVELS.length - 1 : 1)) % THINKING_LEVELS.length];
+        setThinking(next);
+        group.querySelector(`[data-thinking="${next}"]`).focus();
+    });
+})();
 
 /* ---------- 模型選單（樣式與「簡報風格」一致，附廠商圖示） ---------- */
 // 圖示路徑取自 simple-icons（CC0）；沒有 path 的平台改用 Font Awesome 圖示（fa）

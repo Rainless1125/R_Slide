@@ -23,7 +23,7 @@ def new_client(username="alice"):
 def fake_llm(monkeypatch, result=None, error=None, tokens=(100, 50)):
     calls = []
 
-    def fake(provider, model, system_instruction, prompt, schema, temperature, usage=None):
+    def fake(provider, model, system_instruction, prompt, schema, temperature, usage=None, thinking=None):
         calls.append(provider)
         usage.update(provider=provider, model=model or "default-model",
                      **app_module.token_usage(*tokens))

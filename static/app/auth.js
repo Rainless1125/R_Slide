@@ -4,13 +4,18 @@ const LEGACY_HISTORY_KEY = 'rslide_history_v1';
 let currentUser = null;
 let authMode = 'login';            // 'login' | 'register'
 let allowRegistration = true;
+let loginSource = 'system';        // 後端 AUTH_MODE：'system'（內建帳號）| 'ldap'（公司帳號）
 
 function isAuthOpen() { return !document.getElementById('authModal').classList.contains('hidden'); }
 
 function setAuthMode(mode) {
     authMode = mode === 'register' && allowRegistration ? 'register' : 'login';
     const reg = authMode === 'register';
-    document.getElementById('authTitle').textContent = reg ? '註冊新帳號' : '登入 R Slide';
+    const ldap = loginSource === 'ldap';
+    document.getElementById('authTitle').textContent = reg ? '註冊新帳號' : ldap ? '以公司帳號登入' : '登入 R Slide';
+    document.getElementById('authSubtitle').textContent = ldap ? '請輸入公司的帳號與密碼（LDAP）' : '歷史記錄會依帳號分開保存';
+    document.getElementById('authUsernameLabel').textContent = ldap ? '公司帳號' : '帳號';
+    document.getElementById('authUsername').maxLength = ldap ? 64 : 32;
     document.getElementById('authSubmitLabel').textContent = reg ? '註冊並登入' : '登入';
     document.getElementById('authPassword').autocomplete = reg ? 'new-password' : 'current-password';
     document.getElementById('authHint').classList.toggle('hidden', !reg);
@@ -177,7 +182,8 @@ async function initAuth() {
     } catch (err) {
         showToast(friendlyError(err), 'error', 8000);
     }
-    allowRegistration = me.allow_registration !== false;
+    loginSource = me.auth_mode === 'ldap' ? 'ldap' : 'system';
+    allowRegistration = me.allow_registration !== false && loginSource === 'system';
     if (me.username) await onLoggedIn(me.username);
     else showAuth();
 }

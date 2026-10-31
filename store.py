@@ -70,7 +70,8 @@ CREATE TABLE IF NOT EXISTS llm_usage (
     error            TEXT,
     latency_ms       INTEGER,
     fallback         INTEGER NOT NULL DEFAULT 0, -- OpenAI 相容端點改用提示詞附 schema 的備援路徑
-    client_ip        TEXT
+    client_ip        TEXT,
+    thinking         TEXT                       -- 使用者選的思考長度 medium / high，辨識圖片等未指定時為 NULL
 );
 CREATE INDEX IF NOT EXISTS idx_llm_usage_user_time ON llm_usage(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_llm_usage_time ON llm_usage(created_at);
@@ -134,6 +135,7 @@ def init_db(path: str):
 # CREATE TABLE IF NOT EXISTS 不會替已存在的資料表加欄位：之後新增的欄位列在這裡，啟動時補上
 _ADDED_COLUMNS = {
     "feedback": {"rating": "INTEGER"},
+    "llm_usage": {"thinking": "TEXT"},
 }
 
 
@@ -250,6 +252,20 @@ def authenticate(username: str, password: str) -> dict | None:
         return None
     if not verify_password(password, row["password_hash"]):
         return None
+    return {"id": row["id"], "username": row["username"]}
+
+
+# 外部驗證（公司 LDAP）建立的本機帳號：密碼欄位放這個標記，任何密碼都無法通過 verify_password
+EXTERNAL_PASSWORD_HASH = "external$ldap"
+
+
+def get_or_create_external_user(username: str) -> dict:
+    """公司 LDAP 驗證成功後取得對應的本機帳號（帳號名稱不分大小寫），第一次登入時自動建立。
+    已有同名的本機帳號時沿用該帳號，原本的歷史記錄會保留。"""
+    with connect() as conn:
+        conn.execute("INSERT OR IGNORE INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
+                     (username, EXTERNAL_PASSWORD_HASH, now_ms()))
+        row = conn.execute("SELECT id, username FROM users WHERE username = ?", (username,)).fetchone()
     return {"id": row["id"], "username": row["username"]}
 
 
@@ -429,7 +445,7 @@ def delete_history(user_id: int, item_id: str | None = None):
 LLM_USAGE_COLUMNS = ("user_id", "username", "created_at", "action", "provider", "model", "deck_mode", "num_pages",
                      "slides_returned", "input_chars", "content_hash", "input_tokens", "output_tokens",
                      "total_tokens", "cached_tokens", "reasoning_tokens", "status", "http_status", "error",
-                     "latency_ms", "fallback", "client_ip")
+                     "latency_ms", "fallback", "client_ip", "thinking")
 DEFAULT_USAGE_RETENTION_DAYS = 365
 DAY_MS = 24 * 3600 * 1000
 

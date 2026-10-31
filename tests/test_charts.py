@@ -49,7 +49,7 @@ def test_highlight_is_required_in_llm_schema():
 def test_generate_prompt_explains_highlight(monkeypatch):
     captured = {}
 
-    def fake_llm(provider, model, system_instruction, prompt, schema, temperature, usage=None):
+    def fake_llm(provider, model, system_instruction, prompt, schema, temperature, usage=None, thinking=None):
         captured["system"] = system_instruction
         return {"presentation_title": "t", "theme": None, "slides": []}
 
@@ -126,7 +126,7 @@ SLIDE = {"page_number": 1, "layout_concept": "KPI", "slide_title": "營收", "ht
 def regenerate(monkeypatch, slides, llm_result):
     captured = {}
 
-    def fake_llm(provider, model, system_instruction, prompt, schema, temperature, usage=None):
+    def fake_llm(provider, model, system_instruction, prompt, schema, temperature, usage=None, thinking=None):
         captured["prompt"] = prompt
         return dict(llm_result)
 

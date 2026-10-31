@@ -27,6 +27,7 @@ from admin import router as admin_router
 from charts import CHART_RULES, MAX_CHARTS_PER_SLIDE, ChartSpec, normalize_charts
 from exporter import ExportError, build_pptx
 from extract import MAX_REQUEST_BYTES, ExtractError, extract_text
+from ldap_auth import check_config as check_auth_config
 from slide_images import SlideImageReadings, read_slide_images
 
 logger = logging.getLogger("rslide")
@@ -76,6 +77,7 @@ def parse_extra_headers(value: str | None) -> dict[str, str]:
 
 
 LLM_EXTRA_HEADERS = parse_extra_headers(os.getenv("LLM_EXTRA_HEADERS"))
+check_auth_config()   # AUTH_MODE=ldap 時缺少必要設定就啟動失敗
 
 # OpenAI 或 OpenAI 相容端點（公司內部 AI 閘道、Azure OpenAI、Databricks、vLLM、Ollama 等）：
 # 設定 OPENAI_BASE_URL 時改連該網址，模型清單由 OPENAI_MODELS 決定，畫面上的平台名稱由 OPENAI_DISPLAY_NAME 決定
@@ -154,8 +156,26 @@ def gemini_usage(response) -> dict:
                        getattr(u, "thoughts_token_count", None))
 
 
+# 使用者可選的思考長度（畫面上的「中等」「更高」）；對應 OpenAI 的 reasoning_effort 與 Gemini 的 thinking_level
+ThinkingLevel = Literal["medium", "high"]
+GEMINI_THINKING_LEVELS = {"medium": types.ThinkingLevel.MEDIUM, "high": types.ThinkingLevel.HIGH}
+
+
+def with_reasoning_effort(create, effort: str | None, **kwargs):
+    """帶 reasoning_effort 呼叫；模型不支援這個參數（非推理模型、部分相容端點）時改為不帶參數再試一次。"""
+    if effort:
+        try:
+            return create(**kwargs, reasoning_effort=effort)
+        except BadRequestError as e:
+            if "reasoning" not in str(e).lower():
+                raise
+            logger.info("模型 %s 不支援 reasoning_effort，改用模型預設的思考長度", kwargs.get("model"))
+    return create(**kwargs)
+
+
 def call_openai_compatible(client: OpenAI, model: str, system_instruction: str, prompt: str | list,
-                           schema: type[BaseModel], allow_fallback: bool, usage: dict | None = None) -> dict:
+                           schema: type[BaseModel], allow_fallback: bool, usage: dict | None = None,
+                           thinking: str | None = None) -> dict:
     usage = {} if usage is None else usage
     messages = [
         {"role": "system", "content": system_instruction},
@@ -163,7 +183,8 @@ def call_openai_compatible(client: OpenAI, model: str, system_instruction: str, 
     ]
     try:
         # 部分 OpenAI 模型（如推理類）只接受預設 temperature，故不傳入
-        completion = client.beta.chat.completions.parse(model=model, messages=messages, response_format=schema)
+        completion = with_reasoning_effort(client.beta.chat.completions.parse, thinking,
+                                           model=model, messages=messages, response_format=schema)
         usage.update(openai_usage(completion))
         message = completion.choices[0].message
         if message.refusal:
@@ -180,7 +201,8 @@ def call_openai_compatible(client: OpenAI, model: str, system_instruction: str, 
     fallback_system = (system_instruction + "\n\n【輸出格式】：只輸出一個符合下列 JSON Schema 的 JSON 物件，"
                        "不要加上 Markdown 區塊或任何說明文字。\n"
                        + json.dumps(schema.model_json_schema(), ensure_ascii=False))
-    completion = client.chat.completions.create(
+    completion = with_reasoning_effort(
+        client.chat.completions.create, thinking,
         model=model,
         messages=[{"role": "system", "content": fallback_system}, {"role": "user", "content": prompt}],
     )
@@ -210,9 +232,10 @@ def gemini_response_text(response) -> str:
 
 def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
              schema: type[BaseModel], temperature: float, usage: dict | None = None,
-             images: list[tuple[bytes, str]] | None = None) -> dict:
+             images: list[tuple[bytes, str]] | None = None, thinking: str | None = None) -> dict:
     """依平台呼叫 LLM，回傳符合 schema 的 dict。傳入 usage 時會填入實際使用的模型與 token 數（供使用紀錄）。
-    images 為 [(圖片資料, MIME)]，依序附在提示之後（模型需支援圖片輸入）。"""
+    images 為 [(圖片資料, MIME)]，依序附在提示之後（模型需支援圖片輸入）。
+    thinking 為使用者選的思考長度（medium / high）；None 時 Gemini 不思考、OpenAI 用模型預設（例如辨識圖片）。"""
     usage = {} if usage is None else usage
     provider = (provider or "gemini").lower()
     if provider not in MODEL_CATALOG:
@@ -230,7 +253,8 @@ def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
             response_mime_type="application/json",
             response_schema=schema,
             temperature=temperature,
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            thinking_config=(types.ThinkingConfig(thinking_level=GEMINI_THINKING_LEVELS[thinking])
+                             if thinking in GEMINI_THINKING_LEVELS else types.ThinkingConfig(thinking_budget=0)),
             system_instruction=system_instruction
         )
         contents = [prompt, *(types.Part.from_bytes(data=d, mime_type=m) for d, m in images)] if images else prompt
@@ -243,7 +267,7 @@ def call_llm(provider: str, model: str, system_instruction: str, prompt: str,
             "url": f"data:{m};base64,{base64.b64encode(d).decode()}", "detail": "high"}} for d, m in images)]
     # 自訂的 OpenAI 相容端點不一定支援嚴格的結構化輸出，失敗時改用提示詞附 schema 的方式
     return call_openai_compatible(client, model, system_instruction, prompt, schema,
-                                  allow_fallback=bool(OPENAI_BASE_URL), usage=usage)
+                                  allow_fallback=bool(OPENAI_BASE_URL), usage=usage, thinking=thinking)
 
 
 @contextmanager
@@ -255,6 +279,7 @@ def llm_usage_log(request: Request, user: dict, action: str, req):
     base = {
         "user_id": user["id"], "username": user["username"], "action": action,
         "deck_mode": req.deck_mode, "num_pages": req.num_pages, "input_chars": len(req.content),
+        "thinking": getattr(req, "thinking", None),
         "content_hash": hashlib.sha256(req.content.encode()).hexdigest(),
         # 部署於反向代理之後時，uvicorn 的 --forwarded-allow-ips 決定是否採用 X-Forwarded-For
         "client_ip": request.client.host if request.client else None,
@@ -413,6 +438,32 @@ DECK_MODE_RULES = {
     6. 講者備註只做補充：約 50 ~ 120 字、1 ~ 3 句，補充延伸資訊或閱讀重點，不重複畫面內容。
 """,
 }
+# 一頁式報告：整份素材濃縮成單一頁（例如給主管的一頁摘要），不是封面也不是只放一個重點的內容頁，
+# 因此取代【整份簡報的節奏】中的封面 / 結尾規則，文字量也比【簡報模式】的單頁上限多
+ONE_PAGE_REPORT_RULES = """
+    【一頁式簡報報告（頁數為 1 時，最優先，覆蓋【整份簡報的節奏】與【簡報模式】中的文字量規定）】：
+    這份簡報只有一頁，是把整份素材濃縮成一頁的摘要報告，讀者只看這一頁就要掌握全貌。
+    1. 不要做成封面頁、議程頁或只放一個重點的內容頁；封面、結尾與議程的規則都不適用。
+    2. 頁首：主標題寫成整份素材最重要的結論句（text-2xl ~ text-3xl），下方一句導言交代背景與目的（不超過 40 字）。
+    3. 主要內容區以 2~3 欄或 2×2 的區塊網格呈現 3~4 個區塊，依素材從以下挑選：
+       現況 / 背景、關鍵數據（2~4 個 KPI 大數字或一張小圖表）、主要發現或原因、建議 / 下一步行動。
+       每個區塊有小標題與 2~4 點精簡條列，每點不超過 25 字。
+    4. 頁尾可放一列結論或行動呼籲（text-sm），有出處時以 text-xs 標示資料來源。
+    5. 資訊密度高但不可超出畫面：卡片標題 text-sm ~ text-base，內文 text-xs ~ text-sm，卡片內距 p-4，區塊間距 gap-3 ~ gap-4；
+       仍須遵守【版面尺寸硬性限制】，素材太多時優先保留結論、關鍵數字與行動，刪除細節。
+    6. 圖表最多 1 張，且只在數據是整份報告的重點時使用。
+    7. 講者備註寫成約 150 ~ 300 字的口頭報告稿，依頁面區塊的順序說明。
+"""
+ONE_PAGE_OUTLINE_RULES = """
+    【一頁式簡報報告】：頁數為 1 時，只輸出一頁大綱，是把整份素材濃縮成一頁的摘要報告（不是封面）：
+    標題寫成最重要的結論句，重點 4 ~ 6 點，涵蓋現況 / 背景、關鍵數據、主要發現、建議 / 下一步，版型寫「一頁式報告」。
+"""
+
+
+def one_page_rules(pages: int, rules: str = ONE_PAGE_REPORT_RULES) -> str:
+    return rules if pages == 1 else ""
+
+
 DECK_MODE_LABELS = {"speaker": "簡易模式（演講型 / Speaker Deck）", "document": "詳細模式（閱讀型 / Document Deck）"}
 DeckMode = Literal["speaker", "document"]
 
@@ -453,6 +504,7 @@ class GenerateRequest(BaseModel):
     deck_mode: DeckMode = "speaker"
     provider: str = "gemini"
     model: str = ""
+    thinking: ThinkingLevel = "medium"            # 思考長度：medium（中等）/ high（更高）
     outline: DeckOutline | None = None            # 使用者確認過的大綱；有值時依大綱生成，頁數以大綱為準
 
 class RegenerateSlideRequest(BaseModel):
@@ -468,6 +520,7 @@ class RegenerateSlideRequest(BaseModel):
     theme: dict | None = None                     # 整份簡報的設計規範（舊簡報沒有），見 deck_design.py
     provider: str = "gemini"
     model: str = ""
+    thinking: ThinkingLevel = "medium"
 
 # 2. API 端點
 LLM_PATHS = {"/api/generate", "/api/outline", "/api/regenerate-slide"}
@@ -513,7 +566,8 @@ def generate_slides(req: GenerateRequest, request: Request, user: dict = Depends
        - 禁止使用emoji，請一律使用font-awesome圖示。
        - 【重要】你必須絕對服從使用者指定的「視覺風格」。如果要求明亮風，請多用 bg-white/bg-slate-50；如果要求科技風，才使用深色底 bg-slate-900 搭配螢光點綴色。
     """ + THEME_RULES + LAYOUT_CATALOG + DECK_RHYTHM_RULES + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] \
-        + CHART_RULES + SPEAKER_NOTES_RULES + CONTENT_ACCURACY_RULES
+        + CHART_RULES + SPEAKER_NOTES_RULES + CONTENT_ACCURACY_RULES \
+        + one_page_rules(len(req.outline.slides) if req.outline else req.num_pages)
 
     outline_block = ""
     if req.outline:
@@ -545,7 +599,8 @@ def generate_slides(req: GenerateRequest, request: Request, user: dict = Depends
     
     with llm_usage_log(request, user, "generate", req) as usage:
         try:
-            data = call_llm(req.provider, req.model, system_instruction, prompt, AdaptivePresentation, 0.6, usage)
+            data = call_llm(req.provider, req.model, system_instruction, prompt, AdaptivePresentation, 0.6, usage,
+                            thinking=req.thinking)
             data["theme"] = theme_from_input(data.get("theme"))   # 去除多餘空白、限制長度；格式不符時為 None
             for slide in data.get("slides") or []:
                 slide["charts"] = normalize_charts(slide.get("charts"))
@@ -582,7 +637,8 @@ def generate_outline(req: GenerateRequest, request: Request, user: dict = Depend
     3. 只使用素材中的資訊，不要捏造數據。
     4. 建議版型從【版型目錄】中依內容型態選擇（寫出版型名稱即可），並遵守【整份簡報的節奏】。
     5. 使用與原始素材相同的語言。
-    """ + LAYOUT_CATALOG + DECK_RHYTHM_RULES + DECK_MODE_RULES[req.deck_mode] + CONTENT_ACCURACY_RULES
+    """ + LAYOUT_CATALOG + DECK_RHYTHM_RULES + DECK_MODE_RULES[req.deck_mode] + CONTENT_ACCURACY_RULES \
+        + one_page_rules(req.num_pages, ONE_PAGE_OUTLINE_RULES)
 
     pages_hint = (f"{req.num_pages} 頁（必須剛好 {req.num_pages} 頁）"
                   if req.num_pages > 0 else "由你依內容多寡與重點自行決定（建議 3~8 頁）")
@@ -598,7 +654,8 @@ def generate_outline(req: GenerateRequest, request: Request, user: dict = Depend
 
     with llm_usage_log(request, user, "outline", req) as usage:
         try:
-            data = call_llm(req.provider, req.model, system_instruction, prompt, DeckOutline, 0.5, usage)
+            data = call_llm(req.provider, req.model, system_instruction, prompt, DeckOutline, 0.5, usage,
+                            thinking=req.thinking)
             slides = (data.get("slides") or [])[:MAX_PAGES]
             for s in slides:
                 s["key_points"] = [p.strip() for p in s.get("key_points") or [] if p and p.strip()][:MAX_OUTLINE_POINTS]
@@ -750,7 +807,7 @@ def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict =
        可調整它的位置與大小。原 HTML 中的 data-rs-chart 容器內容已省略，圖表資料請參考【原圖表資料】。
     7. 講者備註需配合新版面重新撰寫；使用者的額外需求若只針對版面，仍可沿用【原講者備註】的重點。
     """ + LAYOUT_CATALOG + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + SPEAKER_NOTES_RULES \
-        + CONTENT_ACCURACY_RULES
+        + CONTENT_ACCURACY_RULES + one_page_rules(len(req.slides))
 
     prompt = f"""
     【簡報標題】：{req.presentation_title}
@@ -787,7 +844,8 @@ def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict =
 
     with llm_usage_log(request, user, "regenerate", req) as usage:
         try:
-            data = call_llm(req.provider, req.model, system_instruction, prompt, AdaptiveSlide, 0.7, usage)
+            data = call_llm(req.provider, req.model, system_instruction, prompt, AdaptiveSlide, 0.7, usage,
+                            thinking=req.thinking)
             data["page_number"] = target_slide.page_number
             # 使用者可能自行插入超過 MAX_CHARTS_PER_SLIDE 張圖表：至少保留原頁的張數，避免重產後被截掉
             data["charts"] = normalize_charts(data.get("charts"), max(MAX_CHARTS_PER_SLIDE, len(target_slide.charts)))
