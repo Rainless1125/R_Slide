@@ -17,7 +17,7 @@ SLIDE = {"page_number": 1, "layout_concept": "KPI", "slide_title": "營收", "ht
 def capture_llm(monkeypatch, result):
     captured = {}
 
-    def fake_llm(provider, model, system_instruction, prompt, schema, temperature, usage=None):
+    def fake_llm(provider, model, system_instruction, prompt, schema, temperature, usage=None, thinking=None):
         captured.update(system=system_instruction, prompt=prompt)
         return dict(result)
 

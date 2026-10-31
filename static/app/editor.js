@@ -261,11 +261,17 @@ const RE = {
     items: /^items-(?:start|center|end)$/,
     textColor: new RegExp(`^text-${COLOR_BODY}$|^text-\\[(?:#|rgb|hsl)[^\\]]*\\]$`),
     bgColor: new RegExp(`^bg-${COLOR_BODY}$|^bg-\\[(?:#|rgb|hsl)[^\\]]*\\]$|^bg-gradient-to-\\w+$|^(?:from|via|to)-${COLOR_BODY}$`),
-    radius: /^rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full))?$|^rounded-\[[^\]]*\]$/
+    radius: /^rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full))?$|^rounded-\[[^\]]*\]$/,
+    // 陰影的大小（不含 shadow-blue-500/30 這類陰影顏色）
+    boxShadow: /^shadow(?:-(?:sm|md|lg|xl|2xl|inner|none))?$|^shadow-\[\d[^\]]*\]$/,
+    dropShadow: /^drop-shadow(?:-(?:sm|md|lg|xl|2xl|none))?$|^drop-shadow-\[[^\]]*\]$/
 };
 const SIZE_STEPS = ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl', '7xl', '8xl', '9xl'];
 const SIZE_PX = [12, 14, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96, 128];
 const WEIGHTS = [['thin', '極細', 100], ['light', '細', 300], ['normal', '標準', 400], ['medium', '中等', 500], ['semibold', '半粗', 600], ['bold', '粗', 700], ['extrabold', '特粗', 800], ['black', '黑', 900]];
+// 陰影：'' 為 Tailwind 的 shadow / drop-shadow（無尺寸後綴）；hard 為不模糊的硬邊陰影
+const SHADOWS = [['none', '無'], ['sm', '極小'], ['', '小'], ['md', '中'], ['lg', '大'], ['xl', '特大'], ['2xl', '最大'], ['hard', '硬邊']];
+const SHADOW_HARD = { box: 'shadow-[6px_6px_0_0_rgba(0,0,0,0.85)]', drop: 'drop-shadow-[4px_4px_0_rgba(0,0,0,0.85)]' };
 const RADII = [['none', '無'], ['sm', '極小'], ['', '小'], ['md', '中'], ['lg', '大'], ['xl', '特大'], ['2xl', '2XL'], ['3xl', '3XL'], ['full', '圓形']];
 
 function removeClasses(el, ...res) {
@@ -305,6 +311,45 @@ function currentAlign(el) {
     return a === 'center' ? 'center' : (a === 'right' || a === 'end') ? 'right' : 'left';
 }
 
+/* ----- 陰影 ----- */
+// 有底色或邊框的區塊（卡片、圖片、圖表容器）用 box-shadow，陰影沿著外框；
+// 圖案、圖示與透明背景的文字用 drop-shadow（filter），陰影沿著實際畫出的形狀與文字，不會多出一個方框
+function shadowUsesFilter(el) {
+    const kind = elementKind(el);
+    if (kind === 'shape' || kind === 'icon') return true;
+    if (kind === 'image') return false;
+    const cs = getComputedStyle(el);
+    // 文字編輯中的淡藍底色（app.css 的 [contenteditable]）不算背景
+    const hasBg = cssColorToHex(cs.backgroundColor) !== 'none' || (cs.backgroundImage !== 'none' && !el.hasAttribute('contenteditable'));
+    const hasBorder = ['Top', 'Right', 'Bottom', 'Left'].some(s => parseFloat(cs['border' + s + 'Width']) > 0 && cs['border' + s + 'Style'] !== 'none');
+    return !hasBg && !hasBorder;
+}
+function currentShadow(el) {
+    const cls = [...el.classList].find(c => (RE.boxShadow.test(c) || RE.dropShadow.test(c)) && !/^(?:drop-)?shadow-none$/.test(c));
+    if (cls === SHADOW_HARD.box || cls === SHADOW_HARD.drop) return 'hard';
+    const m = cls?.match(/^(?:drop-)?shadow(?:-(sm|md|lg|xl|2xl))?$/);
+    if (m) return m[1] || '';
+    if (cls) return '__custom';
+    const cs = getComputedStyle(el);
+    // Tailwind 的 ring（外框光暈）也是 box-shadow，不算陰影
+    const ring = [...el.classList].some(c => /^ring(?:-|$)/.test(c));
+    return (cs.boxShadow !== 'none' && !ring) || /drop-shadow/.test(cs.filter) ? '__custom' : 'none';
+}
+function setShadow(el, v) {
+    removeClasses(el, RE.boxShadow, RE.dropShadow);
+    clearInlineStyle(el, 'box-shadow');
+    if (/drop-shadow/.test(el.style.filter)) clearInlineStyle(el, 'filter');
+    if (v === 'none') {
+        // 去掉 class 後仍有陰影（例如從父層的樣式繼承而來）時明確關閉
+        const cs = getComputedStyle(el);
+        if (cs.boxShadow !== 'none') el.classList.add('shadow-none');
+        return;
+    }
+    const drop = shadowUsesFilter(el);
+    const cls = v === 'hard' ? SHADOW_HARD[drop ? 'drop' : 'box'] : (drop ? 'drop-shadow' : 'shadow') + (v ? '-' + v : '');
+    el.classList.add(cls);
+}
+
 // 套用樣式 → 寫回資料（一個撤銷步驟）→ 稍後更新工具列（等 Tailwind 產生新 class 的樣式）
 function fmtCommit() {
     commitSlideEdit();
@@ -326,6 +371,7 @@ const FMT_ACTIONS = {
     },
     weight(v) { setClass(selectedEl, [RE.weight], 'font-' + v); },
     radius(v) { if (v !== '__custom') setClass(selectedEl, [RE.radius], v === '' ? 'rounded' : 'rounded-' + v); },
+    shadow(v) { if (v !== '__custom') setShadow(selectedEl, v); },
     color(kind, c) {                         // c === '' → 移除；圖案的 fill / stroke 為 HEX 或 none
         const el = selectedEl;
         if (kind === 'fill' || kind === 'stroke') { const s = shapeOf(el); if (s) setShapeStyle(s, kind, c); return; }
@@ -453,6 +499,7 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
   ${btn('pal-bg', '<i class="fa-solid fa-fill-drip text-[11px]"></i><span id="fmtBgChip" class="chipbox"></span>', '背景顏色', '', 'bg')}
   <span class="sep"></span>
   <select id="fmtRadius" data-ctl="radius" title="圓角" aria-label="圓角"><option value="__custom" disabled hidden>圓角</option>${RADII.map(r => `<option value="${r[0]}">圓角：${r[1]}</option>`).join('')}</select>
+  <select id="fmtShadow" data-ctl="shadow" title="陰影" aria-label="陰影"><option value="__custom" disabled hidden>陰影：自訂</option>${SHADOWS.map(r => `<option value="${r[0]}">${r[0] === 'none' ? '無陰影' : '陰影：' + r[1]}</option>`).join('')}</select>
   <span class="sep"></span>
   ${btn('pal-fill', '<i class="fa-solid fa-fill-drip text-[11px]"></i><span id="fmtFillChip" class="chipbox"></span>', '圖案填滿顏色', 'shape-fill', 'shape')}
   ${btn('pal-stroke', '<i class="fa-regular fa-square text-[11px]"></i><span id="fmtStrokeChip" class="chipbox"></span>', '外框顏色', '', 'shape')}
@@ -523,6 +570,7 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
     });
     tb.querySelector('#fmtWeight').addEventListener('change', e => runFmt('weight', e.target.value));
     tb.querySelector('#fmtRadius').addEventListener('change', e => runFmt('radius', e.target.value));
+    tb.querySelector('#fmtShadow').addEventListener('change', e => runFmt('shadow', e.target.value));
     tb.querySelector('#fmtStrokeW').addEventListener('change', e => runFmt('shapeProp', 'strokeW', e.target.value));
     tb.querySelector('#fmtShapeRadius').addEventListener('change', e => runFmt('shapeProp', 'radius', e.target.value));
     tb.querySelector('#fmtDash').addEventListener('change', e => runFmt('shapeProp', 'dash', e.target.value));
@@ -600,11 +648,11 @@ function hideMoreMenu() {
  * 圖示：<i> 的 Font Awesome class 自帶字重、外框固定置中，粗細與對齊無效；字級 ± 為縮放圖示。
  * 圖表：SVG 文字用 currentColor 與固定字重，對齊與粗細看不出差別。 */
 const TOOLBAR_CTLS = {
-    text: ['size', 'weight', 'align', 'text', 'bg', 'radius'],     // 文字方塊與 AI 版面元素
-    image: ['bg', 'radius', 'border', 'imgRatio'],
-    icon: ['size', 'text', 'bg', 'radius'],
-    chart: ['size', 'text', 'bg', 'radius', 'chart'],
-    shape: ['size', 'weight', 'align', 'text', 'shape'],
+    text: ['size', 'weight', 'align', 'text', 'bg', 'radius', 'shadow'],     // 文字方塊與 AI 版面元素
+    image: ['bg', 'radius', 'border', 'shadow', 'imgRatio'],
+    icon: ['size', 'text', 'bg', 'radius', 'shadow'],
+    chart: ['size', 'text', 'bg', 'radius', 'shadow', 'chart'],
+    shape: ['size', 'weight', 'align', 'text', 'shape', 'shadow'],
 };
 // 依元素類型替換的按鈕提示（沒列出的沿用預設）
 const TOOLBAR_TITLES = {
@@ -654,6 +702,9 @@ function refreshToolbar() {
     const radSel = document.getElementById('fmtRadius');
     radSel.value = rad;
     if (radSel.value !== rad) radSel.value = '__custom';
+    const shadowSel = document.getElementById('fmtShadow');
+    shadowSel.value = currentShadow(el);
+    if (shadowSel.selectedIndex < 0) shadowSel.value = '__custom';
     const al = currentAlign(el);
     tb.querySelectorAll('[data-fmt^="align-"]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.fmt === 'align-' + al)));
     document.getElementById('fmtTextChip').style.background = cs.color;

@@ -25,6 +25,7 @@ app.py            FastAPI 主程式：生成、大綱、重產、檔案匯入、
 deck_design.py    整份簡報的設計規範（theme）、版型目錄、頁面節奏與內容正確性規則
 charts.py         圖表資料的格式、正規化與提示規則
 accounts.py       登入、註冊、歷史記錄與意見回饋的 API（/api/auth/*、/api/history、/api/feedback）
+ldap_auth.py      登入方式（AUTH_MODE）的設定檢查與公司 LDAP 驗證
 admin.py          後台管理的 API（/api/admin/*）
 store.py          SQLite 資料存取：帳號、session、登入鎖定、註冊次數、歷史記錄、用量紀錄、意見回饋
 manage_users.py   帳號管理指令
@@ -98,7 +99,7 @@ tests/            後端測試（pytest）
 ### AI 輸出的規則
 
 - 給 AI 的提示規則在三個檔案：
-  - `app.py`：版面尺寸、簡報模式、講者備註。
+  - `app.py`：版面尺寸、簡報模式、一頁式報告、講者備註。
   - `deck_design.py`：設計規範、版型目錄、頁面節奏、內容正確性。
   - `charts.py`：圖表。
 - AI 輸出的格式用 Pydantic 定義，例如 `AdaptivePresentation`、`ChartSpec`。
@@ -124,3 +125,5 @@ python -m pytest
 - 每個測試使用自己的暫存資料庫，不會寫入 `data/rslide.db`。
 - 測試預設關閉註冊次數限制。只有 `tests/test_register_limit.py` 測試這個限制。
 - 需要登入的 API，用 `logged_in` fixture 略過登入。
+- 測試不連線 LDAP 伺服器。`tests/test_auth_mode.py` 以假的綁定函式測試 LDAP 登入。
+- 取代 `call_llm` 的假函式要接受 `thinking` 參數（思考長度）。

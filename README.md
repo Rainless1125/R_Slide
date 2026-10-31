@@ -10,15 +10,16 @@ R Slide 用 AI 把文字素材做成簡報。
 
 ## 功能
 
-- **AI 生成簡報**：貼上文字或匯入檔案，AI 自動規劃配色並選擇版型（14 種，例如封面、KPI 大數字、時間軸、比較表格）。可以先確認大綱再生成；頁數可指定 2~12 頁，或交給 AI 決定。
+- **AI 生成簡報**：貼上文字或匯入檔案，AI 自動規劃配色並選擇版型（14 種，例如封面、KPI 大數字、時間軸、比較表格）。可以先確認大綱再生成；頁數可指定 2~12 頁、1 頁式簡報報告（整份素材濃縮成一頁摘要），或交給 AI 決定。
 - **兩種簡報模式**：簡易模式給上台報告用，每頁一個重點，細節寫在講者備註；詳細模式給會後閱讀用，標題是結論句，內文有完整說明。
+- **思考長度**：模型選單旁可選「中等」或「更高」。更高時 AI 想得更久，版面與內容較好，但需要較長時間。
 - **圖表**：AI 把數據做成直條、橫條、折線、圓餅或環圈圖，可加上目標線、凸顯重點項目。
 - **匯入檔案**：PDF（含掃描檔）、Word（.docx）、PowerPoint（.pptx）、Markdown 與 TXT。PowerPoint 中的圖片與 PDF 的掃描頁由 AI 辨識，結果標示「AI 辨識」，生成前請核對數字。
-- **編輯**：直接修改文字、拖曳移動與縮放，插入文字方塊、圖片、圖表、圖示與圖案，按 `Ctrl` + `Z` 撤銷。
+- **編輯**：直接修改文字、拖曳移動與縮放，插入文字方塊、圖片、圖表、圖示與圖案，按 `Ctrl` + `Z` 撤銷。所有元素（含 AI 產生的元素）都可以設定陰影。
 - **重產單頁**：AI 重新做出一頁，可以加上需求（例如「改成時間軸」）。每頁保留最近 3 個舊版本。
 - **講者工具**：AI 為每頁寫講稿。按 `N` 顯示講者備註，按 `P` 開啟講者檢視（目前頁、下一頁、備註與計時器）。
 - **匯出**：PDF、PowerPoint（PPTX）與 HTML。
-- **帳號與後台**：每個帳號的簡報存在伺服器。管理者在 `/admin` 管理帳號、查看用量與意見回饋。
+- **帳號與後台**：可用內建帳號或公司 LDAP 帳號登入。每個帳號的簡報存在伺服器。管理者在 `/admin` 管理帳號、查看用量與意見回饋。
 
 操作細節請按畫面右上角的「?」查看使用教學。
 
@@ -78,7 +79,7 @@ R Slide 用 AI 把文字素材做成簡報。
    ```
 
 7. 在瀏覽器開啟 <http://127.0.0.1:8000>。
-8. 註冊一個帳號。
+8. 註冊一個帳號。使用公司 LDAP 登入時，直接以公司帳號登入（見「[登入方式](#登入方式)」）。
 
 ### 用 Docker 啟動
 
@@ -183,12 +184,63 @@ LLM_EXTRA_HEADERS={"system_name": "R_Slide", "use_area": "F12"}
 - 所有 AI 平台的每一次呼叫都附加這些標頭，包含生成、大綱、重產與圖片辨識。
 - 格式錯誤時，服務不會啟動，並顯示錯誤原因。
 
+### 登入方式
+
+| 變數 | 說明 | 預設值 |
+|------|------|--------|
+| `AUTH_MODE` | 登入方式。`system`：內建的註冊與帳號。`ldap`：公司 LDAP（含 Active Directory）帳號。 | `system` |
+
+使用 `ldap` 時，再設定以下變數：
+
+| 變數 | 說明 | 預設值 |
+|------|------|--------|
+| `LDAP_SERVER` | LDAP 伺服器網址，例如 `ldaps://ldap.example.com:636` 或 `ldap://ldap.example.com:389`。 | 無（必填） |
+| `LDAP_USER_DN_TEMPLATE` | 直接綁定：使用者 DN 的格式，`{username}` 換成登入帳號。AD 可用 `{username}@corp.example.com`，OpenLDAP 可用 `uid={username},ou=people,dc=example,dc=com`。 | 無 |
+| `LDAP_SEARCH_BASE` | 先搜尋再綁定：搜尋使用者的起點，例如 `dc=example,dc=com`。沒有設定 `LDAP_USER_DN_TEMPLATE` 時使用。 | 無 |
+| `LDAP_USER_FILTER` | 搜尋使用者的條件，`{username}` 換成登入帳號。可加上群組條件，只讓特定群組登入。 | `(sAMAccountName={username})` |
+| `LDAP_BIND_DN` | 搜尋用的服務帳號 DN。不填時匿名搜尋。 | 無 |
+| `LDAP_BIND_PASSWORD` | 服務帳號的密碼。 | 無 |
+| `LDAP_START_TLS` | 用 `ldap://` 連線時，是否先升級為 TLS 加密。 | `false` |
+| `LDAP_CA_CERT_FILE` | 公司自簽憑證的 CA 檔案路徑（PEM）。 | 無 |
+| `LDAP_TIMEOUT` | 連線逾時秒數。 | `5` |
+
+`LDAP_USER_DN_TEMPLATE` 與 `LDAP_SEARCH_BASE` 二選一。
+
+範例一：Active Directory，直接綁定。
+
+```env
+AUTH_MODE=ldap
+LDAP_SERVER=ldaps://ad.corp.example.com
+LDAP_USER_DN_TEMPLATE={username}@corp.example.com
+```
+
+範例二：先用服務帳號搜尋，只允許 `R_Slide_Users` 群組登入。
+
+```env
+AUTH_MODE=ldap
+LDAP_SERVER=ldaps://ad.corp.example.com
+LDAP_SEARCH_BASE=dc=corp,dc=example,dc=com
+LDAP_BIND_DN=cn=svc_rslide,ou=service,dc=corp,dc=example,dc=com
+LDAP_BIND_PASSWORD=<服務帳號密碼>
+LDAP_USER_FILTER=(&(sAMAccountName={username})(memberOf=cn=R_Slide_Users,ou=groups,dc=corp,dc=example,dc=com))
+```
+
+說明：
+
+- 使用 `ldap` 時，不開放註冊。畫面顯示「以公司帳號登入」。
+- 公司帳號第一次登入時，系統自動建立同名的帳號，用來保存歷史記錄與用量。帳號名稱不分大小寫。
+- 已有同名的內建帳號時，公司帳號沿用該帳號與歷史記錄。
+- 系統不保存公司帳號的密碼。公司帳號不能用 `system` 方式登入。
+- 登入失敗鎖定的規則與內建帳號相同。LDAP 伺服器連不上時，畫面顯示錯誤，不算登入失敗。
+- 設定不完整時，服務不會啟動，並顯示缺少的設定。
+- 請使用 `ldaps://` 或 `LDAP_START_TLS=true`，避免密碼以明文在網路上傳送。
+
 ### 帳號與用量
 
 | 變數 | 說明 | 預設值 |
 |------|------|--------|
 | `RSLIDE_DB_PATH` | 資料庫檔案的位置。 | `data/rslide.db` |
-| `ALLOW_REGISTRATION` | 是否允許使用者自己註冊。 | `true` |
+| `ALLOW_REGISTRATION` | 是否允許使用者自己註冊。只在 `AUTH_MODE=system` 時有作用。 | `true` |
 | `REGISTER_LIMIT_PER_IP_PER_DAY` | 一個 IP 在 24 小時內可以註冊的帳號數。`0` 表示沒有限制。 | `1` |
 | `COOKIE_SECURE` | 使用 HTTPS 時，設為 `true`。 | `false` |
 | `LLM_RATE_LIMIT_PER_HOUR` | 一個帳號每小時可以使用 AI 的次數。 | `20` |
@@ -303,6 +355,7 @@ python manage_users.py unlock <IP>    # 解除鎖定
 做以下其中一項，防止他人使用你的 API 額度：
 
 - 設定 `ALLOW_REGISTRATION=false`，由管理者建立帳號。
+- 設定 `AUTH_MODE=ldap`，只讓公司帳號登入。
 - 在反向代理加上登入驗證，例如 SSO。
 
 另外，只允許內網連到 `/admin` 與 `/api/admin/`。

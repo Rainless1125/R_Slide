@@ -26,7 +26,7 @@ def llm(monkeypatch):
     """假的 LLM：記錄被呼叫的次數；error 可指定要丟出的例外。"""
     state = {"calls": 0, "error": None}
 
-    def fake(provider, model, system_instruction, prompt, schema, temperature, usage=None):
+    def fake(provider, model, system_instruction, prompt, schema, temperature, usage=None, thinking=None):
         state["calls"] += 1
         usage.update(provider=provider, model=model or "m")
         if state["error"]:
