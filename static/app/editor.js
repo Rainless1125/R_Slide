@@ -269,9 +269,18 @@ const RE = {
 const SIZE_STEPS = ['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl', '5xl', '6xl', '7xl', '8xl', '9xl'];
 const SIZE_PX = [12, 14, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96, 128];
 const WEIGHTS = [['thin', '極細', 100], ['light', '細', 300], ['normal', '標準', 400], ['medium', '中等', 500], ['semibold', '半粗', 600], ['bold', '粗', 700], ['extrabold', '特粗', 800], ['black', '黑', 900]];
-// 陰影：'' 為 Tailwind 的 shadow / drop-shadow（無尺寸後綴）；hard 為不模糊的硬邊陰影
-const SHADOWS = [['none', '無'], ['sm', '極小'], ['', '小'], ['md', '中'], ['lg', '大'], ['xl', '特大'], ['2xl', '最大'], ['hard', '硬邊']];
-const SHADOW_HARD = { box: 'shadow-[6px_6px_0_0_rgba(0,0,0,0.85)]', drop: 'drop-shadow-[4px_4px_0_rgba(0,0,0,0.85)]' };
+// 陰影分級：Tailwind 內建的陰影很淡（透明度約 0.1），在淺色投影片上幾乎看不出差別，
+// 因此改用自訂數值，每一級的距離、模糊與濃度都明顯不同。box：區塊外框的 box-shadow；drop：沿形狀與文字的 drop-shadow
+const SHADOWS = [
+    ['none', '無'],
+    ['sm', '極小', '0 1px 3px rgba(0,0,0,.25)', '0 1px 1.5px rgba(0,0,0,.4)'],
+    ['', '小', '0 3px 8px rgba(0,0,0,.28)', '0 2px 3px rgba(0,0,0,.45)'],
+    ['md', '中', '0 8px 18px rgba(0,0,0,.32)', '0 4px 6px rgba(0,0,0,.5)'],
+    ['lg', '大', '0 14px 30px rgba(0,0,0,.38)', '0 7px 10px rgba(0,0,0,.55)'],
+    ['xl', '特大', '0 22px 46px rgba(0,0,0,.45)', '0 11px 16px rgba(0,0,0,.6)'],
+    ['2xl', '最大', '0 34px 70px rgba(0,0,0,.55)', '0 16px 24px rgba(0,0,0,.65)'],
+    ['hard', '硬邊', '8px 8px 0 rgba(0,0,0,.9)', '5px 5px 0 rgba(0,0,0,.9)'],
+];
 const RADII = [['none', '無'], ['sm', '極小'], ['', '小'], ['md', '中'], ['lg', '大'], ['xl', '特大'], ['2xl', '2XL'], ['3xl', '3XL'], ['full', '圓形']];
 
 function removeClasses(el, ...res) {
@@ -324,9 +333,11 @@ function shadowUsesFilter(el) {
     const hasBorder = ['Top', 'Right', 'Bottom', 'Left'].some(s => parseFloat(cs['border' + s + 'Width']) > 0 && cs['border' + s + 'Style'] !== 'none');
     return !hasBg && !hasBorder;
 }
+// 透過工具列設定的陰影以 inline style 存放，等級記在 data-rs-shadow；AI 用 Tailwind class 寫的陰影對應到最接近的等級
 function currentShadow(el) {
+    const saved = el.getAttribute('data-rs-shadow');
+    if (saved !== null && SHADOWS.some(d => d[0] === saved)) return saved;
     const cls = [...el.classList].find(c => (RE.boxShadow.test(c) || RE.dropShadow.test(c)) && !/^(?:drop-)?shadow-none$/.test(c));
-    if (cls === SHADOW_HARD.box || cls === SHADOW_HARD.drop) return 'hard';
     const m = cls?.match(/^(?:drop-)?shadow(?:-(sm|md|lg|xl|2xl))?$/);
     if (m) return m[1] || '';
     if (cls) return '__custom';
@@ -336,18 +347,22 @@ function currentShadow(el) {
     return (cs.boxShadow !== 'none' && !ring) || /drop-shadow/.test(cs.filter) ? '__custom' : 'none';
 }
 function setShadow(el, v) {
+    const def = SHADOWS.find(d => d[0] === v);
+    if (!def) return;
     removeClasses(el, RE.boxShadow, RE.dropShadow);
-    clearInlineStyle(el, 'box-shadow');
-    if (/drop-shadow/.test(el.style.filter)) clearInlineStyle(el, 'filter');
+    el.style.removeProperty('box-shadow');
+    if (/drop-shadow/.test(el.style.filter)) el.style.removeProperty('filter');
+    el.removeAttribute('data-rs-shadow');
     if (v === 'none') {
-        // 去掉 class 後仍有陰影（例如從父層的樣式繼承而來）時明確關閉
-        const cs = getComputedStyle(el);
-        if (cs.boxShadow !== 'none') el.classList.add('shadow-none');
-        return;
+        // 去掉 class 後仍有陰影（例如其他樣式規則）時明確關閉
+        if (getComputedStyle(el).boxShadow !== 'none') el.style.boxShadow = 'none';
+    } else if (shadowUsesFilter(el)) {
+        el.style.filter = `drop-shadow(${def[3]})`;
+    } else {
+        el.style.boxShadow = def[2];
     }
-    const drop = shadowUsesFilter(el);
-    const cls = v === 'hard' ? SHADOW_HARD[drop ? 'drop' : 'box'] : (drop ? 'drop-shadow' : 'shadow') + (v ? '-' + v : '');
-    el.classList.add(cls);
+    if (v !== 'none') el.setAttribute('data-rs-shadow', v);
+    if (!el.getAttribute('style')) el.removeAttribute('style');
 }
 
 // 套用樣式 → 寫回資料（一個撤銷步驟）→ 稍後更新工具列（等 Tailwind 產生新 class 的樣式）
@@ -375,7 +390,7 @@ const FMT_ACTIONS = {
     color(kind, c) {                         // c === '' → 移除；圖案的 fill / stroke 為 HEX 或 none
         const el = selectedEl;
         if (kind === 'fill' || kind === 'stroke') { const s = shapeOf(el); if (s) setShapeStyle(s, kind, c); return; }
-        if (kind === 'border') { setImgBorder(el, 'color', c); return; }
+        if (kind === 'border') { setBorder(el, 'color', c); return; }
         if (kind === 'text') { setClass(el, [RE.textColor], c ? 'text-' + c : ''); clearInlineStyle(el, 'color'); }
         else { setClass(el, [RE.bgColor], c ? 'bg-' + c : ''); clearInlineStyle(el, 'background', 'background-color', 'background-image'); }
     },
@@ -411,10 +426,10 @@ const FMT_ACTIONS = {
         el.after(c);
         selectElement(c);
     },
-    imgBorder(prop, v) { setImgBorder(selectedEl, prop, v); },
+    imgBorder(prop, v) { setBorder(selectedEl, prop, v); },
     shapeProp(prop, v) { const s = shapeOf(selectedEl); if (s) setShapeStyle(s, prop, v); },
     resetPos() { setOffset(selectedEl, 0, 0); },
-    resetScale() { setScale(selectedEl, 1); },      // 縮放以左上角為基準，還原後左上角位置不變
+    resetScale() { setScale(selectedEl, 1); resetElementSize(selectedEl); },   // 縮放以左上角為基準，還原後左上角位置不變
     resetRatio() { resetImgRatio(selectedEl); },    // 保留寬度，高度依原圖比例
     moveUp() { moveSibling(-1); },
     moveDown() { moveSibling(1); }
@@ -444,23 +459,30 @@ function runFmt(name, ...args) {
     fmtCommit();
 }
 
-/* ----- 圖片邊框 ----- */
-// 以 inline style 存在 <img> 上（border-width / style / color），匯出 HTML、PDF、PPTX 都沿用
+/* ----- 邊框（圖片、AI 版面元素、文字方塊、圖表） ----- */
+// 以 inline style 存在元素上（border-width / style / color），匯出 HTML、PDF、PPTX 都沿用；
+// 目前的邊框從計算後的樣式讀取，AI 以 Tailwind class 畫的邊框（例如 border border-slate-200）也能直接調整
 const IMG_BORDER_WIDTHS = [0, 1, 2, 3, 4, 6, 8, 12, 16];
 const IMG_BORDER_STYLES = [['solid', '實線'], ['dashed', '虛線'], ['dotted', '點線']];
-const IMG_BORDER_DEFAULT_W = 4;
-function readImgBorder(el) {
-    const w = parseFloat(el.style.borderWidth) || 0;
-    const style = IMG_BORDER_STYLES.some(d => d[0] === el.style.borderStyle) ? el.style.borderStyle : 'solid';
-    return { w, style, color: w ? cssColorToHex(el.style.borderColor) : 'none' };
+const IMG_BORDER_DEFAULT_W = 2;
+const BORDER_SIDES = ['Top', 'Right', 'Bottom', 'Left'];
+function readBorder(el) {
+    const cs = getComputedStyle(el);
+    // 四邊中最粗的一邊為準（AI 常只畫單邊，例如 border-l-4 的強調線）
+    const width = sd => cs['border' + sd + 'Style'] === 'none' ? 0 : parseFloat(cs['border' + sd + 'Width']) || 0;
+    const side = BORDER_SIDES.reduce((best, sd) => width(sd) > width(best) ? sd : best, 'Top');
+    const w = Math.round(width(side));
+    const st = cs['border' + side + 'Style'];
+    const style = IMG_BORDER_STYLES.some(d => d[0] === st) ? st : 'solid';
+    return { w, style, color: w ? cssColorToHex(cs['border' + side + 'Color']) : 'none' };
 }
 // 原本沒有邊框時調了粗細或樣式：預設用投影片的文字顏色，在淺色與深色背景都看得到
 function defaultImgBorderColor() {
     const c = cssColorToHex(getComputedStyle(slideRoot() || getScaler()).color);
     return c === 'none' ? '#18181b' : c;
 }
-function setImgBorder(el, prop, v) {
-    let { w, style, color } = readImgBorder(el);
+function setBorder(el, prop, v) {
+    let { w, style, color } = readBorder(el);
     if (prop === 'color') {
         color = /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : 'none';
         if (color === 'none') w = 0; else if (!w) w = IMG_BORDER_DEFAULT_W;
@@ -469,8 +491,10 @@ function setImgBorder(el, prop, v) {
         else { style = v; if (!w) w = IMG_BORDER_DEFAULT_W; }
         if (w && color === 'none') color = defaultImgBorderColor();
     }
+    ['border-width', 'border-style', 'border-color'].forEach(p => el.style.removeProperty(p));
     if (w) Object.assign(el.style, { borderWidth: w + 'px', borderStyle: style, borderColor: color });
-    else ['border-width', 'border-style', 'border-color'].forEach(p => el.style.removeProperty(p));
+    else if (readBorder(el).w) el.style.borderStyle = 'none';    // 邊框來自 Tailwind class：以 inline style 關閉
+    if (!el.getAttribute('style')) el.removeAttribute('style');
 }
 
 /* ----- 浮動工具列 ----- */
@@ -515,7 +539,7 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
   ${btn('resetRatio', '<i class="fa-solid fa-expand text-[11px]"></i><span>還原比例</span>', '還原為原圖的長寬比例（保留目前寬度）', '', 'imgRatio')}
   <span class="sep"></span>
   ${btn('resetPos', '<i class="fa-solid fa-arrows-to-dot text-[11px]"></i><span>還原位置</span>', '移回 AI 版面的原始位置', '', 'aiReset')}
-  ${btn('resetScale', '<i class="fa-solid fa-compress text-[11px]"></i><span>還原大小</span>', '還原為 AI 版面的原始大小（100%）', '', 'aiReset')}
+  ${btn('resetScale', '<i class="fa-solid fa-compress text-[11px]"></i><span>還原大小</span>', '還原為 AI 版面的原始大小與寬高', '', 'aiReset')}
   <span class="sep"></span>
   ${btn('more', '<i class="fa-solid fa-ellipsis text-[12px]"></i>', '更多操作（複製、同層排序）', '', 'common')}
   ${btn('remove', '<i class="fa-regular fa-trash-can text-[11px]"></i>', '刪除元素（Delete）', 'danger', 'common')}`;
@@ -602,7 +626,7 @@ function togglePalette(mode, anchor) {
     palMode = mode;
     const isHexMode = HEX_PAL_MODES.includes(mode);
     pal.querySelector('[data-color=""]').textContent = isHexMode ? '無' : '預設（移除）';
-    const cur = mode === 'border' ? readImgBorder(selectedEl).color
+    const cur = mode === 'border' ? readBorder(selectedEl).color
         : isHexMode ? shapeOf(selectedEl)?.getAttribute('data-' + mode) : cssColorToHex(getComputedStyle(selectedEl)[mode === 'text' ? 'color' : 'backgroundColor']);
     pal.querySelector('#palCustom').value = /^#[0-9a-f]{6}$/i.test(cur || '') ? cur : '#3b82f6';
     pal.classList.add('open');
@@ -648,10 +672,10 @@ function hideMoreMenu() {
  * 圖示：<i> 的 Font Awesome class 自帶字重、外框固定置中，粗細與對齊無效；字級 ± 為縮放圖示。
  * 圖表：SVG 文字用 currentColor 與固定字重，對齊與粗細看不出差別。 */
 const TOOLBAR_CTLS = {
-    text: ['size', 'weight', 'align', 'text', 'bg', 'radius', 'shadow'],     // 文字方塊與 AI 版面元素
+    text: ['size', 'weight', 'align', 'text', 'bg', 'radius', 'border', 'shadow'],     // 文字方塊與 AI 版面元素
     image: ['bg', 'radius', 'border', 'shadow', 'imgRatio'],
     icon: ['size', 'text', 'bg', 'radius', 'shadow'],
-    chart: ['size', 'text', 'bg', 'radius', 'shadow', 'chart'],
+    chart: ['size', 'text', 'bg', 'radius', 'border', 'shadow', 'chart'],
     shape: ['size', 'weight', 'align', 'text', 'shape', 'shadow'],
 };
 // 依元素類型替換的按鈕提示（沒列出的沿用預設）
@@ -723,7 +747,7 @@ function refreshToolbar() {
     const ai = !isFloat(el);
     applyToolbarCtls(tb, kind, ai ? ['aiReset'] : []);
     fmtEl('resetPos').disabled = !ai || !getOffset(el).some(Boolean);
-    fmtEl('resetScale').disabled = !ai || getScale(el) === 1;
+    fmtEl('resetScale').disabled = !ai || (getScale(el) === 1 && !isSized(el));
     fmtEl('resetRatio').disabled = !isImgStretched(el);
     // 圖案：填滿 / 外框；線條沒有填滿，沒有轉角的圖案沒有圓角
     const shape = kind === 'shape' ? shapeOf(el) : null;
@@ -743,8 +767,8 @@ function refreshToolbar() {
         if (![...shapeRadSel.options].some(o => Number(o.value) === st.radius)) shapeRadSel.add(new Option(`圓角：${st.radius}px`, String(st.radius)));
         shapeRadSel.value = String(st.radius);
     }
-    if (kind === 'image') {
-        const b = readImgBorder(el);
+    if (kind === 'image' || kind === 'text' || kind === 'chart') {
+        const b = readBorder(el);
         document.getElementById('fmtBorderChip').style.background = b.w ? b.color : 'transparent';
         const wSel = document.getElementById('fmtBorderW');
         if (![...wSel.options].some(o => Number(o.value) === b.w)) wSel.add(new Option(`邊框：${b.w}px`, String(b.w)));
