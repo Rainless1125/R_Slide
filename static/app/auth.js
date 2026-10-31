@@ -75,6 +75,7 @@ async function onLoggedIn(username) {
     document.getElementById('authModal').classList.add('hidden');
     document.getElementById('authPassword').value = '';
     refreshQuota();
+    loadBrandIcons();
     await importLegacyHistory();
     await loadHistory();
     // 登入逾時期間的修改沒有存到：重新登入後把目前開著的簡報再存一次

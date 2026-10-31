@@ -257,6 +257,7 @@ function toggleShapePicker() {
     if (!editMode || !currentPresentationData) return;
     stopTextEdit();
     closeIconPicker();
+    closeBrandPicker();
     document.getElementById('shapePicker').classList.remove('hidden');
     document.getElementById('shapePickerBtn').setAttribute('aria-expanded', 'true');
     positionShapePicker();

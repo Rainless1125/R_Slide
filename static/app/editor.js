@@ -96,6 +96,7 @@ function toggleEditMode(force) {
     } else {
         closeIconPicker();
         closeShapePicker();
+        closeBrandPicker();
         stopTextEdit();
         clearSelection();
         commitSlideEdit();

@@ -292,6 +292,8 @@ function toggleIconPicker() {
     if (isIconPickerOpen()) { closeIconPicker(); return; }
     if (!editMode || !currentPresentationData) return;
     stopTextEdit();
+    closeShapePicker();
+    closeBrandPicker();
     document.getElementById('iconPicker').classList.remove('hidden');
     document.getElementById('iconPickerBtn').setAttribute('aria-expanded', 'true');
     positionIconPicker();
