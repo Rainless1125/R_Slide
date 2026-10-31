@@ -166,8 +166,9 @@ async function confirmAiEdit() {
         commitSlideEdit(false);
         selectElement(next);
         closeAiEditModal(true);
-        const grew = next.offsetWidth > w + 8 || next.offsetHeight > h + 8;
-        showToast(grew ? 'AI 已修改此元素，但新內容比原本大，可能蓋到旁邊的元素' : 'AI 已修改此元素，頁面其他部分不變',
+        // 元素調整過寬高（或沿用固定大小的 class）時框的大小不變，多出的內容會溢出框外：一併比較內容的實際尺寸
+        const grew = Math.max(next.offsetWidth, next.scrollWidth) > w + 8 || Math.max(next.offsetHeight, next.scrollHeight) > h + 8;
+        showToast(grew ? 'AI 已修改此元素，但新內容比原本大，可能超出外框或蓋到旁邊的元素' : 'AI 已修改此元素，頁面其他部分不變',
             grew ? 'info' : 'success', 6000, { label: '復原', onClick: undo });
     } catch (err) {
         if (!err.handled) showToast(friendlyError(err), 'error', 8000);

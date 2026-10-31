@@ -162,15 +162,24 @@ ThinkingLevel = Literal["medium", "high"]
 GEMINI_THINKING_LEVELS = {"medium": types.ThinkingLevel.MEDIUM, "high": types.ThinkingLevel.HIGH}
 
 
+# 已確認不接受 reasoning_effort 的模型（不帶參數重試後成功）：之後直接不帶參數，不必每次多呼叫一次
+_NO_REASONING_EFFORT_MODELS: set[str] = set()
+
+
 def with_reasoning_effort(create, effort: str | None, **kwargs):
-    """帶 reasoning_effort 呼叫；模型不支援這個參數（非推理模型、部分相容端點）時改為不帶參數再試一次。"""
-    if effort:
+    """帶 reasoning_effort 呼叫。帶參數時收到 400，一律改為不帶參數再試一次：
+    非推理模型與部分公司端點會拒絕這個參數，但錯誤訊息不一定提到 reasoning（例如只回「Invalid request」），
+    無法從訊息判斷原因。不帶參數也失敗時，回報第二次的錯誤（與思考長度無關的問題，例如內容過長）。"""
+    model = kwargs.get("model")
+    if effort and model not in _NO_REASONING_EFFORT_MODELS:
         try:
             return create(**kwargs, reasoning_effort=effort)
         except BadRequestError as e:
-            if "reasoning" not in str(e).lower():
-                raise
-            logger.info("模型 %s 不支援 reasoning_effort，改用模型預設的思考長度", kwargs.get("model"))
+            first_error = e
+        result = create(**kwargs)
+        _NO_REASONING_EFFORT_MODELS.add(model)
+        logger.info("模型 %s 不接受 reasoning_effort（%s），之後改用模型預設的思考長度", model, str(first_error)[:200])
+        return result
     return create(**kwargs)
 
 

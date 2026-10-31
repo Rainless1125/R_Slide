@@ -107,21 +107,35 @@ def test_openai_reasoning_effort(monkeypatch):
     assert seen == ["high", None]
 
 
-def test_openai_model_without_reasoning_retries_without_effort(monkeypatch):
+@pytest.fixture(autouse=True)
+def reset_reasoning_cache():
+    app_module._NO_REASONING_EFFORT_MODELS.clear()
+    yield
+    app_module._NO_REASONING_EFFORT_MODELS.clear()
+
+
+@pytest.mark.parametrize("message", [
+    "Unsupported parameter: 'reasoning_effort' is not supported with this model.",
+    "Invalid request: unknown field",          # 公司端點常見：訊息沒有提到 reasoning
+])
+def test_openai_model_without_reasoning_retries_without_effort(monkeypatch, message):
     seen = []
 
     def parse(**kw):
         seen.append(kw.get("reasoning_effort"))
         if "reasoning_effort" in kw:
-            raise bad_request("Unsupported parameter: 'reasoning_effort' is not supported with this model.")
+            raise bad_request(message)
         return parsed_reply()
 
     openai_client(monkeypatch, parse)
     assert app_module.call_llm("openai", "", "sys", "p", Reply, 0.5, thinking="medium") == {"title": "ok"}
     assert seen == ["medium", None]
+    # 記住這個模型不支援：之後直接不帶參數，不再多呼叫一次
+    assert app_module.call_llm("openai", "", "sys", "p", Reply, 0.5, thinking="high") == {"title": "ok"}
+    assert seen == ["medium", None, None]
 
 
-def test_openai_other_bad_request_not_retried(monkeypatch):
+def test_openai_other_bad_request_reports_second_error(monkeypatch):
     seen = []
 
     def parse(**kw):
@@ -129,6 +143,31 @@ def test_openai_other_bad_request_not_retried(monkeypatch):
         raise bad_request("context length exceeded")
 
     openai_client(monkeypatch, parse)
-    with pytest.raises(BadRequestError):
+    with pytest.raises(BadRequestError, match="context length"):
         app_module.call_llm("openai", "", "sys", "p", Reply, 0.5, thinking="medium")
-    assert seen == ["medium"]
+    assert seen == ["medium", None]
+    assert not app_module._NO_REASONING_EFFORT_MODELS     # 不帶參數也失敗：不是思考長度的問題，不記錄
+
+
+def test_compatible_endpoint_rejecting_both_schema_and_effort(monkeypatch):
+    """E2E 測試發現的情境：公司端點不支援結構化輸出，也以一般錯誤訊息拒絕 reasoning_effort。"""
+    calls = []
+
+    def parse(**kw):
+        calls.append(("parse", kw.get("reasoning_effort")))
+        raise bad_request("response_format not supported")
+
+    def create(**kw):
+        calls.append(("create", kw.get("reasoning_effort")))
+        if "reasoning_effort" in kw:
+            raise bad_request("Invalid request: unknown field")
+        msg = SimpleNamespace(content='{"title": "ok"}')
+        return SimpleNamespace(choices=[SimpleNamespace(message=msg)], usage=None)
+
+    client = SimpleNamespace(beta=SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(parse=parse))),
+                             chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    monkeypatch.setattr(app_module, "openai_client", client)
+    monkeypatch.setattr(app_module, "OPENAI_BASE_URL", "https://ai-gateway.example.com/v1")
+    monkeypatch.setitem(app_module.MODEL_CATALOG, "openai", ["corp-llm"])
+    assert app_module.call_llm("openai", "", "sys", "p", Reply, 0.5, thinking="medium") == {"title": "ok"}
+    assert calls == [("parse", "medium"), ("parse", None), ("create", "medium"), ("create", None)]

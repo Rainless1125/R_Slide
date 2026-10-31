@@ -81,6 +81,16 @@ function serializeScaler(scaler) {
 
 function getScaler() { return document.querySelector('#slideCanvas .slide-scaler'); }
 
+// 編輯溢出的文字時，瀏覽器為了讓游標可見會捲動投影片內 overflow-hidden 的容器（整頁內容偏移），
+// 離開編輯後也不會自己捲回來：結束文字編輯與離開編輯模式時歸零。投影片本來就不應該有捲動。
+function resetSlideScroll() {
+    const canvas = document.getElementById('slideCanvas');
+    [canvas, ...canvas.querySelectorAll('*')].forEach(el => {
+        if (el.scrollTop) el.scrollTop = 0;
+        if (el.scrollLeft) el.scrollLeft = 0;
+    });
+}
+
 // 進入編輯模式／換頁後：記下目前內容作為比對基準
 function prepareEditing() {
     const scaler = getScaler();
@@ -101,6 +111,7 @@ function toggleEditMode(force) {
         stopTextEdit();
         clearSelection();
         commitSlideEdit();
+        resetSlideScroll();
     }
     editMode = want;
     const canvas = document.getElementById('slideCanvas');
@@ -199,6 +210,7 @@ function stopTextEdit() {
     editingEl = null;
     el.removeAttribute('contenteditable');
     el.removeAttribute('spellcheck');
+    resetSlideScroll();
     // 插入後沒有輸入任何文字的文字方塊直接移除（不留下撤銷步驟）
     if (el.hasAttribute('data-rs-text') && !el.textContent.trim()) {
         if (selectedEl === el) clearSelection();
