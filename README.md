@@ -270,6 +270,7 @@ LDAP_USER_FILTER=(&(sAMAccountName={username})(memberOf=cn=R_Slide_Users,ou=grou
 | `LLM_RATE_LIMIT_PER_HOUR` | 一個帳號每小時可以使用 AI 的次數。 | `20` |
 | `LLM_RATE_LIMIT_PER_DAY` | 一個帳號每 24 小時可以使用 AI 的次數。 | `100` |
 | `LLM_MAX_CONCURRENT` | 一個帳號同時可以進行的 AI 工作數。 | `2` |
+| `THREAD_POOL_SIZE` | 處理請求的執行緒上限。每個進行中的 AI 生成會佔用一條，最小 `40`。 | `200` |
 | `LLM_USAGE_RETENTION_DAYS` | 用量紀錄的保留天數。`0` 表示永久保留。 | `365` |
 
 說明：
@@ -284,7 +285,7 @@ LDAP_USER_FILTER=(&(sAMAccountName={username})(memberOf=cn=R_Slide_Users,ou=grou
 | 變數 | 說明 | 預設值 |
 |------|------|--------|
 | `EXTRACT_IMAGES` | 是否用 AI 辨識投影片中的圖片與 PDF 的掃描頁。設為 `false` 時，只匯入文字。 | `true` |
-| `EXTRACT_IMAGE_MAX` | 一個檔案最多辨識幾張圖片。PDF 的一個掃描頁算一張。`0` 表示沒有限制。 | `0` |
+| `EXTRACT_IMAGE_MAX` | 一個檔案最多辨識幾張圖片。PDF 的一個掃描頁算一張。`0` 表示沒有限制。 | `50` |
 | `EXTRACT_IMAGE_CONCURRENCY` | 同時辨識幾頁。 | `4` |
 
 說明：

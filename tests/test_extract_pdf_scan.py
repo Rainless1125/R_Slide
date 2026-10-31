@@ -130,3 +130,21 @@ def test_page_limit_from_env(fake_vision, monkeypatch):
     assert len(fake_vision) == 1
     assert "掃描頁內容 P1" in body["text"]
     assert any("超過辨識上限" in n for n in body["notices"])
+
+
+def test_page_limit_applies_before_rendering(fake_vision, monkeypatch):
+    import extract
+    rendered = []
+    real = extract._render_pdf_pages
+    monkeypatch.setattr(extract, "_render_pdf_pages", lambda data, numbers: rendered.extend(numbers) or real(data, numbers))
+    monkeypatch.setenv("EXTRACT_IMAGE_MAX", "2")
+    body = upload(merge(scan_pdf(), scan_pdf(), scan_pdf(), scan_pdf())).json()
+    assert rendered == [1, 2]
+    assert len(fake_vision) == 2
+    assert any("2 頁掃描頁未辨識" in n for n in body["notices"])
+
+
+def test_default_image_limit(monkeypatch):
+    from extract import DEFAULT_IMAGE_MAX, image_limit
+    monkeypatch.delenv("EXTRACT_IMAGE_MAX", raising=False)
+    assert image_limit() == DEFAULT_IMAGE_MAX > 0

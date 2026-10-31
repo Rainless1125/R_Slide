@@ -71,7 +71,7 @@ static/app/           主畫面的樣式與程式：
 ### 測試
 
 ```
-tests/            後端測試（pytest）
+tests/            後端測試（pytest）；test_sanitize_html.py 在 Chromium 中測試 static/export.js 的 HTML 清理
 ```
 
 ## 開發規則
@@ -120,9 +120,13 @@ tests/            後端測試（pytest）
 ### 執行測試
 
 ```bash
-pip install pytest
+pip install pytest playwright
+python -m playwright install chromium
 python -m pytest
 ```
+
+`tests/test_sanitize_html.py` 需要 Playwright 與 Chromium，用真正的瀏覽器測試 `sanitizeSlideHtml` 能擋住已知的 XSS 攻擊字串。
+沒有安裝時這個檔案會略過（pytest 輸出顯示 `s`），其他測試照常執行。修改 `static/export.js` 的清理規則前，務必安裝並跑過這支測試。
 
 ### 測試的行為
 
@@ -132,3 +136,4 @@ python -m pytest
 - 需要登入的 API，用 `logged_in` fixture 略過登入。
 - 測試不連線 LDAP 伺服器。`tests/test_auth_mode.py` 以假的綁定函式測試 LDAP 登入。
 - 取代 `call_llm` 的假函式要接受 `thinking` 參數（思考長度）。
+- 發現新的 XSS 攻擊手法時，把攻擊字串加進 `tests/test_sanitize_html.py` 的 `ATTACKS`。攻擊成功時要呼叫 `__pwned()`，測試會實際插入頁面確認沒有執行。
