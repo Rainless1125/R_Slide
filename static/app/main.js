@@ -26,6 +26,10 @@ document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') { e.preventDefault(); closeIconPicker(); document.getElementById('insertBtn').focus(); return; }
         if (e.target.closest?.('#iconPicker')) return;   // 面板內的輸入 / 方向鍵不觸發換頁等快捷鍵
     }
+    if (isOverflowModalOpen()) {
+        if (e.key === 'Escape') { e.preventDefault(); closeOverflowModal(); }
+        return;
+    }
     if (isAiEditModalOpen()) {
         if (e.key === 'Escape') { e.preventDefault(); closeAiEditModal(); }
         return;                                   // 視窗開啟時不觸發換頁、刪除元素等快捷鍵
@@ -50,6 +54,7 @@ document.addEventListener('keydown', (e) => {
     }
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || !!e.target.isContentEditable;
     if (e.key === 'Escape' && e.target.isContentEditable && e.target.closest('#slideCanvas')) { e.target.blur(); return; }
+    if (e.key === 'Escape' && editMode && painterClip) { setPainter(null); return; }   // 取消格式刷
     if (e.key === 'Escape' && editMode && selectedEl && !typing) { clearSelection(); return; }
     if ((e.key === 'Delete' || e.key === 'Backspace') && editMode && selectedEl && !typing) { e.preventDefault(); runFmt('remove'); return; }
     // 選取元素時方向鍵微調位置（Shift：10px），不換頁

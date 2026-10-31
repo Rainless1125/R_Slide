@@ -1127,6 +1127,18 @@ body:has(#slideCanvas.editing) #toastRoot {
     color: #c4b5fd;
 }
 
+/* 版面檢查：內容超出外框的元素（選取中的元素維持藍色選取框） */
+#slideCanvas.editing [data-rs-overflow]:not([data-rs-sel]) {
+    outline: 2px dashed #ef4444 !important;
+    outline-offset: -2px;
+}
+
+/* 格式刷：等待點選要套用的元素 */
+#slideCanvas.editing.painting,
+#slideCanvas.editing.painting * {
+    cursor: copy !important;
+}
+
 #slideCanvas [data-rs-busy] {
     outline: 2px dashed #8b5cf6 !important;
     outline-offset: 2px;
@@ -1722,6 +1734,38 @@ body:has(#slideCanvas.editing) #toastRoot {
 #brandPicker {
     max-height: min(420px, 70vh);
     overflow-y: auto;
+}
+
+.brand-pos {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding: 0 4px 8px;
+    font-size: 11px;
+}
+
+.brand-pos span {
+    color: rgb(113 113 122);
+    margin-right: 2px;
+}
+
+.brand-pos button {
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(128, 128, 128, .3);
+}
+
+.brand-pos button[aria-checked="true"] {
+    background: #18181b;
+    border-color: #18181b;
+    color: #fff;
+}
+
+.dark .brand-pos button[aria-checked="true"] {
+    background: #fff;
+    border-color: #fff;
+    color: #18181b;
 }
 
 .brand-grid {
