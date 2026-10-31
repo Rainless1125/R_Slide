@@ -40,21 +40,21 @@ class Credentials(BaseModel):
 
 
 def current_user(request: Request) -> dict:
-    user = store.session_user(request.cookies.get(SESSION_COOKIE))
+    user = store.session_user(request.cookies.get(SESSION_COOKIE), auth_mode())
     if user is None:
         raise HTTPException(status_code=401, detail="請先登入")
     return user
 
 
 def start_session(response: Response, user: dict) -> dict:
-    response.set_cookie(SESSION_COOKIE, store.create_session(user["id"]), max_age=store.SESSION_TTL_SECONDS,
+    response.set_cookie(SESSION_COOKIE, store.create_session(user["id"], auth_mode()), max_age=store.SESSION_TTL_SECONDS,
                         httponly=True, samesite="lax", secure=env_flag("COOKIE_SECURE", False))
     return {"username": user["username"]}
 
 
 @router.get("/api/auth/me")
 def auth_me(request: Request):
-    user = store.session_user(request.cookies.get(SESSION_COOKIE))
+    user = store.session_user(request.cookies.get(SESSION_COOKIE), auth_mode())
     return {"username": user["username"] if user else None, "auth_mode": auth_mode(),
             "allow_registration": registration_open()}
 
