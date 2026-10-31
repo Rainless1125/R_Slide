@@ -21,7 +21,7 @@
 ### 後端
 
 ```
-app.py            FastAPI 主程式：生成、大綱、重產、檔案匯入、匯出 PPTX 的 API，與生成用的提示規則
+app.py            FastAPI 主程式：生成、大綱、重產（整頁與單一元素）、檔案匯入、匯出 PPTX 的 API，與生成用的提示規則
 deck_design.py    整份簡報的設計規範（theme）、版型目錄、頁面節奏與內容正確性規則
 charts.py         圖表資料的格式、正規化與提示規則
 accounts.py       登入、註冊、歷史記錄與意見回饋的 API（/api/auth/*、/api/history、/api/feedback）
@@ -56,6 +56,7 @@ static/app/           主畫面的樣式與程式：
   outline.js          先確認大綱
   shapes.js           插入圖案
   brand.js            插入企業 / 品牌識別圖示
+  aiedit.js           AI 修改此元素：只送出選取的元素給 AI，回來後替換該元素並沿用位置、大小與圖層
   editor.js           撤銷 / 重做、選取、文字編輯、編輯列與格式工具列
   media.js            插入圖片、文字方塊、圖示；拖曳、縮放；版面元素的移動與縮放；圖表編輯器
   player.js           頁面管理、播放器、全螢幕、匯出選單

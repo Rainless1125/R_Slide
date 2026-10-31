@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS llm_usage (
     user_id          INTEGER NOT NULL,
     username         TEXT NOT NULL,
     created_at       INTEGER NOT NULL,          -- 毫秒
-    action           TEXT NOT NULL,             -- generate / regenerate
+    action           TEXT NOT NULL,             -- generate / regenerate / element（AI 修改單一元素）/ outline / extract
     provider         TEXT NOT NULL,
     model            TEXT NOT NULL,
     deck_mode        TEXT,
@@ -575,14 +575,14 @@ def finish_llm_call(usage_id: int, entry: dict):
 
 def usage_by_user(since_ms: int) -> list[dict]:
     """各使用者的用量摘要，依 token 合計由多到少排序。max_same_content 為同一份素材被送去「生成」的最多次數。
-    calls 依 action 分成 generates / regenerates / outlines / extracts（匯入檔案時的 AI 辨識）。"""
+    calls 依 action 分成 generates / regenerates（含 AI 修改單一元素）/ outlines / extracts（匯入檔案時的 AI 辨識）。"""
     with connect() as conn:
         rows = conn.execute("""
             SELECT l.user_id, COALESCE(u.username, MAX(l.username)) AS username,
                    SUM(l.status != 'rate_limited') AS calls, SUM(l.status = 'error') AS errors,
                    SUM(l.status = 'rate_limited') AS rate_limited,
                    SUM(l.action = 'generate' AND l.status != 'rate_limited') AS generates,
-                   SUM(l.action = 'regenerate' AND l.status != 'rate_limited') AS regenerates,
+                   SUM(l.action IN ('regenerate', 'element') AND l.status != 'rate_limited') AS regenerates,
                    SUM(l.action = 'outline' AND l.status != 'rate_limited') AS outlines,
                    SUM(l.action = 'extract' AND l.status != 'rate_limited') AS extracts,
                    COALESCE(SUM(l.input_tokens), 0) AS input_tokens, COALESCE(SUM(l.output_tokens), 0) AS output_tokens,

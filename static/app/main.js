@@ -26,6 +26,10 @@ document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') { e.preventDefault(); closeIconPicker(); document.getElementById('iconPickerBtn').focus(); return; }
         if (e.target.closest?.('#iconPicker')) return;   // 面板內的輸入 / 方向鍵不觸發換頁等快捷鍵
     }
+    if (isAiEditModalOpen()) {
+        if (e.key === 'Escape') { e.preventDefault(); closeAiEditModal(); }
+        return;                                   // 視窗開啟時不觸發換頁、刪除元素等快捷鍵
+    }
     if (isBrandPickerOpen()) {
         if (e.key === 'Escape') { e.preventDefault(); closeBrandPicker(); document.getElementById('brandPickerBtn').focus(); return; }
         if (e.target.closest?.('#brandPicker')) return;

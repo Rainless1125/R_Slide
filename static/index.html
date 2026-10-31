@@ -27,7 +27,7 @@
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/app/app.css?v=29">
+    <link rel="stylesheet" href="/static/app/app.css?v=30">
 </head>
 
 <body
@@ -715,6 +715,46 @@
         </div>
     </div>
 
+    <!-- AI 修改此元素 Modal（static/app/aiedit.js） -->
+    <div id="aiEditModal" role="dialog" aria-modal="true" aria-labelledby="aiEditTitle"
+        class="hidden fixed inset-0 z-[90] bg-black/45 backdrop-blur-sm p-4 flex items-center justify-center">
+        <div class="w-full max-w-xl rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-5 sm:p-6">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <h3 id="aiEditTitle" class="text-base sm:text-lg font-bold"><i class="fa-solid fa-wand-magic-sparkles text-violet-500 mr-1.5"></i>AI 修改此元素</h3>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">只會重新設計選取的元素，頁面其他部分不變；留白則由 AI 自動優化。</p>
+                </div>
+                <button onclick="closeAiEditModal()" class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="關閉">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="mt-4">
+                <label for="aiEditPrompt" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">修改需求（選填）</label>
+                <textarea id="aiEditPrompt" rows="3" maxlength="2000"
+                    class="mt-1.5 w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow resize-y"
+                    placeholder="例如：改成長條圖、只留三個重點、把數字放大並加上圖示"></textarea>
+                <div id="aiEditChips" class="mt-2 flex flex-wrap gap-1.5 text-xs">
+                    <span class="text-zinc-400 py-1">快速選擇：</span>
+                    <button type="button" data-prompt="精簡文字，只保留重點" class="px-2.5 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800">精簡文字</button>
+                    <button type="button" data-prompt="改成條列重點" class="px-2.5 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800">改成條列</button>
+                    <button type="button" data-prompt="改用圖表呈現數據" class="px-2.5 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800">改成圖表</button>
+                    <button type="button" data-prompt="放大並強調關鍵數字" class="px-2.5 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800">強調數字</button>
+                    <button type="button" data-prompt="每個項目加上合適的圖示" class="px-2.5 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800">加上圖示</button>
+                </div>
+            </div>
+            <div class="mt-5 flex flex-wrap items-center justify-end gap-2">
+                <span class="mr-auto text-[11px] text-zinc-400">Ctrl + Enter 送出 · 算一次 AI 用量 · 可撤銷</span>
+                <button id="aiEditCancelBtn" onclick="closeAiEditModal()"
+                    class="icon-btn h-9 px-4 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-sm font-semibold">取消</button>
+                <button id="aiEditConfirmBtn" onclick="confirmAiEdit()"
+                    class="icon-btn h-9 px-4 rounded-full bg-black text-white dark:bg-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 text-sm font-semibold flex items-center gap-2 disabled:opacity-60">
+                    <i id="aiEditConfirmIcon" class="fa-solid fa-wand-magic-sparkles text-[11px]"></i>
+                    <span id="aiEditConfirmLabel">開始修改</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- 單頁版本 Modal（versions.js）：目前版本與舊版排成預覽卡片，點擊即切換 -->
     <div id="versionModal" role="dialog" aria-modal="true" aria-labelledby="versionModalTitle"
         class="hidden fixed inset-0 z-[90] bg-black/45 backdrop-blur-sm p-4 flex items-center justify-center">
@@ -864,6 +904,7 @@
                         <h5>修改 AI 生成的版面</h5>
                         <ul>
                             <li>點擊文字即可修改；選取元素後，投影片上方的編輯列會顯示格式工具列，可調整字級、粗細、對齊、顏色、圓角與陰影，或刪除元素；AI 版面元素另有「還原位置」「還原大小」，複製與圖層順序（物件重疊時誰在上面：上移 / 下移一層、移到最上 / 最下層，快捷鍵 <kbd>Ctrl</kbd> + <kbd>↑</kbd> / <kbd>↓</kbd>，加 <kbd>Shift</kbd> 移到最上 / 最下層）在「更多」選單中。工具列只顯示該類元素有作用的設定，例如圖片沒有字級與對齊。</li>
+                            <li><b>AI 修改此元素</b>：選取一個元素（例如一張卡片），按工具列的「AI 修改此元素」並輸入需求（例如「改成長條圖」「只留三個重點」），AI 只會重新設計這個元素，頁面其他部分不變；算一次 AI 用量，可按 <kbd>Ctrl</kbd> + <kbd>Z</kbd> 復原。要重做整頁請用「重產此頁」。</li>
                             <li>AI 生成的元素可以移動與縮放：先單擊選取（必要時按「選取父層」選到整張卡片），按住拖曳或用方向鍵微調位置，拉四個角可等比例縮放（文字一起放大縮小），旁邊的元素不會跟著變動；拉四邊中點（或按住 <kbd>Shift</kbd> 拉角落）可不鎖定比例調整寬高（文字依新寬度換行，旁邊的元素同樣不變動）；工具列可設定外框（顏色、粗細、樣式）與陰影，「還原位置」「還原大小」可恢復原狀。AI 產生的圖表可修改數據。</li>
                             <li>元素被拖出所在的卡片或區塊時，超出的部分可能被裁掉，建議選取外層卡片整個移動。</li>
                         </ul>
@@ -1090,15 +1131,16 @@
     <script src="/static/app/generate.js?v=24"></script>
     <script src="/static/app/outline.js?v=1"></script>
     <script src="/static/app/shapes.js?v=3"></script>
-    <script src="/static/app/editor.js?v=17"></script>
+    <script src="/static/app/editor.js?v=18"></script>
     <script src="/static/app/media.js?v=16"></script>
+    <script src="/static/app/aiedit.js?v=1"></script>
     <script src="/static/app/brand.js?v=1"></script>
     <script src="/static/app/player.js?v=4"></script>
     <script src="/static/app/versions.js?v=2"></script>
     <script src="/static/app/auth.js?v=5"></script>
     <script src="/static/app/guide.js?v=2"></script>
     <script src="/static/app/feedback.js?v=2"></script>
-    <script src="/static/app/main.js?v=11"></script>
+    <script src="/static/app/main.js?v=12"></script>
 </body>
 
 </html>
