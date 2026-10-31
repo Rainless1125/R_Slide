@@ -27,12 +27,14 @@ charts.py         圖表資料的格式、正規化與提示規則
 accounts.py       登入、註冊、歷史記錄與意見回饋的 API（/api/auth/*、/api/history、/api/feedback）
 ldap_auth.py      登入方式（AUTH_MODE）的設定檢查與公司 LDAP 驗證
 admin.py          後台管理的 API（/api/admin/*）
+brand_icons.py    企業 / 品牌識別圖示的 API（/api/brand-icons）：列出並提供 brand_icon 資料夾中的圖片
 store.py          SQLite 資料存取：帳號、session、登入鎖定、註冊次數、歷史記錄、用量紀錄、意見回饋
 manage_users.py   帳號管理指令
 extract.py        讀取上傳檔案的文字（PDF、DOCX、PPTX、Markdown、TXT）
 slide_images.py   匯入檔案時用 AI 辨識圖片（PPTX 的圖片、PDF 的掃描頁）：提示規則、逐頁呼叫與併發
 exporter.py       把投影片圖片組成 PPTX
 .env_example      環境變數範本
+brand_icon/       企業 / 品牌識別圖片（開發者放入，所有使用者可插入）
 ```
 
 ### 前端
@@ -53,6 +55,7 @@ static/app/           主畫面的樣式與程式：
   generate.js         模型選單、生成、載入狀態、審查頁、單頁重產
   outline.js          先確認大綱
   shapes.js           插入圖案
+  brand.js            插入企業 / 品牌識別圖示
   editor.js           撤銷 / 重做、選取、文字編輯、編輯列與格式工具列
   media.js            插入圖片、文字方塊、圖示；拖曳、縮放；版面元素的移動與縮放；圖表編輯器
   player.js           頁面管理、播放器、全螢幕、匯出選單

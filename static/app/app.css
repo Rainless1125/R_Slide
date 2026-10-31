@@ -1673,6 +1673,60 @@ body:has(#slideCanvas.editing) #toastRoot {
 }
 
 /* ---------- 插入圖案（static/app/shapes.js） ---------- */
+/* 企業 / 品牌識別圖示面板（static/app/brand.js）：一列 3 個，縮圖以棋盤格底顯示透明背景 */
+#brandPicker {
+    max-height: min(420px, 70vh);
+    overflow-y: auto;
+}
+
+.brand-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.brand-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 6px;
+    border-radius: 10px;
+    font-size: 11px;
+}
+
+.brand-cell:hover,
+.brand-cell:focus-visible {
+    background: rgba(128, 128, 128, .15);
+    outline: none;
+}
+
+.brand-thumb {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    border-radius: 8px;
+    border: 1px solid rgba(128, 128, 128, .25);
+    background: repeating-conic-gradient(#f4f4f5 0% 25%, #fff 0% 50%) 50% / 12px 12px;
+}
+
+.brand-thumb img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.brand-name {
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+}
+
 .shape-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));

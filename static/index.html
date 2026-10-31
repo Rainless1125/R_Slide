@@ -27,7 +27,7 @@
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/app/app.css?v=28">
+    <link rel="stylesheet" href="/static/app/app.css?v=29">
 </head>
 
 <body
@@ -556,6 +556,12 @@
                         aria-label="插入圖案" title="插入矩形、三角形、箭頭等圖案（可調整外框粗細與填滿顏色）">
                         <i class="fa-solid fa-shapes text-[11px]"></i><span class="hidden xl:inline">圖案</span>
                     </button>
+                    <!-- 企業 / 品牌識別圖示：brand_icon 資料夾有圖片時才顯示（static/app/brand.js） -->
+                    <button id="brandPickerBtn" onclick="toggleBrandPicker()" aria-haspopup="dialog" aria-expanded="false" aria-controls="brandPicker"
+                        class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
+                        aria-label="插入品牌識別圖示" title="插入公司統一的 Logo 與品牌識別圖片">
+                        <i class="fa-solid fa-certificate text-[11px]"></i><span class="hidden xl:inline">品牌</span>
+                    </button>
                     <input id="slideImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" class="hidden">
                     <button id="versionCurrentBtn" onclick="openVersionModal(currentSlideIdx)"
                         class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
@@ -748,6 +754,10 @@
         <div id="iconGrid" class="flex-1 min-h-0 overflow-y-auto p-2.5"></div>
     </div>
 
+    <!-- 插入品牌識別圖示面板（static/app/brand.js） -->
+    <div id="brandPicker" role="dialog" aria-label="插入品牌識別圖示"
+        class="hidden fixed z-[80] p-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl"></div>
+
     <!-- 插入圖案面板（static/app/shapes.js 建立按鈕） -->
     <div id="shapePicker" role="dialog" aria-label="插入圖案"
         class="hidden fixed z-[80] p-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl"></div>
@@ -863,6 +873,7 @@
                             <div class="guide-card"><b><i class="fa-regular fa-image"></i>圖片</b><span>上傳、拖放或貼上圖片，在瀏覽器端壓縮後內嵌；可設定圓角、邊框（顏色、粗細、實線 / 虛線 / 點線）與透明圖片的底色；拉角落等比例縮放，拉四邊中點（或按住 <kbd>Shift</kbd> 拉角落）可不鎖定比例調整寬高，「還原比例」可恢復原圖比例。</span></div>
                             <div class="guide-card"><b><i class="fa-solid fa-chart-column"></i>圖表</b><span>以試算表輸入數據，可直接貼上 Excel 多格資料，並可加參考虛線、勾選要凸顯的項目；拉四邊中點只調整寬或高（文字不變形），按住 <kbd>Shift</kbd> 拉角落可等比例縮放。</span></div>
                             <div class="guide-card"><b><i class="fa-solid fa-icons"></i>圖示</b><span>內建 300 個常用圖示，可用中英文關鍵字搜尋，Enter 插入第一個。</span></div>
+                            <div class="guide-card"><b><i class="fa-solid fa-certificate"></i>品牌</b><span>插入公司統一的 Logo 與品牌識別圖片（由管理者放在伺服器上），插入後與一般圖片相同，可移動、縮放、加外框與陰影；沒有設定品牌圖片時不顯示這個按鈕。</span></div>
                             <div class="guide-card"><b><i class="fa-solid fa-shapes"></i>圖案</b><span>16 種圖案，可調整填滿、外框、線條樣式與圓角，雙擊輸入文字；拉四邊中點只調整寬或高，按住 <kbd>Shift</kbd> 拉角落可等比例縮放。</span></div>
                             <div class="guide-card"><b><i class="fa-regular fa-square-plus"></i>空白頁</b><span>在目前頁面之後新增空白頁並直接切換過去。</span></div>
                         </div>
@@ -1078,15 +1089,16 @@
     <script src="/static/app/input.js?v=7"></script>
     <script src="/static/app/generate.js?v=24"></script>
     <script src="/static/app/outline.js?v=1"></script>
-    <script src="/static/app/shapes.js?v=2"></script>
-    <script src="/static/app/editor.js?v=16"></script>
-    <script src="/static/app/media.js?v=15"></script>
+    <script src="/static/app/shapes.js?v=3"></script>
+    <script src="/static/app/editor.js?v=17"></script>
+    <script src="/static/app/media.js?v=16"></script>
+    <script src="/static/app/brand.js?v=1"></script>
     <script src="/static/app/player.js?v=4"></script>
     <script src="/static/app/versions.js?v=2"></script>
-    <script src="/static/app/auth.js?v=4"></script>
+    <script src="/static/app/auth.js?v=5"></script>
     <script src="/static/app/guide.js?v=2"></script>
     <script src="/static/app/feedback.js?v=2"></script>
-    <script src="/static/app/main.js?v=10"></script>
+    <script src="/static/app/main.js?v=11"></script>
 </body>
 
 </html>

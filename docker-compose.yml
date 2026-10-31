@@ -12,6 +12,8 @@ services:
     volumes:
       # 帳號與歷史記錄存在 named volume，重建容器也不會遺失
       - rslide-data:/app/data
+      # 企業 / 品牌識別圖示：直接修改主機上的 brand_icon 資料夾，不需重建映像檔
+      - ./brand_icon:/app/brand_icon:ro
     restart: unless-stopped
 
 volumes:

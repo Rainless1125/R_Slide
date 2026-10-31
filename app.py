@@ -24,6 +24,7 @@ from accounts import current_user, env_flag, router as accounts_router
 from deck_design import (CONTENT_ACCURACY_RULES, DECK_RHYTHM_RULES, LAYOUT_CATALOG, THEME_RULES, DeckTheme,
                          format_theme, theme_from_input)
 from admin import router as admin_router
+from brand_icons import router as brand_icons_router
 from charts import CHART_RULES, MAX_CHARTS_PER_SLIDE, ChartSpec, normalize_charts
 from exporter import ExportError, build_pptx
 from extract import MAX_REQUEST_BYTES, ExtractError, extract_text
@@ -858,6 +859,7 @@ def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict =
 
 app.include_router(accounts_router)
 app.include_router(admin_router)
+app.include_router(brand_icons_router)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/favicon.ico", include_in_schema=False)
