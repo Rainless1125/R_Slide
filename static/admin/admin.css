@@ -23,6 +23,21 @@
     color: #a1a1aa;
 }
 
+/* 帳號列表的「來源」欄：表格內不需要左邊距 */
+.admin-table .admin-badge {
+    margin-left: 0;
+}
+
+.admin-badge-ldap {
+    border-color: #c4b5fd;
+    color: #7c3aed;
+}
+
+.dark .admin-badge-ldap {
+    border-color: #5b21b6;
+    color: #c4b5fd;
+}
+
 /* ---------- 分頁 ---------- */
 .admin-tab {
     display: inline-flex;

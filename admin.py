@@ -11,10 +11,14 @@ from pydantic import BaseModel
 
 import store
 from accounts import MAX_PASSWORD, PASSWORD_RULE, USERNAME_RE, env_flag, locked_error, password_ok
+from ldap_auth import auth_mode
 
 router = APIRouter(prefix="/api/admin")
 
 ADMIN_COOKIE = "rslide_admin"
+# 公司 LDAP 登入時帳號與密碼由公司管理：在這裡建立的帳號或設定的密碼都無法用來登入
+LDAP_MANAGED_DETAIL = ("目前使用公司 LDAP 登入（AUTH_MODE=ldap），帳號由公司管理：使用者第一次以公司帳號登入時自動建立，"
+                       "密碼請在公司系統修改")
 Days = Query(30, ge=1, le=3650)
 
 
@@ -56,7 +60,8 @@ def admin_me(request: Request):
     status = admin_status()
     creds = admin_credentials()
     logged_in = creds is not None and store.admin_session_valid(request.cookies.get(ADMIN_COOKIE), _cred_key(creds))
-    return {"status": status, "username": creds[0] if logged_in else None, "password_rule": PASSWORD_RULE}
+    return {"status": status, "username": creds[0] if logged_in else None, "password_rule": PASSWORD_RULE,
+            "auth_mode": auth_mode()}
 
 
 @router.post("/login")
@@ -116,6 +121,8 @@ def admin_users(_: str = Depends(require_admin)):
 
 @router.post("/users")
 def admin_add_user(body: NewUser, _: str = Depends(require_admin)):
+    if auth_mode() == "ldap":
+        raise HTTPException(status_code=409, detail=LDAP_MANAGED_DETAIL)
     username = body.username.strip()
     if not USERNAME_RE.match(username):
         raise HTTPException(status_code=400, detail="帳號需為 2~32 個字，只能包含文字、數字與 . _ - @")
@@ -129,6 +136,8 @@ def admin_add_user(body: NewUser, _: str = Depends(require_admin)):
 
 @router.put("/users/{username}/password")
 def admin_reset_password(username: str, body: NewPassword, _: str = Depends(require_admin)):
+    if auth_mode() == "ldap":
+        raise HTTPException(status_code=409, detail=LDAP_MANAGED_DETAIL)
     if not password_ok(body.password):
         raise HTTPException(status_code=400, detail=PASSWORD_RULE)
     if not store.set_password(username, body.password):

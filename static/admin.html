@@ -29,7 +29,7 @@
     </script>
     <!-- 背景光暈、卡片陰影、toast 等沿用主畫面樣式 -->
     <link rel="stylesheet" href="/static/app/app.css?v=16">
-    <link rel="stylesheet" href="/static/admin/admin.css?v=2">
+    <link rel="stylesheet" href="/static/admin/admin.css?v=3">
 </head>
 
 <body
@@ -118,7 +118,17 @@
 
         <!-- 帳號 -->
         <section data-panel="users" class="admin-panel hidden">
-            <div class="admin-card p-5 mb-4">
+            <!-- 公司 LDAP 登入（AUTH_MODE=ldap）時取代「建立帳號」 -->
+            <div id="ldapNote" class="admin-card p-5 mb-4 hidden">
+                <h2 class="text-sm font-bold mb-2 flex items-center gap-2"><i class="fa-solid fa-building-shield text-violet-500"></i>帳號由公司 LDAP 管理</h2>
+                <ul class="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed list-disc pl-5 space-y-1">
+                    <li>目前的登入方式是公司 LDAP（<code>AUTH_MODE=ldap</code>），不需要在這裡建立帳號：使用者第一次以公司帳號登入時，系統會自動建立。</li>
+                    <li>密碼由公司系統管理，這裡無法重設；忘記密碼請洽公司 IT。</li>
+                    <li>「本機帳號」是改用 LDAP 之前建立的帳號，公司目錄中沒有同名帳號時無法登入，歷史記錄仍保留。</li>
+                    <li>刪除帳號會一併刪除歷史記錄；該使用者之後再以公司帳號登入時，會建立一個新的空帳號。</li>
+                </ul>
+            </div>
+            <div id="addUserCard" class="admin-card p-5 mb-4">
                 <h2 class="text-sm font-bold mb-3 flex items-center gap-2"><i class="fa-solid fa-user-plus text-violet-500"></i>建立帳號</h2>
                 <form id="addUserForm" class="flex flex-col sm:flex-row gap-2" novalidate>
                     <input id="newUsername" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="32"
@@ -139,7 +149,7 @@
                 </div>
                 <div class="overflow-x-auto">
                     <table class="admin-table">
-                        <thead><tr><th>帳號</th><th>建立時間</th><th class="num">歷史記錄</th><th>最後使用 LLM</th><th class="text-right">操作</th></tr></thead>
+                        <thead><tr><th>帳號</th><th>來源</th><th>建立時間</th><th class="num">歷史記錄</th><th>最後使用 LLM</th><th class="text-right">操作</th></tr></thead>
                         <tbody id="userRows"></tbody>
                     </table>
                 </div>
@@ -238,7 +248,7 @@
         </form>
     </div>
 
-    <script src="/static/admin/admin.js?v=2"></script>
+    <script src="/static/admin/admin.js?v=3"></script>
 </body>
 
 </html>

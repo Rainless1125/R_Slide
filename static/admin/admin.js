@@ -54,6 +54,7 @@ async function api(path, { method = 'GET', body } = {}) {
 
 /* ===================== 登入 ===================== */
 let passwordRule = '';
+let authMode = 'system';           // 主畫面的登入方式（.env 的 AUTH_MODE）
 
 function showLogin(notice = '') {
     $('adminMain').classList.add('hidden');
@@ -83,6 +84,10 @@ async function initAuth() {
         return;
     }
     passwordRule = me.password_rule;
+    authMode = me.auth_mode === 'ldap' ? 'ldap' : 'system';
+    // 公司 LDAP 登入時帳號與密碼由公司管理：以說明取代「建立帳號」，帳號列表不顯示「重設密碼」
+    $('ldapNote').classList.toggle('hidden', authMode !== 'ldap');
+    $('addUserCard').classList.toggle('hidden', authMode === 'ldap');
     if (me.status === 'not_configured') {
         showLogin('<i class="fa-solid fa-circle-info mr-1"></i>後台尚未啟用。請在伺服器的 <code>.env</code> 設定 <code>ADMIN_USERNAME</code> 與 <code>ADMIN_PASSWORD</code>，再重新啟動服務。');
     } else if (me.status === 'weak_password') {
@@ -181,14 +186,15 @@ function renderUsers() {
     $('userRows').innerHTML = list.length ? list.map(u => `
         <tr>
             <td class="font-semibold">${esc(u.username)}</td>
+            <td>${u.source === 'ldap' ? '<span class="admin-badge admin-badge-ldap">公司帳號</span>' : '<span class="admin-badge">本機帳號</span>'}</td>
             <td>${fmtTime(u.created_at)}</td>
             <td class="num">${num(u.history_count)}</td>
             <td>${fmtTime(u.last_used)}</td>
             <td class="text-right">
-                <button class="admin-btn-ghost admin-btn-sm" data-action="password" data-user="${esc(u.username)}"><i class="fa-solid fa-key"></i>重設密碼</button>
+                ${authMode === 'ldap' ? '' : `<button class="admin-btn-ghost admin-btn-sm" data-action="password" data-user="${esc(u.username)}"><i class="fa-solid fa-key"></i>重設密碼</button>`}
                 <button class="admin-btn-ghost admin-btn-sm danger" data-action="delete" data-user="${esc(u.username)}"><i class="fa-regular fa-trash-can"></i>刪除</button>
             </td>
-        </tr>`).join('') : emptyRow(5, users.length ? '沒有符合的帳號' : '目前還沒有帳號');
+        </tr>`).join('') : emptyRow(6, users.length ? '沒有符合的帳號' : authMode === 'ldap' ? '目前還沒有帳號，使用者以公司帳號登入後會出現在這裡' : '目前還沒有帳號');
 }
 
 $('userSearch').addEventListener('input', renderUsers);
@@ -210,7 +216,8 @@ $('userRows').addEventListener('click', e => {
     } else {
         openModal({
             title: `刪除帳號 ${username}？`,
-            text: '帳號與其所有歷史記錄會一併刪除且無法復原；LLM 使用紀錄與意見回饋會保留。',
+            text: '帳號與其所有歷史記錄會一併刪除且無法復原；LLM 使用紀錄與意見回饋會保留。'
+                + (authMode === 'ldap' ? '該使用者之後再以公司帳號登入時，會建立一個新的空帳號。' : ''),
             danger: true, submitLabel: '刪除帳號',
             onSubmit: async () => {
                 await api(`/users/${encodeURIComponent(username)}`, { method: 'DELETE' });

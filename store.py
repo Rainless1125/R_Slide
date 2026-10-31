@@ -649,13 +649,14 @@ def list_feedback(since_ms: int, username: str | None = None) -> list[dict]:
 
 # ===================== 後台管理 =====================
 def list_users() -> list[dict]:
-    """後台帳號列表：歷史記錄筆數與最後一次呼叫 LLM 的時間。"""
+    """後台帳號列表：帳號來源（ldap = 公司 LDAP 登入時自動建立、local = 本機帳號）、歷史記錄筆數與最後一次呼叫 LLM 的時間。"""
     with connect() as conn:
         rows = conn.execute("""
             SELECT u.id, u.username, u.created_at,
+                   CASE WHEN u.password_hash = ? THEN 'ldap' ELSE 'local' END AS source,
                    (SELECT COUNT(*) FROM history h WHERE h.user_id = u.id) AS history_count,
                    (SELECT MAX(created_at) FROM llm_usage l WHERE l.user_id = u.id) AS last_used
-            FROM users u ORDER BY u.username""").fetchall()
+            FROM users u ORDER BY u.username""", (EXTERNAL_PASSWORD_HASH,)).fetchall()
     return [dict(r) for r in rows]
 
 
