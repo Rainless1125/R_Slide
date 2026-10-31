@@ -116,7 +116,7 @@ function toggleEditMode(force) {
         resetSlideScroll();
     }
     editMode = want;
-    if (!editMode) markOverflows();      // 清除「超出外框」的標示
+    if (!editMode) markOverflows();      // 清除「超出畫面」的標示
     const canvas = document.getElementById('slideCanvas');
     canvas.classList.toggle('editing', editMode);
     const btn = document.getElementById('editBtn');

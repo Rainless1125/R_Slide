@@ -1,63 +1,50 @@
-/* 版面檢查：找出內容超出外框（或整頁超出 1024×576 畫面）的元素
+/* 版面檢查：找出超出畫布（1024×576 投影片範圍）的內容，這些內容在播放與匯出時會被裁掉
+ * 只檢查畫布邊界：卡片內的圖表或文字超出卡片、但仍在畫布內時，視為使用者想要的佈局，不標示。
  * 編輯模式中以紅色虛線標示並在編輯列顯示提示；匯出前檢查每一頁，有問題時先詢問。
  * 所有 app/*.js 是一般 <script>（非 module），共用全域，須依 index.html 中的順序載入（需在 editor.js、media.js 之後）。 */
-const OVERFLOW_TOLERANCE = 6;      // 容許的誤差（px）：大字級的字形、行高四捨五入會多出幾 px
+const OVERFLOW_TOLERANCE = 6;      // 容許的誤差（投影片座標 px）：大字級的字形、行高四捨五入會多出幾 px
 
-// 元素的內容是否超出自己的外框（含 overflow-hidden 被裁掉的內容）
-function isOverflowing(el) {
-    if (el.closest('svg') || el.tagName === 'IMG' || el.tagName === 'I' || el.hasAttribute('data-rs-chart')) return false;
-    const cs = getComputedStyle(el);
-    if (cs.display === 'inline' || cs.display === 'contents' || cs.display === 'none') return false;
-    if (!el.clientWidth && !el.clientHeight) return false;
-    return el.scrollHeight > el.clientHeight + OVERFLOW_TOLERANCE || el.scrollWidth > el.clientWidth + OVERFLOW_TOLERANCE;
-}
-
-// 元素「內容」實際佔用的範圍（含直接寫在元素內的文字），不受 grid / flex 把元素拉高的影響
+// 元素「內容」實際佔用的範圍（含直接寫在元素內的文字與超出元素外框的部分）
 function contentRect(el) {
     const range = document.createRange();
     range.selectNodeContents(el);
     return range.getBoundingClientRect();
 }
 
-// 排版容器（或整頁）超出時，真正要修改的是把它撐出去的區塊：往內找出「內容」超出容器範圍的子元素，
-// 遇到看得到外框的區塊（卡片）就停下來。例如三張並排的卡片被拉成一樣高時，只標出內容太多的那一張
-function overflowCulprits(node, bound, tol) {
+// 元素或它的內容是否超出畫布
+function crossesCanvas(el, canvas, tol) {
+    const rects = [el.getBoundingClientRect(), contentRect(el)].filter(r => r.width || r.height);
+    return rects.some(r => r.left < canvas.left - tol || r.top < canvas.top - tol
+        || r.right > canvas.right + tol || r.bottom > canvas.bottom + tol);
+}
+
+// 純裝飾的色塊（沒有文字、圖片、圖示或圖表，例如 AI 刻意放在角落、只露出一半的光暈圓形）不算
+function hasContent(el) {
+    return !!el.textContent.trim() || !!el.querySelector('img, svg, i, [data-rs-chart]') || /^(IMG|SVG|I)$/i.test(el.tagName);
+}
+
+// 由外而內找出超出畫布的元素：看得到外框的區塊（整張卡片）或最內層的元素就停下來，
+// 只是排版用的容器（grid / flex 外框）則往內找出實際超出的那一個，不會把同一列的每張卡片都標出來
+function canvasCulprits(node, canvas, tol) {
     const out = [];
     for (const c of node.children) {
-        if (c.closest('svg') || c.hasAttribute('data-rs-float')) continue;
-        const r = contentRect(c);
-        if (!(r.width || r.height)) continue;
-        if (r.bottom <= bound.bottom + tol && r.right <= bound.right + tol) continue;
-        const deeper = isVisualBox(c) ? [] : overflowCulprits(c, bound, tol);
+        if (c.hasAttribute('data-rs-float')) continue;
+        if (!hasContent(c) || !crossesCanvas(c, canvas, tol)) continue;
+        // 圖表、SVG 與圖片以整個物件為單位，不往內找
+        if (isVisualBox(c) || !c.children.length || c.matches('svg, img, [data-rs-chart]')) { out.push(c); continue; }
+        const deeper = canvasCulprits(c, canvas, tol);
         out.push(...(deeper.length ? deeper : [c]));
     }
     return out;
 }
 
-// 一頁（.slide-scaler）中超出外框的元素。先找出內容超出的最內層元素（子孫也超出時，外層通常只是被撐出去的連帶結果）；
-// 它是排版容器或整頁時，改標出把它撐出去的區塊（見 overflowCulprits）。
-// 自行插入的浮動物件（圖片、Logo 等）可能刻意放在頁面邊緣，量測時暫時隱藏，不算整頁超出
+// 一頁（.slide-scaler）中超出畫布的元素。自行插入的浮動物件（圖片、Logo 等）可能刻意貼齊或超出頁面邊緣，不檢查
 function findOverflows(scaler) {
     const root = scaler.children.length === 1 ? scaler.firstElementChild : scaler;
     if (!root) return [];
-    const floats = [...root.querySelectorAll('[data-rs-float]')];
-    const prev = floats.map(f => f.style.display);
-    floats.forEach(f => { f.style.display = 'none'; });
-    try {
-        const flagged = [root, ...root.querySelectorAll('*')].filter(el => !el.closest('[data-rs-float]') && isOverflowing(el));
-        const innermost = flagged.filter(el => !flagged.some(o => o !== el && el.contains(o)));
-        const result = new Set();
-        for (const el of innermost) {
-            if (isVisualBox(el) && el !== root) { result.add(el); continue; }
-            const box = el.getBoundingClientRect();
-            const tol = OVERFLOW_TOLERANCE * (box.height / (el.offsetHeight || box.height || 1));   // 縮圖以 transform 縮小
-            const culprits = overflowCulprits(el, box, tol);
-            (culprits.length ? culprits : [el]).forEach(c => result.add(c));
-        }
-        return [...result];
-    } finally {
-        floats.forEach((f, i) => { f.style.display = prev[i]; });
-    }
+    const canvas = scaler.getBoundingClientRect();
+    const tol = OVERFLOW_TOLERANCE * canvas.width / SLIDE_W;   // 縮圖以 transform 縮小
+    return canvasCulprits(root, canvas, tol);
 }
 
 /* ----- 編輯模式：標示目前頁面 ----- */
@@ -77,7 +64,7 @@ function markOverflows() {
     found.forEach(el => el.setAttribute('data-rs-overflow', '1'));
     badge.classList.toggle('hidden', !found.length);
     badge.classList.toggle('flex', !!found.length);
-    document.getElementById('overflowBadgeLabel').textContent = `${found.length} 處內容超出外框`;
+    document.getElementById('overflowBadgeLabel').textContent = `${found.length} 處內容超出畫面`;
 }
 
 // 點提示：依序選取超出的元素，方便修改（縮小字級、精簡文字或用 AI 修改）
@@ -112,7 +99,7 @@ function guardExportOverflow(run) {
     overflowExportRun = run;
     document.getElementById('overflowPages').innerHTML = pages.map(p => `
         <li class="flex items-center justify-between gap-3 py-2">
-            <span><b>第 ${p.idx + 1} 頁</b><span class="text-zinc-500 dark:text-zinc-400">：${p.count} 處內容超出外框或畫面</span></span>
+            <span><b>第 ${p.idx + 1} 頁</b><span class="text-zinc-500 dark:text-zinc-400">：${p.count} 處內容超出畫面</span></span>
             <button type="button" data-goto="${p.idx}" class="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">前往修改</button>
         </li>`).join('');
     document.getElementById('overflowModal').classList.remove('hidden');

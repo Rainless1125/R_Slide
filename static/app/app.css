@@ -1127,7 +1127,7 @@ body:has(#slideCanvas.editing) #toastRoot {
     color: #c4b5fd;
 }
 
-/* 版面檢查：內容超出外框的元素（選取中的元素維持藍色選取框） */
+/* 版面檢查：超出畫面（投影片範圍）的元素（選取中的元素維持藍色選取框） */
 #slideCanvas.editing [data-rs-overflow]:not([data-rs-sel]) {
     outline: 2px dashed #ef4444 !important;
     outline-offset: -2px;
