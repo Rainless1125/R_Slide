@@ -1171,6 +1171,15 @@ body:has(#slideCanvas.editing) #toastRoot {
     opacity: .55;
 }
 
+#fmtMore .mh {
+    padding: 8px 10px 4px;
+    margin-top: 4px;
+    border-top: 1px solid rgba(128, 128, 128, .2);
+    font-size: 11px;
+    font-weight: 600;
+    color: rgb(113 113 122);
+}
+
 #fmtMore .mi:hover:not(:disabled) {
     background: rgba(128, 128, 128, .15);
 }

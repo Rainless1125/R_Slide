@@ -58,6 +58,13 @@ document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && !e.altKey && !typing && currentPresentationData) {
         const k = e.key.toLowerCase();
         if (k === 'd' && !e.shiftKey && editMode && selectedEl) { e.preventDefault(); runFmt('duplicate'); return; }
+        // 圖層順序：Ctrl+↑ / ↓ 上移 / 下移一層，加 Shift 移到最上 / 最下層
+        if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && editMode && selectedEl) {
+            e.preventDefault();
+            const up = e.key === 'ArrowUp';
+            runFmt(e.shiftKey ? (up ? 'layerTop' : 'layerBottom') : (up ? 'layerUp' : 'layerDown'));
+            return;
+        }
         if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
         if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo(); return; }
     }

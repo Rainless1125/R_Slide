@@ -431,8 +431,10 @@ const FMT_ACTIONS = {
     resetPos() { setOffset(selectedEl, 0, 0); },
     resetScale() { setScale(selectedEl, 1); resetElementSize(selectedEl); },   // 縮放以左上角為基準，還原後左上角位置不變
     resetRatio() { resetImgRatio(selectedEl); },    // 保留寬度，高度依原圖比例
-    moveUp() { moveSibling(-1); },
-    moveDown() { moveSibling(1); }
+    layerUp() { moveLayer('up'); },
+    layerDown() { moveLayer('down'); },
+    layerTop() { moveLayer('top'); },
+    layerBottom() { moveLayer('bottom'); }
 };
 
 function stepSize(dir) {
@@ -444,13 +446,71 @@ function stepSize(dir) {
     setClass(el, [RE.size], 'text-' + SIZE_STEPS[i]);
     if (isChart) { clearInlineStyle(el, 'font-size'); rerenderChart(el); }   // 圖表是 SVG，字級要重畫才會生效
 }
-function moveSibling(dir) {
+/* ----- 圖層順序（z-index） ----- */
+// 只調整與選取元素「有重疊」的其他物件之間的上下關係，不改變排版。
+// 參與排序的物件：選取元素自己，以及選取元素和它每一層外層的兄弟元素中、與選取元素重疊的（例如蓋在卡片上的圖片、文字方塊、圖案）。
+// 先依畫面上實際的上下順序排好，移動選取元素後，依新順序把 z-index 重新編為 1..n。
+function rectsOverlap(a, b) {
+    return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom && a.width && a.height && b.width && b.height;
+}
+function layerCandidates(el) {
+    const root = slideRoot(), r = el.getBoundingClientRect(), out = [];
+    for (let a = el; a && a !== root && a !== getScaler(); a = a.parentElement) {
+        for (const sib of a.parentElement?.children || []) {
+            if (sib !== a && rectsOverlap(r, sib.getBoundingClientRect())) out.push(sib);
+        }
+    }
+    return out;
+}
+// a 是否畫在 b 的上面：在兩者重疊區域的中心點查詢最上層的元素；查不到時以文件順序（後面的在上）判斷
+function paintedAbove(a, b) {
+    const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+    const x = (Math.max(ra.left, rb.left) + Math.min(ra.right, rb.right)) / 2;
+    const y = (Math.max(ra.top, rb.top) + Math.min(ra.bottom, rb.bottom)) / 2;
+    for (const hit of document.elementsFromPoint(x, y)) {
+        if (a.contains(hit)) return true;
+        if (b.contains(hit)) return false;
+    }
+    return !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_PRECEDING);
+}
+// z-index 只對定位元素或 flex / grid 子項有效；一般區塊加上 position: relative（不移動位置）
+function setLayerZ(el, z) {
+    const parent = el.parentElement && getComputedStyle(el.parentElement).display;
+    if (getComputedStyle(el).position === 'static' && !/flex|grid/.test(parent || '')) el.style.position = 'relative';
+    el.style.zIndex = String(z);
+}
+// 選取元素的外層若自成一個堆疊環境（例如被移動過而有 translate），z-index 出不了那一層，外層也一起調整
+function createsStackingContext(el) {
+    const cs = getComputedStyle(el);
+    return cs.transform !== 'none' || cs.translate !== 'none' || cs.scale !== 'none' || cs.filter !== 'none'
+        || Number(cs.opacity) < 1 || cs.isolation === 'isolate' || (cs.zIndex !== 'auto' && cs.position !== 'static');
+}
+// 回傳是否有變動（已在最上層 / 最下層、或沒有重疊的物件時不動）
+function moveLayer(dir) {
     const el = selectedEl;
-    if (isRootBlock(el)) return;
-    const other = dir < 0 ? el.previousElementSibling : el.nextElementSibling;
-    if (!other) return;
-    stopTextEdit();
-    if (dir < 0) other.before(el); else other.after(el);
+    if (isRootBlock(el)) return false;
+    const others = layerCandidates(el);
+    if (!others.length) { showToast('這個元素沒有和其他物件重疊，不需要調整圖層', 'info', 2600); return false; }
+    // 由下到上排序（插入排序：每次和已排好的元素逐一比較，畫在上面的往後放）
+    const order = [];
+    for (const n of [...others, el]) {
+        let i = order.length;
+        while (i > 0 && paintedAbove(order[i - 1], n)) i--;
+        order.splice(i, 0, n);
+    }
+    const i = order.indexOf(el);
+    const to = { up: i + 1, down: i - 1, top: order.length - 1, bottom: 0 }[dir];
+    if (to < 0 || to >= order.length || to === i) {
+        showToast(dir === 'up' || dir === 'top' ? '已經在最上層' : '已經在最下層', 'info', 1800);
+        return false;
+    }
+    order.splice(i, 1);
+    order.splice(to, 0, el);
+    order.forEach((n, z) => setLayerZ(n, z + 1));
+    for (let a = el.parentElement; a && a !== slideRoot() && a !== getScaler(); a = a.parentElement) {
+        if (others.some(o => o.parentElement === a.parentElement) && createsStackingContext(a)) setLayerZ(a, order.indexOf(el) + 1);
+    }
+    return true;
 }
 
 function runFmt(name, ...args) {
@@ -522,7 +582,7 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
     ${btn('align-right', '<i class="fa-solid fa-align-right text-[11px]"></i>', '靠右對齊', '', 'align')}`)}
   ${group('', btn('pal-text', colorBtn('<i class="fa-solid fa-font text-[11px]"></i>', 'fmtTextChip', '文字顏色', 'textColor'), '文字顏色', '', 'text'))}
   <span class="fspacer"></span>
-  ${group('', `${btn('more', '<i class="fa-solid fa-ellipsis text-[12px]"></i><span class="bt">更多</span>', '更多操作（複製、同層排序）', '', 'common')}
+  ${group('', `${btn('more', '<i class="fa-solid fa-ellipsis text-[12px]"></i><span class="bt">更多</span>', '更多操作（複製、圖層順序）', '', 'common')}
     ${btn('remove', '<i class="fa-regular fa-trash-can text-[11px]"></i><span class="bt">刪除</span>', '刪除元素（Delete）', 'danger', 'common')}`)}
 </div>
 <div class="frow">
@@ -555,8 +615,11 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
         `<i class="${icon}"></i><span>${label}</span>${key ? `<kbd>${key}</kbd>` : ''}</button>`;
     more.innerHTML = `
   ${item('duplicate', 'fa-regular fa-clone', '複製元素', 'common', 'Ctrl+D')}
-  ${item('moveUp', 'fa-solid fa-arrow-up', '同層上移（往前）', 'common')}
-  ${item('moveDown', 'fa-solid fa-arrow-down', '同層下移（往後）', 'common')}`;
+  <div class="mh">圖層順序（重疊時的上下）</div>
+  ${item('layerTop', 'fa-solid fa-angles-up', '移到最上層', 'common', 'Ctrl+Shift+↑')}
+  ${item('layerUp', 'fa-solid fa-arrow-up', '上移一層', 'common', 'Ctrl+↑')}
+  ${item('layerDown', 'fa-solid fa-arrow-down', '下移一層', 'common', 'Ctrl+↓')}
+  ${item('layerBottom', 'fa-solid fa-angles-down', '移到最下層', 'common', 'Ctrl+Shift+↓')}`;
     document.body.appendChild(more);
     more.addEventListener('mousedown', e => e.preventDefault());
     more.addEventListener('click', e => {
@@ -750,8 +813,7 @@ function refreshToolbar() {
     fmtEl('sizeUp').disabled = isIcon ? el.offsetWidth >= ICON_MAX : sizeIdx >= (isChart ? CHART_SIZE_MAX : SIZE_STEPS.length - 1);
     fmtEl('duplicate').disabled = root;
     fmtEl('remove').disabled = root;
-    fmtEl('moveUp').disabled = root || !el.previousElementSibling;
-    fmtEl('moveDown').disabled = root || !el.nextElementSibling;
+    ['layerTop', 'layerUp', 'layerDown', 'layerBottom'].forEach(id => { fmtEl(id).disabled = root; });
     // 還原位置 / 大小：AI 版面元素一律顯示在工具列，沒有移動或縮放過時停用（浮動物件沒有原始位置可還原）
     const ai = !isFloat(el);
     applyToolbarCtls(tb, kind, ai ? ['aiReset'] : []);
