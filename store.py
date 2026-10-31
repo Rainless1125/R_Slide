@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS sessions (
     token_hash TEXT PRIMARY KEY,
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    expires_at INTEGER NOT NULL
+    expires_at INTEGER NOT NULL,
+    auth_mode  TEXT                       -- 登入時的方式 system / ldap；與目前的 AUTH_MODE 不同時視為無效（舊資料為 NULL，視為 system）
 );
 CREATE TABLE IF NOT EXISTS history (
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -136,6 +137,7 @@ def init_db(path: str):
 _ADDED_COLUMNS = {
     "feedback": {"rating": "INTEGER"},
     "llm_usage": {"thinking": "TEXT"},
+    "sessions": {"auth_mode": "TEXT"},
 }
 
 
@@ -284,23 +286,30 @@ def _token_hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def create_session(user_id: int) -> str:
+def create_session(user_id: int, auth_mode: str = "system") -> str:
+    """auth_mode 為登入時的方式（system / ldap），session_user 會與目前的方式比對。"""
     token = secrets.token_urlsafe(32)
     now = int(time.time())
     with connect() as conn:
         conn.execute("DELETE FROM sessions WHERE expires_at < ?", (now,))
-        conn.execute("INSERT INTO sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)",
-                     (_token_hash(token), user_id, now + SESSION_TTL_SECONDS))
+        conn.execute("INSERT INTO sessions (token_hash, user_id, expires_at, auth_mode) VALUES (?, ?, ?, ?)",
+                     (_token_hash(token), user_id, now + SESSION_TTL_SECONDS, auth_mode))
     return token
 
 
-def session_user(token: str | None) -> dict | None:
+def session_user(token: str | None, auth_mode: str = "system") -> dict | None:
+    """以 session token 取得登入中的使用者。auth_mode 為目前的登入方式：
+    session 是用另一種方式登入的（例如改用公司 LDAP 之前以本機帳號登入）時視為無效並刪除，使用者需以新的方式重新登入。"""
     if not token:
         return None
     with connect() as conn:
         row = conn.execute(
-            "SELECT u.id, u.username FROM sessions s JOIN users u ON u.id = s.user_id "
-            "WHERE s.token_hash = ? AND s.expires_at >= ?", (_token_hash(token), int(time.time()))).fetchone()
+            "SELECT u.id, u.username, COALESCE(s.auth_mode, 'system') AS auth_mode FROM sessions s "
+            "JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at >= ?",
+            (_token_hash(token), int(time.time()))).fetchone()
+        if row is not None and row["auth_mode"] != auth_mode:
+            conn.execute("DELETE FROM sessions WHERE token_hash = ?", (_token_hash(token),))
+            return None
     return {"id": row["id"], "username": row["username"]} if row else None
 
 

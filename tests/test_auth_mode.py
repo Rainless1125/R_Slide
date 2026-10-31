@@ -47,11 +47,11 @@ def test_ldap_login_creates_local_account_once(ldap_mode):
     res = c.post("/api/auth/login", json={"username": "E12345", "password": "corp-pass"})
     assert res.status_code == 200 and res.json()["username"] == "E12345"
     assert c.get("/api/auth/me").json()["username"] == "E12345"
-    first = store.session_user(c.cookies.get(accounts.SESSION_COOKIE))
+    first = store.session_user(c.cookies.get(accounts.SESSION_COOKIE), "ldap")
 
     c2 = TestClient(app_module.app)
     assert c2.post("/api/auth/login", json={"username": "e12345", "password": "corp-pass"}).status_code == 200
-    assert store.session_user(c2.cookies.get(accounts.SESSION_COOKIE))["id"] == first["id"]   # 不分大小寫，同一個帳號
+    assert store.session_user(c2.cookies.get(accounts.SESSION_COOKIE), "ldap")["id"] == first["id"]   # 不分大小寫，同一個帳號
     with store.connect() as conn:
         assert conn.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 1
 
@@ -204,3 +204,44 @@ def test_check_config_accepts_valid_settings(monkeypatch):
     ldap_auth.check_config()
     monkeypatch.setenv("AUTH_MODE", "system")
     ldap_auth.check_config()
+
+
+# ---------- 切換登入方式後，舊的登入狀態失效 ----------
+def test_switching_to_ldap_invalidates_system_sessions(monkeypatch):
+    c = TestClient(app_module.app)
+    assert c.post("/api/auth/register", json={"username": "local_user", "password": "secret123"}).status_code == 200
+    assert c.get("/api/auth/me").json()["username"] == "local_user"
+    token = c.cookies.get(accounts.SESSION_COOKIE)
+
+    monkeypatch.setenv("AUTH_MODE", "ldap")
+    assert c.get("/api/auth/me").json()["username"] is None
+    assert c.get("/api/history").status_code == 401
+    # 無效的 session 已刪除：改回 system 也不會復活，需要重新登入
+    monkeypatch.setenv("AUTH_MODE", "system")
+    assert store.session_user(token) is None
+    assert c.get("/api/auth/me").json()["username"] is None
+
+
+def test_switching_back_to_system_invalidates_ldap_sessions(ldap_mode, monkeypatch):
+    c = TestClient(app_module.app)
+    assert c.post("/api/auth/login", json={"username": "E12345", "password": "corp-pass"}).status_code == 200
+    assert c.get("/api/history").status_code == 200
+    monkeypatch.setenv("AUTH_MODE", "system")
+    assert c.get("/api/history").status_code == 401
+
+
+def test_sessions_created_before_upgrade_count_as_system(monkeypatch):
+    """升級前建立的 session 沒有記錄登入方式（NULL）：system 模式照常有效，ldap 模式需重新登入。"""
+    user = store.create_user("old_user", "secret123")
+    token = store.create_session(user["id"])
+    with store.connect() as conn:
+        conn.execute("UPDATE sessions SET auth_mode = NULL")
+    assert store.session_user(token)["username"] == "old_user"
+    assert store.session_user(token, "ldap") is None
+
+
+def test_ldap_users_stay_logged_in_while_mode_unchanged(ldap_mode):
+    c = TestClient(app_module.app)
+    c.post("/api/auth/login", json={"username": "E12345", "password": "corp-pass"})
+    for _ in range(3):
+        assert c.get("/api/auth/me").json()["username"] == "E12345"
