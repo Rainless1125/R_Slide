@@ -1068,17 +1068,58 @@ body:has(#slideCanvas.editing) #toastRoot {
     bottom: 24px;
 }
 
+/* 固定兩行：第一行文字設定，第二行外觀與位置；每組控制項以淡底色區塊分開，前面有文字標籤 */
 #fmtToolbar {
     display: none;
     flex: 1;
     min-width: 0;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 2px;
+    flex-direction: column;
+    gap: 4px;
 }
 
 #fmtToolbar.open {
     display: flex;
+}
+
+#fmtToolbar .frow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+}
+
+#fmtToolbar .frow + .frow {
+    padding-top: 4px;
+    border-top: 1px solid rgba(128, 128, 128, .2);
+}
+
+#fmtToolbar .fg {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 10px;
+    background: rgba(128, 128, 128, .08);
+}
+
+#fmtToolbar .fl {
+    padding: 0 4px 0 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgb(113 113 122);
+    white-space: nowrap;
+}
+
+.dark #fmtToolbar .fl {
+    color: rgb(161 161 170);
+}
+
+#fmtToolbar .fspacer {
+    flex: 1;
+}
+
+#fmtToolbar .bt {
+    font-weight: 500;
 }
 
 #fmtMore {
@@ -1183,13 +1224,6 @@ body:has(#slideCanvas.editing) #toastRoot {
 
 #fmtToolbar select option {
     color: #18181b;
-}
-
-#fmtToolbar .sep {
-    width: 1px;
-    height: 18px;
-    margin: 0 4px;
-    background: rgba(128, 128, 128, .35);
 }
 
 #fmtToolbar .chipbox {

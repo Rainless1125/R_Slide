@@ -506,43 +506,43 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
     tb.setAttribute('aria-label', '文字與元素格式');
     const btn = (id, icon, title, extra, ctl) => `<button type="button" class="fb ${extra}" data-fmt="${id}" data-ctl="${ctl}" title="${title}" aria-label="${title}">${icon}</button>`;
     // data-ctl：控制項所屬的群組，依選取的元素類型顯示（見 TOOLBAR_CTLS）；分隔線由 refreshToolbar 依可見群組自動隱藏
+    // 兩行：第一行為文字（字級、粗細、對齊、顏色），第二行為外觀（背景、圓角、陰影、外框等）與位置；
+    // 每組控制項前有文字標籤（.fl），標籤依元素類型替換（見 TOOLBAR_LABELS），整組沒有可用的控制項時隱藏
+    const group = (label, inner, lbl = '') => `<div class="fg">${label ? `<span class="fl"${lbl ? ` data-lbl="${lbl}"` : ''}>${label}</span>` : ''}${inner}</div>`;
+    const colorBtn = (icon, id, text, lbl = '') => `${icon}<span class="bt"${lbl ? ` data-lbl="${lbl}"` : ''}>${text}</span><span id="${id}" class="chipbox"></span>`;
     tb.innerHTML = `
-  ${btn('parent', '<i class="fa-solid fa-turn-up text-[11px]"></i>', '選取父層元素', '', 'parent')}
-  <span class="sep"></span>
-  ${btn('sizeDown', '<i class="fa-solid fa-minus text-[9px]"></i><span>A</span>', '縮小字級', '', 'size')}
-  <span id="fmtSize" data-ctl="size" class="px-1 tabular-nums min-w-[2.2rem] text-center" title="目前字級"></span>
-  ${btn('sizeUp', '<span>A</span><i class="fa-solid fa-plus text-[9px]"></i>', '放大字級', '', 'size')}
-  <span class="sep"></span>
-  <select id="fmtWeight" data-ctl="weight" title="字體粗細" aria-label="字體粗細">${WEIGHTS.map(w => `<option value="${w[0]}">${w[1]}</option>`).join('')}</select>
-  <span class="sep"></span>
-  ${btn('align-left', '<i class="fa-solid fa-align-left text-[11px]"></i>', '靠左', '', 'align')}
-  ${btn('align-center', '<i class="fa-solid fa-align-center text-[11px]"></i>', '置中', '', 'align')}
-  ${btn('align-right', '<i class="fa-solid fa-align-right text-[11px]"></i>', '靠右', '', 'align')}
-  <span class="sep"></span>
-  ${btn('pal-text', '<span class="font-bold">A</span><span id="fmtTextChip" class="chipbox"></span>', '文字顏色', '', 'text')}
-  ${btn('pal-bg', '<i class="fa-solid fa-fill-drip text-[11px]"></i><span id="fmtBgChip" class="chipbox"></span>', '背景顏色', '', 'bg')}
-  <span class="sep"></span>
-  <select id="fmtRadius" data-ctl="radius" title="圓角" aria-label="圓角"><option value="__custom" disabled hidden>圓角</option>${RADII.map(r => `<option value="${r[0]}">圓角：${r[1]}</option>`).join('')}</select>
-  <select id="fmtShadow" data-ctl="shadow" title="陰影" aria-label="陰影"><option value="__custom" disabled hidden>陰影：自訂</option>${SHADOWS.map(r => `<option value="${r[0]}">${r[0] === 'none' ? '無陰影' : '陰影：' + r[1]}</option>`).join('')}</select>
-  <span class="sep"></span>
-  ${btn('pal-fill', '<i class="fa-solid fa-fill-drip text-[11px]"></i><span id="fmtFillChip" class="chipbox"></span>', '圖案填滿顏色', 'shape-fill', 'shape')}
-  ${btn('pal-stroke', '<i class="fa-regular fa-square text-[11px]"></i><span id="fmtStrokeChip" class="chipbox"></span>', '外框顏色', '', 'shape')}
-  <select id="fmtStrokeW" data-ctl="shape" title="外框粗細" aria-label="外框粗細">${SHAPE_STROKE_WIDTHS.map(w => `<option value="${w}">${w ? `外框：${w}px` : '無外框'}</option>`).join('')}</select>
-  <select id="fmtShapeRadius" data-ctl="shape" class="shape-radius" title="圖案圓角（轉角倒圓）" aria-label="圖案圓角">${SHAPE_RADII.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
-  <select id="fmtDash" data-ctl="shape" title="外框樣式" aria-label="外框樣式">${SHAPE_DASHES.map(d => `<option value="${d[0]}">${d[1]}</option>`).join('')}</select>
-  ${btn('pal-border', '<i class="fa-regular fa-square text-[11px]"></i><span id="fmtBorderChip" class="chipbox"></span>', '邊框顏色', '', 'border')}
-  <select id="fmtBorderW" data-ctl="border" title="邊框粗細" aria-label="邊框粗細">${IMG_BORDER_WIDTHS.map(w => `<option value="${w}">${w ? `邊框：${w}px` : '無邊框'}</option>`).join('')}</select>
-  <select id="fmtBorderStyle" data-ctl="border" title="邊框樣式" aria-label="邊框樣式">${IMG_BORDER_STYLES.map(d => `<option value="${d[0]}">${d[1]}</option>`).join('')}</select>
-  <span class="sep"></span>
-  ${btn('chart', '<i class="fa-solid fa-chart-column text-[11px]"></i><span>圖表資料</span>', '編輯圖表資料', '', 'chart')}
-  <span class="sep"></span>
-  ${btn('resetRatio', '<i class="fa-solid fa-expand text-[11px]"></i><span>還原比例</span>', '還原為原圖的長寬比例（保留目前寬度）', '', 'imgRatio')}
-  <span class="sep"></span>
-  ${btn('resetPos', '<i class="fa-solid fa-arrows-to-dot text-[11px]"></i><span>還原位置</span>', '移回 AI 版面的原始位置', '', 'aiReset')}
-  ${btn('resetScale', '<i class="fa-solid fa-compress text-[11px]"></i><span>還原大小</span>', '還原為 AI 版面的原始大小與寬高', '', 'aiReset')}
-  <span class="sep"></span>
-  ${btn('more', '<i class="fa-solid fa-ellipsis text-[12px]"></i>', '更多操作（複製、同層排序）', '', 'common')}
-  ${btn('remove', '<i class="fa-regular fa-trash-can text-[11px]"></i>', '刪除元素（Delete）', 'danger', 'common')}`;
+<div class="frow">
+  ${group('', btn('parent', '<i class="fa-solid fa-turn-up text-[11px]"></i><span class="bt">選取外層</span>', '選取包住這個元素的外層元素（例如整張卡片）', '', 'parent'))}
+  ${group('字級', `${btn('sizeDown', '<i class="fa-solid fa-minus text-[10px]"></i>', '縮小字級', '', 'size')}
+    <span id="fmtSize" data-ctl="size" class="px-1 tabular-nums min-w-[2.6rem] text-center" title="目前字級"></span>
+    ${btn('sizeUp', '<i class="fa-solid fa-plus text-[10px]"></i>', '放大字級', '', 'size')}`, 'size')}
+  ${group('粗細', `<select id="fmtWeight" data-ctl="weight" title="字體粗細" aria-label="字體粗細">${WEIGHTS.map(w => `<option value="${w[0]}">${w[1]}</option>`).join('')}</select>`)}
+  ${group('對齊', `${btn('align-left', '<i class="fa-solid fa-align-left text-[11px]"></i>', '靠左對齊', '', 'align')}
+    ${btn('align-center', '<i class="fa-solid fa-align-center text-[11px]"></i>', '置中對齊', '', 'align')}
+    ${btn('align-right', '<i class="fa-solid fa-align-right text-[11px]"></i>', '靠右對齊', '', 'align')}`)}
+  ${group('', btn('pal-text', colorBtn('<i class="fa-solid fa-font text-[11px]"></i>', 'fmtTextChip', '文字顏色', 'textColor'), '文字顏色', '', 'text'))}
+  <span class="fspacer"></span>
+  ${group('', `${btn('more', '<i class="fa-solid fa-ellipsis text-[12px]"></i><span class="bt">更多</span>', '更多操作（複製、同層排序）', '', 'common')}
+    ${btn('remove', '<i class="fa-regular fa-trash-can text-[11px]"></i><span class="bt">刪除</span>', '刪除元素（Delete）', 'danger', 'common')}`)}
+</div>
+<div class="frow">
+  ${group('', btn('pal-bg', colorBtn('<i class="fa-solid fa-fill-drip text-[11px]"></i>', 'fmtBgChip', '背景顏色', 'bgColor'), '背景顏色', '', 'bg'))}
+  ${group('圓角', `<select id="fmtRadius" data-ctl="radius" title="圓角" aria-label="圓角"><option value="__custom" disabled hidden>自訂</option>${RADII.map(r => `<option value="${r[0]}">${r[1]}</option>`).join('')}</select>`)}
+  ${group('陰影', `<select id="fmtShadow" data-ctl="shadow" title="陰影" aria-label="陰影"><option value="__custom" disabled hidden>自訂</option>${SHADOWS.map(r => `<option value="${r[0]}">${r[1]}</option>`).join('')}</select>`)}
+  ${group('外框', `${btn('pal-border', '<span class="bt">顏色</span><span id="fmtBorderChip" class="chipbox"></span>', '外框顏色', '', 'border')}
+    <select id="fmtBorderW" data-ctl="border" title="外框粗細" aria-label="外框粗細">${IMG_BORDER_WIDTHS.map(w => `<option value="${w}">${w ? `${w}px` : '無'}</option>`).join('')}</select>
+    <select id="fmtBorderStyle" data-ctl="border" title="外框樣式" aria-label="外框樣式">${IMG_BORDER_STYLES.map(d => `<option value="${d[0]}">${d[1]}</option>`).join('')}</select>`)}
+  ${group('圖案', `${btn('pal-fill', '<span class="bt">填滿</span><span id="fmtFillChip" class="chipbox"></span>', '圖案填滿顏色', 'shape-fill', 'shape')}
+    ${btn('pal-stroke', '<span class="bt">線條</span><span id="fmtStrokeChip" class="chipbox"></span>', '外框（線條）顏色', '', 'shape')}
+    <select id="fmtStrokeW" data-ctl="shape" title="外框粗細" aria-label="外框粗細">${SHAPE_STROKE_WIDTHS.map(w => `<option value="${w}">${w ? `粗細 ${w}px` : '無外框'}</option>`).join('')}</select>
+    <select id="fmtDash" data-ctl="shape" title="外框樣式" aria-label="外框樣式">${SHAPE_DASHES.map(d => `<option value="${d[0]}">${d[1]}</option>`).join('')}</select>
+    <select id="fmtShapeRadius" data-ctl="shape" class="shape-radius" title="圖案圓角（轉角倒圓）" aria-label="圖案圓角">${SHAPE_RADII.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>`)}
+  ${group('', btn('chart', '<i class="fa-solid fa-chart-column text-[11px]"></i><span class="bt">編輯圖表資料</span>', '編輯圖表資料', '', 'chart'))}
+  ${group('', btn('resetRatio', '<i class="fa-solid fa-expand text-[11px]"></i><span class="bt">還原圖片比例</span>', '還原為原圖的長寬比例（保留目前寬度）', '', 'imgRatio'))}
+  <span class="fspacer"></span>
+  ${group('', `${btn('resetPos', '<i class="fa-solid fa-arrows-to-dot text-[11px]"></i><span class="bt">還原位置</span>', '移回 AI 版面的原始位置', '', 'aiReset')}
+    ${btn('resetScale', '<i class="fa-solid fa-compress text-[11px]"></i><span class="bt">還原大小</span>', '還原為 AI 版面的原始大小與寬高', '', 'aiReset')}`)}
+</div>`;
     // 工具列固定在投影片上方的編輯列（#fmtDock）內，不會蓋住投影片內容
     document.getElementById('fmtDock').appendChild(tb);
     tb.querySelector('[data-fmt="more"]').setAttribute('aria-haspopup', 'menu');
@@ -678,6 +678,12 @@ const TOOLBAR_CTLS = {
     chart: ['size', 'text', 'bg', 'radius', 'border', 'shadow', 'chart'],
     shape: ['size', 'weight', 'align', 'text', 'shape', 'shadow'],
 };
+// 依元素類型替換的文字標籤（data-lbl，沒列出的沿用預設）
+const TOOLBAR_LABELS = {
+    image: { bgColor: '底色' },
+    icon: { size: '大小', textColor: '圖示顏色' },
+    chart: { size: '圖表文字', textColor: '標籤顏色' },
+};
 // 依元素類型替換的按鈕提示（沒列出的沿用預設）
 const TOOLBAR_TITLES = {
     image: { 'pal-bg': '背景顏色（透明圖片的底色）' },
@@ -701,14 +707,17 @@ function applyToolbarCtls(tb, kind, extras = []) {
         b.title = t;
         b.setAttribute('aria-label', t);
     });
-    let last = null;
-    [...tb.children].forEach(n => {
-        if (!n.classList.contains('sep')) { if (n.style.display !== 'none') last = n; return; }
-        const visible = !!last && !last.classList.contains('sep');
-        n.style.display = visible ? '' : 'none';
-        if (visible) last = n;
+    tb.querySelectorAll('[data-lbl]').forEach(n => {
+        n.dataset.defaultLabel ??= n.textContent;
+        n.textContent = TOOLBAR_LABELS[kind]?.[n.dataset.lbl] || n.dataset.defaultLabel;
     });
-    if (last?.classList.contains('sep')) last.style.display = 'none';
+    // 整組的控制項都隱藏時隱藏該組；一行都沒有可用的組時隱藏整行
+    tb.querySelectorAll('.fg').forEach(g => {
+        g.style.display = [...g.querySelectorAll('[data-ctl]')].some(n => n.style.display !== 'none') ? '' : 'none';
+    });
+    tb.querySelectorAll('.frow').forEach(r => {
+        r.style.display = [...r.querySelectorAll('.fg')].some(g => g.style.display !== 'none') ? '' : 'none';
+    });
 }
 
 function refreshToolbar() {
@@ -720,7 +729,7 @@ function refreshToolbar() {
     const cs = getComputedStyle(el);
     const isIcon = kind === 'icon';
     const isChart = kind === 'chart';
-    document.getElementById('fmtSize').textContent = isIcon ? el.offsetWidth + 'px' : SIZE_STEPS[currentSizeIndex(el)];
+    document.getElementById('fmtSize').textContent = isIcon ? el.offsetWidth + 'px' : SIZE_PX[currentSizeIndex(el)] + 'px';
     document.getElementById('fmtWeight').value = currentWeight(el);
     const rad = currentRadius(el);
     const radSel = document.getElementById('fmtRadius');
