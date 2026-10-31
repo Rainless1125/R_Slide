@@ -270,6 +270,7 @@ LDAP_USER_FILTER=(&(sAMAccountName={username})(memberOf=cn=R_Slide_Users,ou=grou
 | `LLM_RATE_LIMIT_PER_HOUR` | 一個帳號每小時可以使用 AI 的次數。 | `20` |
 | `LLM_RATE_LIMIT_PER_DAY` | 一個帳號每 24 小時可以使用 AI 的次數。 | `100` |
 | `LLM_MAX_CONCURRENT` | 一個帳號同時可以進行的 AI 工作數。 | `2` |
+| `THREAD_POOL_SIZE` | 處理請求的執行緒上限。每個進行中的 AI 生成會佔用一條，最小 `40`。 | `200` |
 | `LLM_USAGE_RETENTION_DAYS` | 用量紀錄的保留天數。`0` 表示永久保留。 | `365` |
 
 說明：

@@ -5,9 +5,10 @@ import base64
 import hashlib
 import logging
 import time
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 from typing import Literal
 from pathlib import Path
+import anyio.to_thread
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
@@ -104,7 +105,25 @@ gemini_client = (genai.Client(api_key=MY_GEMINI_API_KEY, http_options=types.Http
 openai_client = (OpenAI(api_key=MY_OPENAI_API_KEY, base_url=OPENAI_BASE_URL or DEFAULT_OPENAI_BASE_URL,
                         default_headers=_headers)
                  if MY_OPENAI_API_KEY else None)
-app = FastAPI(title="R Slide")
+# 同步端點與同步依賴（current_user、登入、歷史紀錄）共用 anyio 的執行緒池，預設只有 40 條。
+# 一次生成會佔住一條執行緒 1～5 分鐘，同時生成的人一多，連登入都要排隊，所以啟動時調高上限。
+DEFAULT_THREAD_POOL_SIZE = 200
+
+
+def thread_pool_size() -> int:
+    try:
+        return max(40, int(os.getenv("THREAD_POOL_SIZE", DEFAULT_THREAD_POOL_SIZE)))
+    except ValueError:
+        return DEFAULT_THREAD_POOL_SIZE
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    anyio.to_thread.current_default_thread_limiter().total_tokens = thread_pool_size()
+    yield
+
+
+app = FastAPI(title="R Slide", lifespan=lifespan)
 
 # 各平台可選模型（第一個為預設）；OpenAI 的模型清單可由 .env 的 OPENAI_MODELS 改寫
 MODEL_CATALOG = {
