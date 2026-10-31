@@ -20,6 +20,8 @@ load_dotenv()
 
 import store  # noqa: E402  （需在 load_dotenv 之後，才會讀到 .env 的 RSLIDE_DB_PATH）
 from accounts import PASSWORD_RULE, USERNAME_RE, password_ok  # noqa: E402
+from admin import LDAP_MANAGED_DETAIL  # noqa: E402
+from ldap_auth import auth_mode  # noqa: E402
 
 
 def ask_password() -> str:
@@ -108,10 +110,13 @@ def main(argv: list[str]):
     cmd, args = (argv[0] if argv else ""), argv[1:]
     if cmd == "list":
         with store.connect() as conn:
-            rows = conn.execute("SELECT u.username, COUNT(h.id) AS n FROM users u "
+            rows = conn.execute("SELECT u.username, u.password_hash, COUNT(h.id) AS n FROM users u "
                                 "LEFT JOIN history h ON h.user_id = u.id GROUP BY u.id ORDER BY u.username").fetchall()
         for r in rows:
-            print(f"{r['username']}\t{r['n']} 筆紀錄")
+            source = "\t公司帳號（LDAP）" if r["password_hash"] == store.EXTERNAL_PASSWORD_HASH else ""
+            print(f"{r['username']}\t{r['n']} 筆紀錄{source}")
+    elif cmd in ("add", "reset-password") and len(args) == 1 and auth_mode() == "ldap":
+        sys.exit(LDAP_MANAGED_DETAIL)
     elif cmd == "add" and len(args) == 1:
         if not USERNAME_RE.match(args[0]):
             sys.exit("帳號需為 2~32 個字，只能包含文字、數字與 . _ - @")

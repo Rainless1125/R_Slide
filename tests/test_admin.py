@@ -130,3 +130,42 @@ def test_admin_overview_usage_feedback_lockouts():
     assert [r["ip"] for r in c.get("/api/admin/lockouts").json()] == ["10.0.0.9"]
     assert c.delete("/api/admin/lockouts/10.0.0.9").json() == {"was_locked": True}
     assert c.get("/api/admin/lockouts").json() == []
+
+
+# ---------- 公司 LDAP 登入（AUTH_MODE=ldap）：帳號與密碼由公司管理 ----------
+def test_users_list_shows_account_source():
+    c = admin_client()
+    c.post("/api/admin/users", json={"username": "local1", "password": "secret123"})
+    store.get_or_create_external_user("E12345")
+    users = {u["username"]: u["source"] for u in c.get("/api/admin/users").json()}
+    assert users == {"local1": "local", "E12345": "ldap"}
+    assert c.get("/api/admin/me").json()["auth_mode"] == "system"
+
+
+def test_ldap_mode_blocks_creating_accounts_and_resetting_passwords(monkeypatch):
+    c = admin_client()
+    assert c.post("/api/admin/users", json={"username": "old_local", "password": "secret123"}).status_code == 200
+    store.get_or_create_external_user("E12345")
+    monkeypatch.setenv("AUTH_MODE", "ldap")
+    assert c.get("/api/admin/me").json()["auth_mode"] == "ldap"
+    res = c.post("/api/admin/users", json={"username": "new_local", "password": "secret123"})
+    assert res.status_code == 409 and "公司 LDAP" in res.json()["detail"]
+    for name in ("old_local", "E12345"):
+        res = c.put(f"/api/admin/users/{name}/password", json={"password": "newpass123"})
+        assert res.status_code == 409 and "公司系統修改" in res.json()["detail"]
+    assert store.authenticate("old_local", "secret123") is not None     # 密碼沒有被改動
+    assert {u["username"] for u in c.get("/api/admin/users").json()} == {"old_local", "E12345"}
+    # 刪除仍可使用（例如離職員工）；之後再以公司帳號登入會建立新的空帳號
+    assert c.delete("/api/admin/users/E12345").status_code == 200
+
+
+def test_manage_users_cli_refuses_in_ldap_mode(monkeypatch, capsys):
+    import manage_users
+    monkeypatch.setenv("AUTH_MODE", "ldap")
+    for cmd in (["add", "someone"], ["reset-password", "someone"]):
+        with pytest.raises(SystemExit) as e:
+            manage_users.main(cmd)
+        assert "公司 LDAP" in str(e.value)
+    store.get_or_create_external_user("E12345")
+    manage_users.main(["list"])
+    assert "E12345\t0 筆紀錄\t公司帳號（LDAP）" in capsys.readouterr().out
