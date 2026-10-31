@@ -95,7 +95,9 @@ async function compressImage(file) {
     }
 }
 
-async function insertSlideImage(file, at) {
+// opts（品牌識別圖示用）：corner 為 tl / tr / bl / br 時放在該角落（留邊 32px），maxW / maxH 為預設大小上限；
+// 成功時回傳插入的 <img>
+async function insertSlideImage(file, at, opts = {}) {
     if (!editMode || !currentPresentationData) return;
     if (!/^image\/(png|jpeg|webp|gif|svg\+xml)$/.test(file.type)) { showToast('只支援 PNG、JPG、WebP、GIF、SVG 圖片', 'error'); return; }
     if (file.size > IMG_MAX_INPUT) { showToast('圖片過大（上限 15 MB）', 'error'); return; }
@@ -108,10 +110,16 @@ async function insertSlideImage(file, at) {
     if (!root) return;
     stopTextEdit();
     // 預設寬度約 40% 版面，太高時以高度為準
-    let w = Math.min(result.w, SLIDE_W * 0.4), h = w * result.h / result.w;
-    if (h > SLIDE_H * 0.6) { h = SLIDE_H * 0.6; w = h * result.w / result.h; }
+    const maxW = opts.maxW || SLIDE_W * 0.4, maxH = opts.maxH || SLIDE_H * 0.6;
+    let w = Math.min(result.w, maxW), h = w * result.h / result.w;
+    if (h > maxH) { h = maxH; w = h * result.w / result.h; }
     let x = (SLIDE_W - w) / 2, y = (SLIDE_H - h) / 2;
     if (at) { x = at.x - w / 2; y = at.y - h / 2; }
+    const CORNER_MARGIN = 32;
+    if (/^[tb][lr]$/.test(opts.corner || '')) {
+        x = opts.corner[1] === 'l' ? CORNER_MARGIN : SLIDE_W - w - CORNER_MARGIN;
+        y = opts.corner[0] === 't' ? CORNER_MARGIN : SLIDE_H - h - CORNER_MARGIN;
+    }
     const img = document.createElement('img');
     img.src = result.data;
     img.alt = file.name.replace(/\.[^.]+$/, '').slice(0, 80);
@@ -124,7 +132,46 @@ async function insertSlideImage(file, at) {
     root.appendChild(img);
     commitSlideEdit();
     selectElement(img);
-    showToast('已插入圖片，可拖曳移動；拉角落等比例縮放，拉四邊中點可只改寬或高', 'success', 2600);
+    if (!opts.quiet) showToast('已插入圖片，可拖曳移動；拉角落等比例縮放，拉四邊中點可只改寬或高', 'success', 2600);
+    return img;
+}
+
+/* ----- 複製到所有頁面 ----- */
+// 把自行插入的物件（圖片、品牌 Logo、文字方塊、圖案、圖表）以相同位置與大小複製到其他每一頁，例如每頁右上角的公司 Logo。
+// 其他頁只有 HTML 字串：解析後放進該頁的最外層容器（與 slideRoot 的規則相同）；圖表另外複製一份資料。
+const COPY_TO_ALL_MAX_BYTES = 20 * 1024 * 1024;     // 歷史記錄單筆上限為 40 MB，留一半給投影片本身
+function copyToAllSlides(el) {
+    const deck = currentPresentationData;
+    if (!editMode || !deck || !isFloat(el)) return;
+    const others = deck.slides.filter((_, i) => i !== currentSlideIdx);
+    if (!others.length) { showToast('目前只有一頁', 'info', 2200); return; }
+    stopTextEdit();
+    const clone = el.cloneNode(true);
+    [clone, ...clone.querySelectorAll(EDIT_ATTRS.map(a => `[${a}]`).join(','))].forEach(n => EDIT_ATTRS.forEach(a => n.removeAttribute(a)));
+    const html = clone.outerHTML;
+    if (html.length * others.length > COPY_TO_ALL_MAX_BYTES) {
+        showToast('這個物件太大（例如高解析度圖片），複製到每一頁會讓簡報過大；請先換成較小的圖片', 'error', 6000);
+        return;
+    }
+    const chartSpec = el.hasAttribute('data-rs-chart') ? deck.slides[currentSlideIdx].charts?.[Number(el.getAttribute('data-rs-chart'))] : null;
+    pushUndoSnapshot();
+    for (const slide of others) {
+        const doc = new DOMParser().parseFromString(`<!DOCTYPE html><html><body>${slide.html_content || ''}</body></html>`, 'text/html');
+        const body = doc.body;
+        const root = body.children.length === 1 ? body.firstElementChild : body;
+        const tpl = doc.createElement('template');
+        tpl.innerHTML = html;
+        const node = tpl.content.firstElementChild;
+        if (chartSpec) {
+            slide.charts = Array.isArray(slide.charts) ? slide.charts : [];
+            slide.charts.push(JSON.parse(JSON.stringify(chartSpec)));
+            node.setAttribute('data-rs-chart', String(slide.charts.length - 1));
+        }
+        root.appendChild(node);
+        slide.html_content = body.innerHTML;
+    }
+    applySlides(deck.slides);         // 更新縮圖並存回歷史記錄
+    showToast(`已複製到其他 ${others.length} 頁（相同位置），可按 Ctrl+Z 復原`, 'success', 4000);
 }
 
 // 拖放 / 貼上圖片到投影片（僅編輯模式）

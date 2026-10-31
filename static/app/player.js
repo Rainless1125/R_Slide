@@ -302,7 +302,8 @@ function setInsertMenuOpen(open, focusFirst = false) {
         if (open && focusFirst) items[0].focus();
     };
     btn.onclick = () => setOpen(list.classList.contains('hidden'));
-    items.forEach(item => item.onclick = () => { setOpen(false); btn.focus(); actions[item.dataset.export](); });
+    // 匯出前檢查每一頁是否有內容超出畫面（見 overflow.js），有問題時先詢問
+    items.forEach(item => item.onclick = () => { setOpen(false); btn.focus(); guardExportOverflow(actions[item.dataset.export]); });
     document.addEventListener('click', e => { if (!e.target.closest('#exportMenu')) setOpen(false); });
     wrap.addEventListener('keydown', e => {
         const open = !list.classList.contains('hidden');

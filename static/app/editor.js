@@ -72,7 +72,7 @@ let editMode = false;
 const PLAINTEXT_EDIT = (() => { const d = document.createElement('div'); try { d.contentEditable = 'plaintext-only'; } catch (e) { } return d.contentEditable === 'plaintext-only'; })();
 
 // 序列化投影片 DOM：移除編輯用的標記屬性（文字編輯中 / 拼字檢查 / 選取標記），得到可存回 html_content 的字串
-const EDIT_ATTRS = ['contenteditable', 'spellcheck', 'data-rs-sel', 'data-rs-busy'];
+const EDIT_ATTRS = ['contenteditable', 'spellcheck', 'data-rs-sel', 'data-rs-busy', 'data-rs-overflow'];
 function serializeScaler(scaler) {
     const c = scaler.cloneNode(true);
     c.querySelectorAll(EDIT_ATTRS.map(a => `[${a}]`).join(',')).forEach(el => EDIT_ATTRS.forEach(a => el.removeAttribute(a)));
@@ -95,6 +95,7 @@ function resetSlideScroll() {
 function prepareEditing() {
     const scaler = getScaler();
     if (scaler) scaler.dataset.base = serializeScaler(scaler);
+    scheduleOverflowCheck();
 }
 
 function toggleEditMode(force) {
@@ -108,12 +109,14 @@ function toggleEditMode(force) {
         closeShapePicker();
         closeBrandPicker();
         setInsertMenuOpen(false);
+        setPainter(null);
         stopTextEdit();
         clearSelection();
         commitSlideEdit();
         resetSlideScroll();
     }
     editMode = want;
+    if (!editMode) markOverflows();      // 清除「超出畫面」的標示
     const canvas = document.getElementById('slideCanvas');
     canvas.classList.toggle('editing', editMode);
     const btn = document.getElementById('editBtn');
@@ -148,6 +151,7 @@ function commitSlideEdit(withUndo = true) {
     const slide = currentPresentationData?.slides?.[currentSlideIdx];
     if (!scaler || !slide || scaler.dataset.base === undefined) return;
     const html = serializeScaler(scaler);
+    scheduleOverflowCheck();
     if (html === scaler.dataset.base) { if (!withUndo) syncCurrentPresentationToHistory(); return; }
     if (withUndo) pushUndoSnapshot();
     slide.html_content = html;
@@ -234,8 +238,34 @@ slideCanvasEl.addEventListener('click', e => {
     if (svg && svg !== t && scaler.contains(svg)) t = svg;   // SVG 內部以整個圖形為單位
     const obj = t.closest('[data-rs-chart],[data-rs-float]');
     if (obj && scaler.contains(obj)) t = obj;                // 圖表 / 浮動圖片以整個容器為單位
-    selectElement(t);
+    if (painterClip) { applyFormatPainter(pickSelectTarget(t)); return; }   // 格式刷：套用到點到的元素
+    selectElement(pickSelectTarget(t));
 });
+
+/* ----- 點選的層級：先選整張卡片，再點一次往內一層 ----- */
+// 與 PowerPoint 的群組相同：第一次點擊選到最外層「看得到外框」的區塊（有底色、邊框或陰影，例如整張卡片），
+// 在已選取的區塊內再點一次，往下一層（下一個看得到外框的區塊，最後是點到的元素本身）；雙擊仍直接編輯文字。
+// 沒有底色、邊框的排版容器（grid / flex 外框）會被略過。
+function isVisualBox(el) {
+    const cs = getComputedStyle(el);
+    if (cssColorToHex(cs.backgroundColor) !== 'none' || cs.backgroundImage !== 'none') return true;
+    if (cs.boxShadow !== 'none') return true;
+    return BORDER_SIDES.some(sd => cs['border' + sd + 'Style'] !== 'none' && parseFloat(cs['border' + sd + 'Width']) > 0);
+}
+function pickSelectTarget(t) {
+    if (isRootBlock(t) || t.hasAttribute('data-rs-float')) return t;
+    const chain = [];                                         // 由外而內：最外層版面容器之下 → 點到的元素
+    for (let a = t; a && !isRootBlock(a) && a !== getScaler(); a = a.parentElement) chain.unshift(a);
+    if (!chain.length) return t;
+    const stops = chain.filter((a, i) => i === chain.length - 1 || isVisualBox(a));
+    const cur = selectedEl;
+    if (cur && cur !== t && chain.includes(cur)) {
+        // 已選取這條路徑上的某一層：選它裡面的下一層
+        return stops.find(s => s !== cur && cur.contains(s)) || t;
+    }
+    if (cur === t) return t;
+    return stops[0];
+}
 slideCanvasEl.addEventListener('dblclick', e => {
     if (!editMode) return;
     const scaler = getScaler();
@@ -422,6 +452,8 @@ const FMT_ACTIONS = {
         clearSelection();
         el.remove();
     },
+    pasteFormat() { if (formatClip) applyFormat(selectedEl, formatClip); },
+    copyToAll() { copyToAllSlides(selectedEl); },
     duplicate() {
         if (isRootBlock(selectedEl)) return;
         stopTextEdit();
@@ -574,6 +606,74 @@ function setBorder(el, prop, v) {
     if (!el.getAttribute('style')) el.removeAttribute('style');
 }
 
+/* ----- 格式刷：複製一個元素的格式，套用到其他元素 ----- */
+// 複製字級、粗細、文字對齊、文字顏色、背景、圓角（Tailwind class 與 inline style）、外框與陰影；兩個都是圖案時另外複製填滿與線條。
+// 不複製位置、大小與排版（flex / grid）相關的設定。格式刷按下後點下一個元素即套用一次；「貼上格式」可重複套用最後複製的格式。
+const FORMAT_CLASS_GROUPS = ['size', 'weight', 'align', 'textColor', 'bgColor', 'radius'];
+const FORMAT_INLINE_PROPS = ['color', 'background', 'background-color', 'background-image', 'font-size', 'font-weight', 'text-align', 'border-radius'];
+let painterClip = null;         // 格式刷進行中：等待點選要套用的元素
+let formatClip = null;          // 最後一次複製的格式（「貼上格式」用）
+
+function captureFormat(el) {
+    const shape = shapeOf(el);
+    return {
+        classes: [...el.classList].filter(c => FORMAT_CLASS_GROUPS.some(g => RE[g].test(c))),
+        inline: Object.fromEntries(FORMAT_INLINE_PROPS.map(p => [p, el.style.getPropertyValue(p)]).filter(([, v]) => v)),
+        border: readBorder(el),
+        shadow: currentShadow(el),
+        shadowCss: { box: el.style.boxShadow, filter: /drop-shadow/.test(el.style.filter) ? el.style.filter : '' },
+        shape: shape ? readShapeStyle(shape) : null,
+    };
+}
+
+function applyFormat(el, f) {
+    removeClasses(el, ...FORMAT_CLASS_GROUPS.map(g => RE[g]));
+    f.classes.forEach(c => el.classList.add(c));
+    FORMAT_INLINE_PROPS.forEach(p => el.style.removeProperty(p));
+    Object.entries(f.inline).forEach(([p, v]) => el.style.setProperty(p, v));
+    ['border-width', 'border-style', 'border-color'].forEach(p => el.style.removeProperty(p));
+    if (f.border.w) Object.assign(el.style, { borderWidth: f.border.w + 'px', borderStyle: f.border.style, borderColor: f.border.color });
+    else if (readBorder(el).w) el.style.borderStyle = 'none';
+    if (f.shadow === '__custom') {
+        setShadow(el, 'none');
+        if (f.shadowCss.box) el.style.boxShadow = f.shadowCss.box;
+        if (f.shadowCss.filter) el.style.filter = f.shadowCss.filter;
+    } else setShadow(el, f.shadow);
+    const shape = shapeOf(el);
+    if (f.shape && shape) {
+        setShapeStyle(shape, 'fill', f.shape.fill);
+        setShapeStyle(shape, 'stroke', f.shape.stroke);
+        setShapeStyle(shape, 'strokeW', f.shape.sw);
+        setShapeStyle(shape, 'dash', f.shape.dash);
+        if (shapeHasRadius(shape)) setShapeStyle(shape, 'radius', f.shape.radius);
+    }
+    if (!el.getAttribute('class')) el.removeAttribute('class');
+    if (!el.getAttribute('style')) el.removeAttribute('style');
+    if (el.hasAttribute('data-rs-chart')) rerenderChart(el);   // 圖表的字級與文字顏色要重畫才會生效
+}
+
+function setPainter(clip) {
+    painterClip = clip;
+    slideCanvasEl.classList.toggle('painting', !!clip);
+    fmtEl('painter')?.setAttribute('aria-pressed', String(!!clip));
+}
+function togglePainter() {
+    if (painterClip) { setPainter(null); return; }
+    if (!editMode || !selectedEl) return;
+    stopTextEdit();
+    formatClip = captureFormat(selectedEl);
+    setPainter(formatClip);
+    showToast('已複製格式，點選要套用的元素（Esc 取消）', 'info', 3000);
+}
+function applyFormatPainter(target) {
+    const clip = painterClip;
+    setPainter(null);
+    if (!clip || !target) return;
+    applyFormat(target, clip);
+    selectElement(target);
+    fmtCommit();
+}
+
 /* ----- 浮動工具列 ----- */
 const fmtRO = new ResizeObserver(() => positionToolbar());
 (function buildToolbar() {
@@ -590,6 +690,7 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
     tb.innerHTML = `
 <div class="frow">
   ${group('', btn('parent', '<i class="fa-solid fa-turn-up text-[11px]"></i><span class="bt">選取外層</span>', '選取包住這個元素的外層元素（例如整張卡片）', '', 'parent'))}
+  ${group('', btn('painter', '<i class="fa-solid fa-paintbrush text-[11px]"></i><span class="bt">格式刷</span>', '格式刷：複製這個元素的格式，再點選要套用的元素（Esc 取消）', '', 'common'))}
   ${group('', btn('aiEdit', '<i class="fa-solid fa-wand-magic-sparkles text-[11px]"></i><span class="bt">AI 修改此元素</span>', '輸入需求，只讓 AI 重新設計這個元素，頁面其他部分不變', 'ai-edit', 'aiEdit'))}
   ${group('字級', `${btn('sizeDown', '<i class="fa-solid fa-minus text-[10px]"></i>', '縮小字級', '', 'size')}
     <span id="fmtSize" data-ctl="size" class="px-1 tabular-nums min-w-[2.6rem] text-center" title="目前字級"></span>
@@ -633,6 +734,8 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
         `<i class="${icon}"></i><span>${label}</span>${key ? `<kbd>${key}</kbd>` : ''}</button>`;
     more.innerHTML = `
   ${item('duplicate', 'fa-regular fa-clone', '複製元素', 'common', 'Ctrl+D')}
+  ${item('pasteFormat', 'fa-solid fa-paintbrush', '貼上格式（最後一次格式刷複製的格式）', 'common')}
+  ${item('copyToAll', 'fa-regular fa-copy', '複製到所有頁面（相同位置）', 'float')}
   <div class="mh">圖層順序（重疊時的上下）</div>
   ${item('layerTop', 'fa-solid fa-angles-up', '移到最上層', 'common', 'Ctrl+Shift+↑')}
   ${item('layerUp', 'fa-solid fa-arrow-up', '上移一層', 'common', 'Ctrl+↑')}
@@ -669,6 +772,7 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
         const id = b.dataset.fmt;
         if (id === 'chart') openChartEditor(selectedEl);
         else if (id === 'aiEdit') openAiEditModal();
+        else if (id === 'painter') togglePainter();
         else if (id === 'more') toggleMoreMenu(b);
         else if (id.startsWith('align-')) runFmt('align', id.slice(6));
         else if (id.startsWith('pal-')) togglePalette(id.slice(4), b);
@@ -832,11 +936,12 @@ function refreshToolbar() {
     fmtEl('sizeDown').disabled = isIcon ? el.offsetWidth <= ICON_MIN : sizeIdx <= 0;
     fmtEl('sizeUp').disabled = isIcon ? el.offsetWidth >= ICON_MAX : sizeIdx >= (isChart ? CHART_SIZE_MAX : SIZE_STEPS.length - 1);
     fmtEl('duplicate').disabled = root;
+    fmtEl('pasteFormat').disabled = !formatClip;
     fmtEl('remove').disabled = root;
     ['layerTop', 'layerUp', 'layerDown', 'layerBottom'].forEach(id => { fmtEl(id).disabled = root; });
     // 還原位置 / 大小：AI 版面元素一律顯示在工具列，沒有移動或縮放過時停用（浮動物件沒有原始位置可還原）
     const ai = !isFloat(el);
-    applyToolbarCtls(tb, kind, ai ? ['aiReset'] : []);
+    applyToolbarCtls(tb, kind, ai ? ['aiReset'] : ['float']);     // float：自行插入的物件（可複製到所有頁面）
     fmtEl('resetPos').disabled = !ai || !getOffset(el).some(Boolean);
     fmtEl('resetScale').disabled = !ai || (getScale(el) === 1 && !isSized(el));
     fmtEl('resetRatio').disabled = !isImgStretched(el);

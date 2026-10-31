@@ -27,7 +27,7 @@
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/app/app.css?v=31">
+    <link rel="stylesheet" href="/static/app/app.css?v=32">
 </head>
 
 <body
@@ -463,9 +463,14 @@
                 <div id="fmtDock" data-edit-only class="hidden w-full max-w-[1024px] items-center mb-2">
                     <p id="fmtDockHint">
                         <i class="fa-regular fa-hand-pointer" aria-hidden="true"></i>
-                        <span>點選元素即可調整格式；雙擊編輯文字，拖曳移動、拉角落縮放，Esc 取消選取</span>
+                        <span>點一下選取整張卡片，再點一次選取裡面的元素；雙擊編輯文字，拖曳移動、拉角落縮放，Esc 取消選取</span>
                         <button type="button" onclick="openGuideSection('edit')">編輯說明與快捷鍵</button>
                     </p>
+                    <!-- 版面檢查：此頁有內容超出畫面（投影片範圍）時顯示，點一下依序選取（static/app/overflow.js） -->
+                    <button id="overflowBadge" type="button" onclick="selectNextOverflow()" title="點一下依序選取超出畫面的元素，可縮小字級、精簡文字或用 AI 修改"
+                        class="hidden shrink-0 self-start ml-2 items-center gap-1.5 h-8 px-3 rounded-full bg-red-50 text-red-600 border border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900 text-xs font-semibold hover:bg-red-100 dark:hover:bg-red-950">
+                        <i class="fa-solid fa-triangle-exclamation text-[11px]"></i><span id="overflowBadgeLabel"></span>
+                    </button>
                 </div>
 
                 <!-- 16:9 投影片主畫布 -->
@@ -716,6 +721,22 @@
         </div>
     </div>
 
+    <!-- 匯出前的版面檢查 Modal（static/app/overflow.js） -->
+    <div id="overflowModal" role="dialog" aria-modal="true" aria-labelledby="overflowTitle"
+        class="hidden fixed inset-0 z-[90] bg-black/45 backdrop-blur-sm p-4 flex items-center justify-center">
+        <div class="w-full max-w-md rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-5 sm:p-6">
+            <h3 id="overflowTitle" class="text-base sm:text-lg font-bold"><i class="fa-solid fa-triangle-exclamation text-red-500 mr-1.5"></i>有內容超出畫面</h3>
+            <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">超出投影片範圍的內容在播放與匯出時會被裁掉。建議先修改（縮小字級、精簡文字、調整大小，或用「AI 修改此元素」）。</p>
+            <ul id="overflowPages" class="mt-3 text-sm divide-y divide-zinc-100 dark:divide-zinc-800 max-h-60 overflow-y-auto"></ul>
+            <div class="mt-5 flex flex-wrap items-center justify-end gap-2">
+                <button onclick="closeOverflowModal()"
+                    class="icon-btn h-9 px-4 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-sm font-semibold">取消</button>
+                <button id="overflowExportBtn"
+                    class="icon-btn h-9 px-4 rounded-full bg-black text-white dark:bg-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 text-sm font-semibold">仍要匯出</button>
+            </div>
+        </div>
+    </div>
+
     <!-- AI 修改此元素 Modal（static/app/aiedit.js） -->
     <div id="aiEditModal" role="dialog" aria-modal="true" aria-labelledby="aiEditTitle"
         class="hidden fixed inset-0 z-[90] bg-black/45 backdrop-blur-sm p-4 flex items-center justify-center">
@@ -904,9 +925,12 @@
                         <p>在簡報頁按「編輯」進入編輯模式，直接修改投影片內容，不會呼叫 AI。</p>
                         <h5>修改 AI 生成的版面</h5>
                         <ul>
-                            <li>點擊文字即可修改；選取元素後，投影片上方的編輯列會顯示格式工具列，可調整字級、粗細、對齊、顏色、圓角與陰影，或刪除元素；AI 版面元素另有「還原位置」「還原大小」，複製與圖層順序（物件重疊時誰在上面：上移 / 下移一層、移到最上 / 最下層，快捷鍵 <kbd>Ctrl</kbd> + <kbd>↑</kbd> / <kbd>↓</kbd>，加 <kbd>Shift</kbd> 移到最上 / 最下層）在「更多」選單中。工具列只顯示該類元素有作用的設定，例如圖片沒有字級與對齊。</li>
+                            <li><b>選取</b>：點一下選取整張卡片（有底色、外框或陰影的區塊），在卡片內再點一次選取裡面的元素；雙擊直接編輯文字；「選取外層」可回到外面一層。</li>
+                            <li><b>格式刷</b>：選取一個元素後按工具列的「格式刷」，再點另一個元素，即可套用相同的字級、粗細、對齊、文字與背景顏色、圓角、外框與陰影（圖案另含填滿與線條；不改變位置與大小），<kbd>Esc</kbd> 取消；「更多」選單的「貼上格式」可把最後複製的格式再套用到其他元素。</li>
+                            <li><b>版面檢查</b>：超出畫面（投影片範圍）、播放與匯出時會被裁掉的元素會以紅色虛線標示，編輯列右側會顯示「N 處內容超出畫面」，點一下依序選取；匯出前也會檢查每一頁，有問題時可前往修改或仍要匯出。</li>
+                            <li>選取元素後，投影片上方的編輯列會顯示格式工具列，可調整字級、粗細、對齊、顏色、圓角與陰影，或刪除元素；AI 版面元素另有「還原位置」「還原大小」，複製與圖層順序（物件重疊時誰在上面：上移 / 下移一層、移到最上 / 最下層，快捷鍵 <kbd>Ctrl</kbd> + <kbd>↑</kbd> / <kbd>↓</kbd>，加 <kbd>Shift</kbd> 移到最上 / 最下層）在「更多」選單中。工具列只顯示該類元素有作用的設定，例如圖片沒有字級與對齊。</li>
                             <li><b>AI 修改此元素</b>：選取一個元素（例如一張卡片），按工具列的「AI 修改此元素」並輸入需求（例如「改成長條圖」「只留三個重點」），AI 只會重新設計這個元素，頁面其他部分不變；算一次 AI 用量，可按 <kbd>Ctrl</kbd> + <kbd>Z</kbd> 復原。要重做整頁請用「重產此頁」。</li>
-                            <li>AI 生成的元素可以移動與縮放：先單擊選取（必要時按「選取父層」選到整張卡片），按住拖曳或用方向鍵微調位置，拉四個角可等比例縮放（文字一起放大縮小），旁邊的元素不會跟著變動；拉四邊中點（或按住 <kbd>Shift</kbd> 拉角落）可不鎖定比例調整寬高（文字依新寬度換行，旁邊的元素同樣不變動）；工具列可設定外框（顏色、粗細、樣式）與陰影，「還原位置」「還原大小」可恢復原狀。AI 產生的圖表可修改數據。</li>
+                            <li>AI 生成的元素可以移動與縮放：先單擊選取，按住拖曳或用方向鍵微調位置，拉四個角可等比例縮放（文字一起放大縮小），旁邊的元素不會跟著變動；拉四邊中點（或按住 <kbd>Shift</kbd> 拉角落）可不鎖定比例調整寬高（文字依新寬度換行，旁邊的元素同樣不變動）；工具列可設定外框（顏色、粗細、樣式）與陰影，「還原位置」「還原大小」可恢復原狀。AI 產生的圖表可修改數據。</li>
                             <li>元素被拖出所在的卡片或區塊時，超出的部分可能被裁掉，建議選取外層卡片整個移動。</li>
                         </ul>
                         <h5>插入內容</h5>
@@ -916,7 +940,7 @@
                             <div class="guide-card"><b><i class="fa-regular fa-image"></i>圖片</b><span>上傳、拖放或貼上圖片，在瀏覽器端壓縮後內嵌；可設定圓角、邊框（顏色、粗細、實線 / 虛線 / 點線）與透明圖片的底色；拉角落等比例縮放，拉四邊中點（或按住 <kbd>Shift</kbd> 拉角落）可不鎖定比例調整寬高，「還原比例」可恢復原圖比例。</span></div>
                             <div class="guide-card"><b><i class="fa-solid fa-chart-column"></i>圖表</b><span>以試算表輸入數據，可直接貼上 Excel 多格資料，並可加參考虛線、勾選要凸顯的項目；拉四邊中點只調整寬或高（文字不變形），按住 <kbd>Shift</kbd> 拉角落可等比例縮放。</span></div>
                             <div class="guide-card"><b><i class="fa-solid fa-icons"></i>圖示</b><span>內建 300 個常用圖示，可用中英文關鍵字搜尋，Enter 插入第一個。</span></div>
-                            <div class="guide-card"><b><i class="fa-solid fa-certificate"></i>品牌</b><span>插入公司統一的 Logo 與品牌識別圖片（由管理者放在伺服器上），插入後與一般圖片相同，可移動、縮放、加外框與陰影；沒有設定品牌圖片時，選單中不顯示這一項。</span></div>
+                            <div class="guide-card"><b><i class="fa-solid fa-certificate"></i>品牌</b><span>插入公司統一的 Logo 與品牌識別圖片（由管理者放在伺服器上），可選擇插入位置（預設右上角，也可選左上、右下、左下或置中），插入後可按提示中的「複製到所有頁面」放到每一頁的相同位置；之後與一般圖片相同，可移動、縮放、加外框與陰影。沒有設定品牌圖片時，選單中不顯示這一項。自行插入的物件都可以從「更多」選單「複製到所有頁面（相同位置）」。</span></div>
                             <div class="guide-card"><b><i class="fa-solid fa-shapes"></i>圖案</b><span>16 種圖案，可調整填滿、外框、線條樣式與圓角，雙擊輸入文字；拉四邊中點只調整寬或高，按住 <kbd>Shift</kbd> 拉角落可等比例縮放。</span></div>
                             <div class="guide-card"><b><i class="fa-regular fa-square-plus"></i>空白頁</b><span>在目前頁面之後新增空白頁並直接切換過去。</span></div>
                         </div>
@@ -1133,16 +1157,17 @@
     <script src="/static/app/generate.js?v=24"></script>
     <script src="/static/app/outline.js?v=1"></script>
     <script src="/static/app/shapes.js?v=4"></script>
-    <script src="/static/app/editor.js?v=20"></script>
-    <script src="/static/app/media.js?v=17"></script>
+    <script src="/static/app/editor.js?v=21"></script>
+    <script src="/static/app/media.js?v=18"></script>
+    <script src="/static/app/overflow.js?v=2"></script>
     <script src="/static/app/aiedit.js?v=2"></script>
-    <script src="/static/app/brand.js?v=2"></script>
-    <script src="/static/app/player.js?v=5"></script>
+    <script src="/static/app/brand.js?v=3"></script>
+    <script src="/static/app/player.js?v=6"></script>
     <script src="/static/app/versions.js?v=2"></script>
     <script src="/static/app/auth.js?v=5"></script>
     <script src="/static/app/guide.js?v=2"></script>
     <script src="/static/app/feedback.js?v=2"></script>
-    <script src="/static/app/main.js?v=13"></script>
+    <script src="/static/app/main.js?v=14"></script>
 </body>
 
 </html>
