@@ -284,7 +284,7 @@ LDAP_USER_FILTER=(&(sAMAccountName={username})(memberOf=cn=R_Slide_Users,ou=grou
 | 變數 | 說明 | 預設值 |
 |------|------|--------|
 | `EXTRACT_IMAGES` | 是否用 AI 辨識投影片中的圖片與 PDF 的掃描頁。設為 `false` 時，只匯入文字。 | `true` |
-| `EXTRACT_IMAGE_MAX` | 一個檔案最多辨識幾張圖片。PDF 的一個掃描頁算一張。`0` 表示沒有限制。 | `0` |
+| `EXTRACT_IMAGE_MAX` | 一個檔案最多辨識幾張圖片。PDF 的一個掃描頁算一張。`0` 表示沒有限制。 | `50` |
 | `EXTRACT_IMAGE_CONCURRENCY` | 同時辨識幾頁。 | `4` |
 
 說明：

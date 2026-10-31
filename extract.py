@@ -495,6 +495,20 @@ MIN_PDF_PAGE_CHARS = 10
 PDF_RENDER_SIDE = 2000
 # 灰階標準差低於此值的頁面視為空白頁，不送辨識
 BLANK_PAGE_STDDEV = 2.0
+# 一個檔案預設最多辨識幾張圖片（PDF 的一個掃描頁算一張）
+DEFAULT_IMAGE_MAX = 50
+
+
+def env_int(name: str, default: int) -> int:
+    try:
+        return max(0, int(os.getenv(name, default)))
+    except ValueError:
+        return default
+
+
+def image_limit() -> int:
+    """EXTRACT_IMAGE_MAX：一個檔案最多辨識幾張圖片，0 為不限制。"""
+    return env_int("EXTRACT_IMAGE_MAX", DEFAULT_IMAGE_MAX)
 
 
 def _render_pdf_pages(data: bytes, numbers: list[int]) -> dict[int, bytes]:
@@ -524,6 +538,11 @@ def _extract_pdf(data: bytes, read_images: ImageReader | None) -> tuple[str, int
     scanned = [i for i, t in enumerate(pages, 1) if len(t) < MIN_PDF_PAGE_CHARS]
     readings, info = {}, {}
     if scanned and read_images:
+        # 先截到上限再轉圖片：一個 PDF 可以有上千頁共用同一張圖，全部轉成圖片會耗盡記憶體與 AI 用量
+        limit, skipped = image_limit(), 0
+        if limit and len(scanned) > limit:
+            skipped = len(scanned) - limit
+            scanned = scanned[:limit]
         try:
             images = _render_pdf_pages(data, scanned)
         except pdfium.PdfiumError as e:
@@ -531,6 +550,8 @@ def _extract_pdf(data: bytes, read_images: ImageReader | None) -> tuple[str, int
         jobs = [SourcePage(number=n, blocks=[SlideImage(key=f"p{n}", data=img, mime="image/jpeg")])
                 for n, img in images.items()]
         readings, notices = read_images(jobs) if jobs else ({}, [])
+        if skipped:
+            notices = [f"超過辨識上限（{limit} 張），{skipped} 頁掃描頁未辨識", *notices]
         info = {"images": len(jobs), "images_read": sum(1 for j in jobs if f"p{j.number}" in readings),
                 "notices": notices}
     out = []

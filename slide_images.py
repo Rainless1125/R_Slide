@@ -3,28 +3,15 @@
 結果以圖片的 key 對回原本的位置（見 extract.render_pptx），所以同一頁的原生文字與辨識結果不會錯置。
 AI 呼叫由呼叫端傳入（app.py 的 call_llm），本模組只負責提示規則、分頁與併發。
 """
-import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 
 from pydantic import BaseModel, Field
 
-from extract import SourcePage
+from extract import SourcePage, env_int, image_limit
 
 DEFAULT_CONCURRENCY = 4
 MAX_CONTEXT_CHARS = 2000      # 附給 AI 的本頁文字上限
-
-
-def env_int(name: str, default: int) -> int:
-    try:
-        return max(0, int(os.getenv(name, default)))
-    except ValueError:
-        return default
-
-
-def image_limit() -> int:
-    """EXTRACT_IMAGE_MAX：一個檔案最多辨識幾張圖片，0 為不限制（預設）。"""
-    return env_int("EXTRACT_IMAGE_MAX", 0)
 
 
 def concurrency() -> int:
