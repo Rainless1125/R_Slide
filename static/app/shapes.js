@@ -247,7 +247,7 @@ function insertSlideShape(type) {
         cells[Math.min(cells.length - 1, Math.max(0, i + step))].focus();
     });
     document.addEventListener('mousedown', e => {
-        if (!e.target.closest('#shapePicker') && !e.target.closest('#shapePickerBtn')) closeShapePicker();
+        if (!e.target.closest('#shapePicker') && !e.target.closest('#insertMenu')) closeShapePicker();
     });
 })();
 
@@ -273,11 +273,11 @@ function closeShapePicker() {
 function positionShapePicker() {
     if (!isShapePickerOpen()) return;
     const panel = document.getElementById('shapePicker');
-    const r = document.getElementById('shapePickerBtn').getBoundingClientRect();
+    const r = document.getElementById('insertBtn').getBoundingClientRect();
     const w = Math.min(340, window.innerWidth - 16);
     panel.style.width = w + 'px';
     const h = panel.offsetHeight;
     const up = r.top - 16 >= h || r.top > window.innerHeight - r.bottom;
-    panel.style.left = Math.min(Math.max(8, r.right - w), window.innerWidth - w - 8) + 'px';
+    panel.style.left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8) + 'px';
     panel.style.top = (up ? Math.max(8, r.top - 8 - h) : r.bottom + 8) + 'px';
 }

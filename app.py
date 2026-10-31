@@ -476,7 +476,7 @@ def check_field_lengths(req):
     limits = [("內容", req.content, MAX_CONTENT_CHARS), ("目標受眾", req.target_audience, MAX_AUDIENCE_CHARS),
               ("視覺風格", req.style_preference, MAX_STYLE_CHARS), ("平台", req.provider, MAX_MODEL_CHARS),
               ("模型名稱", req.model, MAX_MODEL_CHARS)]
-    if isinstance(req, RegenerateSlideRequest):
+    if isinstance(req, (RegenerateSlideRequest, RegenerateElementRequest)):
         limits += [("簡報標題", req.presentation_title, MAX_TITLE_CHARS),
                    ("重產提示詞", req.custom_prompt, MAX_CUSTOM_PROMPT_CHARS)]
     outline = getattr(req, "outline", None)
@@ -523,8 +523,50 @@ class RegenerateSlideRequest(BaseModel):
     model: str = ""
     thinking: ThinkingLevel = "medium"
 
+class RegenerateElementRequest(BaseModel):
+    """AI 修改單一元素：slide_html 是整頁 HTML（要修改的元素標有 data-rs-target），element_html 是該元素本身。
+    圖片已換成 rs-img 代號、圖表容器已清空；charts 是元素內的圖表資料，element_html 中的 data-rs-chart 已改為從 0 開始的索引。"""
+    content: str
+    target_audience: str = "商務主管 / 技術決策者"
+    num_pages: int = Field(0, ge=0, le=MAX_REGEN_SLIDES)
+    style_preference: str = "蘋果極簡白 (Apple Minimalist)"
+    presentation_title: str = "未命名簡報"
+    deck_mode: DeckMode = "speaker"
+    theme: dict | None = None
+    slide_title: str = ""
+    slide_html: str
+    element_html: str
+    element_width: int = Field(ge=1, le=4096)
+    element_height: int = Field(ge=1, le=4096)
+    charts: list[dict | None] = Field(default_factory=list)
+    custom_prompt: str = ""
+    provider: str = "gemini"
+    model: str = ""
+    thinking: ThinkingLevel = "medium"
+
+
+class ElementRewrite(BaseModel):
+    html_content: str = Field(description="取代選取元素的 HTML（純 HTML + Tailwind CSS class），必須是單一根元素，規則見【只修改單一元素】")
+    charts: list[ChartSpec] = Field(description="新元素內的圖表資料，依 data-rs-chart 索引（從 0 開始）對應；沒有圖表時為空陣列")
+
+
+ELEMENT_EDIT_RULES = """
+    【只修改單一元素（最優先）】：
+    1. 使用者在投影片上選取了一個元素（整頁 HTML 中標有 data-rs-target 的元素，原始 HTML 另附在【要修改的元素】）。
+       你只能重新設計這個元素，頁面上其他部分完全不變，因此只輸出取代它的 HTML。
+    2. 輸出必須是「單一根元素」，不要輸出整頁、不要加 <html>、<body>，也不要輸出 data-rs-target 屬性。
+    3. 根元素保留原本決定它在版面中位置與大小的 class（例如 flex-1、col-span-2、row-span-2、w-1/2、h-full、min-h-0、self-start、order-2），
+       讓新元素佔用與原元素相同的位置。
+    4. 新內容必須完整放進與原元素相同的 {width} × {height} px 範圍內，不可撐大或超出：內容多時精簡文字、縮小字級與間距。
+    5. 配色、字級、圓角、卡片樣式沿用【整份簡報的設計規範】與頁面上相鄰的元素，讓新元素看起來和整頁一致。
+    6. 僅使用 Tailwind CSS class；禁止使用 emoji，請使用 font-awesome 圖示（<i class="fa-solid fa-...">）。
+    7. <img data-rs-img src="rs-img:數字"> 是使用者上傳的圖片：除非使用者要求移除，否則保留該 <img> 標籤與 src 原樣。
+    8. 需要圖表時放入 <div data-rs-chart="索引"></div>，資料寫在 charts，索引從 0 開始；原元素的圖表資料附在【原圖表資料】，可沿用、修改或刪除。
+    9. 使用者沒有指定需求時，在不改變元素用途與資訊的前提下，讓排版更清楚、重點更突出。
+"""
+
 # 2. API 端點
-LLM_PATHS = {"/api/generate", "/api/outline", "/api/regenerate-slide"}
+LLM_PATHS = {"/api/generate", "/api/outline", "/api/regenerate-slide", "/api/regenerate-element"}
 
 
 @app.middleware("http")
@@ -850,6 +892,70 @@ def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict =
             data["page_number"] = target_slide.page_number
             # 使用者可能自行插入超過 MAX_CHARTS_PER_SLIDE 張圖表：至少保留原頁的張數，避免重產後被截掉
             data["charts"] = normalize_charts(data.get("charts"), max(MAX_CHARTS_PER_SLIDE, len(target_slide.charts)))
+            usage["slides_returned"] = 1
+            return data
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/regenerate-element")
+def regenerate_element(req: RegenerateElementRequest, request: Request, user: dict = Depends(current_user)):
+    """AI 修改投影片上的單一元素（頁面其他部分不變），回傳取代該元素的 HTML 與圖表資料。"""
+    check_field_lengths(req)
+    if not req.element_html.strip():
+        raise HTTPException(status_code=400, detail="缺少要修改的元素")
+    for label, value, limit in [("此元素", req.element_html, MAX_SLIDE_HTML_CHARS), ("此頁", req.slide_html, MAX_SLIDE_HTML_CHARS),
+                                ("頁面標題", req.slide_title, MAX_SLIDE_META_CHARS)]:
+        if len(value) > limit:
+            raise HTTPException(status_code=400, detail=f"{label}內容過多，無法修改；請先刪減內容後再試")
+    if len(json.dumps(req.charts, ensure_ascii=False)) > MAX_SLIDE_CHARTS_CHARS:
+        raise HTTPException(status_code=400, detail="此元素的圖表資料過多，無法修改")
+    theme = theme_from_input(req.theme)
+    theme_block = (format_theme(theme) if theme
+                   else "（這份簡報沒有記錄設計規範，請沿用頁面上其他元素的配色、卡片與標題樣式）")
+    w, h = req.element_width, req.element_height
+
+    system_instruction = """
+    你是一位榮獲世界設計大獎的簡報 UI 設計師。
+    你的任務是依使用者的需求，重新設計投影片上「單一個元素」，頁面的其他部分保持不變。
+    """ + ELEMENT_EDIT_RULES.replace("{width}", str(w)).replace("{height}", str(h)) \
+        + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + CONTENT_ACCURACY_RULES
+
+    prompt = f"""
+    【簡報標題】：{req.presentation_title}
+    【簡報目標客群】：{req.target_audience}
+    【簡報模式】：{DECK_MODE_LABELS[req.deck_mode]}
+    【指定視覺風格】：{req.style_preference}
+    【原始素材內容】：
+    {req.content}
+
+    【整份簡報的設計規範】：
+    {theme_block}
+
+    【此頁標題】：{req.slide_title or "（無）"}
+    【整頁 HTML（要修改的元素標有 data-rs-target，僅供參考，不要輸出）】：
+    {req.slide_html}
+
+    【要修改的元素】（寬 {w} px、高 {h} px）：
+    {req.element_html}
+
+    【原圖表資料】（JSON，索引從 0 開始）：
+    {json.dumps(req.charts, ensure_ascii=False) if req.charts else "（無）"}
+
+    【使用者的修改需求】：
+    {req.custom_prompt.strip() or "（無，請你自行優化這個元素）"}
+
+    請只輸出取代這個元素的單一根元素 HTML 與它的圖表資料。
+    """
+
+    with llm_usage_log(request, user, "element", req) as usage:
+        try:
+            data = call_llm(req.provider, req.model, system_instruction, prompt, ElementRewrite, 0.6, usage,
+                            thinking=req.thinking)
+            if not (data.get("html_content") or "").strip():
+                raise HTTPException(status_code=502, detail="模型沒有回傳新的元素內容")
+            data["charts"] = normalize_charts(data.get("charts"), max(MAX_CHARTS_PER_SLIDE, len(req.charts)))
             usage["slides_returned"] = 1
             return data
         except HTTPException:

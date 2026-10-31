@@ -1118,6 +1118,25 @@ body:has(#slideCanvas.editing) #toastRoot {
     flex: 1;
 }
 
+/* AI 修改此元素：工具列按鈕與等待 AI 時的元素外框 */
+#fmtToolbar .fb.ai-edit {
+    color: #7c3aed;
+}
+
+.dark #fmtToolbar .fb.ai-edit {
+    color: #c4b5fd;
+}
+
+#slideCanvas [data-rs-busy] {
+    outline: 2px dashed #8b5cf6 !important;
+    outline-offset: 2px;
+    animation: rs-ai-busy 1.2s ease-in-out infinite;
+}
+
+@keyframes rs-ai-busy {
+    50% { opacity: .55; }
+}
+
 #fmtToolbar .bt {
     font-weight: 500;
 }
@@ -1288,6 +1307,32 @@ body:has(#slideCanvas.editing) #toastRoot {
 #editBtn[aria-pressed="true"] {
     background: #3b82f6;
     color: #fff;
+}
+
+#editBtn[aria-pressed="true"]:hover {
+    background: #2563eb;
+}
+
+/* 播放器控制列：三個區塊（頁面導覽 / 播放或插入 / 動作），以分隔線隔開 */
+#playerBar .bar-zone {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+#playerBar .bar-zone[hidden] {
+    display: none;
+}
+
+#playerBar .bar-sep {
+    width: 1px;
+    height: 20px;
+    margin: 0 4px;
+    background: rgb(228 228 231);
+}
+
+.dark #playerBar .bar-sep {
+    background: rgb(63 63 70);
 }
 
 /* ---------- 圖片 / 圖表：可拖曳移動、拖曳控制點縮放 ---------- */

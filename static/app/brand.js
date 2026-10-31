@@ -11,11 +11,8 @@ async function loadBrandIcons() {
         const res = await fetch('/api/brand-icons');
         if (res.ok) brandIcons = await res.json();
     } catch (e) { }
-    const btn = document.getElementById('brandPickerBtn');
-    const has = brandIcons.length > 0;
-    btn.toggleAttribute('data-edit-only', has);           // 編輯模式的按鈕由 toggleEditMode 依 data-edit-only 顯示
-    btn.classList.toggle('hidden', !(has && editMode));
-    btn.classList.toggle('flex', has && editMode);
+    // 「插入」選單中的「品牌」項目
+    document.getElementById('brandPickerBtn').classList.toggle('hidden', !brandIcons.length);
     renderBrandPicker();
 }
 
@@ -60,7 +57,7 @@ async function insertBrandIcon(icon) {
         cells[Math.min(cells.length - 1, Math.max(0, i + step))].focus();
     });
     document.addEventListener('mousedown', e => {
-        if (!e.target.closest('#brandPicker') && !e.target.closest('#brandPickerBtn')) closeBrandPicker();
+        if (!e.target.closest('#brandPicker') && !e.target.closest('#insertMenu')) closeBrandPicker();
     });
 })();
 
@@ -86,12 +83,12 @@ function closeBrandPicker() {
 function positionBrandPicker() {
     if (!isBrandPickerOpen()) return;
     const panel = document.getElementById('brandPicker');
-    const r = document.getElementById('brandPickerBtn').getBoundingClientRect();
+    const r = document.getElementById('insertBtn').getBoundingClientRect();
     const w = Math.min(360, window.innerWidth - 16);
     panel.style.width = w + 'px';
     const h = panel.offsetHeight;
     const up = r.top - 16 >= h || r.top > window.innerHeight - r.bottom;
-    panel.style.left = Math.min(Math.max(8, r.right - w), window.innerWidth - w - 8) + 'px';
+    panel.style.left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8) + 'px';
     panel.style.top = (up ? Math.max(8, r.top - 8 - h) : r.bottom + 8) + 'px';
 }
 window.addEventListener('resize', positionBrandPicker);

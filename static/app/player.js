@@ -246,6 +246,49 @@ document.addEventListener('fullscreenchange', () => {
     setTimeout(fitSlide, 50);
 });
 
+/* ===================== 插入選單（編輯模式） ===================== */
+// 圖示、圖案、品牌的面板以「插入」按鈕為定位基準（選單項目在選單關閉後看不到）
+function setInsertMenuOpen(open, focusFirst = false) {
+    const list = document.getElementById('insertList');
+    if (!list) return;
+    list.classList.toggle('hidden', !open);
+    document.getElementById('insertBtn').setAttribute('aria-expanded', String(open));
+    if (open && focusFirst) list.querySelector('[role=menuitem]:not(.hidden)')?.focus();
+}
+(function initInsertMenu() {
+    const wrap = document.getElementById('insertMenu');
+    const btn = document.getElementById('insertBtn');
+    const list = document.getElementById('insertList');
+    const actions = {
+        text: insertTextBox, image: pickSlideImage, chart: () => openChartEditor(null),
+        icon: toggleIconPicker, shape: toggleShapePicker, brand: toggleBrandPicker,
+        blank: () => addBlankSlide(currentSlideIdx, true)
+    };
+    btn.onclick = () => {
+        const open = list.classList.contains('hidden');
+        if (open) { closeIconPicker(); closeShapePicker(); closeBrandPicker(); }
+        setInsertMenuOpen(open);
+    };
+    list.addEventListener('click', e => {
+        const item = e.target.closest('[data-insert]');
+        if (!item) return;
+        setInsertMenuOpen(false);
+        actions[item.dataset.insert]();
+    });
+    document.addEventListener('click', e => { if (!e.target.closest('#insertMenu')) setInsertMenuOpen(false); });
+    wrap.addEventListener('keydown', e => {
+        const open = !list.classList.contains('hidden');
+        if (e.key === 'Escape' && open) { e.stopPropagation(); setInsertMenuOpen(false); btn.focus(); return; }
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        e.preventDefault();
+        e.stopPropagation(); // 避免觸發全域的換頁與微調位置快捷鍵
+        if (!open) { setInsertMenuOpen(true, true); return; }
+        const items = [...list.querySelectorAll('[role=menuitem]:not(.hidden)')];
+        const i = items.indexOf(document.activeElement);
+        items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
+    });
+})();
+
 /* ===================== 匯出選單 ===================== */
 (function initExportMenu() {
     const wrap = document.getElementById('exportMenu');

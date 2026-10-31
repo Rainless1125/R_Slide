@@ -278,7 +278,7 @@ function scaleIcon(el, dir) {
         vis[Math.min(vis.length - 1, k + step)]?.focus();
     });
     document.addEventListener('mousedown', e => {
-        if (!e.target.closest('#iconPicker') && !e.target.closest('#iconPickerBtn')) closeIconPicker();
+        if (!e.target.closest('#iconPicker') && !e.target.closest('#insertMenu')) closeIconPicker();
     });
 
     function pickIcon(name) {
@@ -311,14 +311,14 @@ function closeIconPicker() {
 function positionIconPicker() {
     if (!isIconPickerOpen()) return;
     const panel = document.getElementById('iconPicker');
-    const r = document.getElementById('iconPickerBtn').getBoundingClientRect();
+    const r = document.getElementById('insertBtn').getBoundingClientRect();
     const w = Math.min(460, window.innerWidth - 16);
     const above = r.top - 16, below = window.innerHeight - r.bottom - 16;
     const up = above >= Math.min(420, below);
     const h = Math.min(520, Math.max(220, up ? above : below));
     panel.style.width = w + 'px';
     panel.style.height = h + 'px';
-    panel.style.left = Math.min(Math.max(8, r.right - w), window.innerWidth - w - 8) + 'px';
+    panel.style.left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8) + 'px';
     panel.style.top = (up ? Math.max(8, r.top - 8 - h) : r.bottom + 8) + 'px';
 }
 

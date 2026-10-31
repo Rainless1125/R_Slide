@@ -27,7 +27,7 @@
             }
         }
     </script>
-    <link rel="stylesheet" href="/static/app/app.css?v=29">
+    <link rel="stylesheet" href="/static/app/app.css?v=31">
 </head>
 
 <body
@@ -490,122 +490,123 @@
                     </div>
                 </div>
 
-                <!-- 控制列 -->
-                <div
+                <!-- 控制列：左側頁面導覽、中間依模式切換（一般：播放與簡報；編輯：插入、撤銷、重做）、右側動作（編輯、舊版本、重產、匯出） -->
+                <div id="playerBar"
                     class="mt-4 max-w-full flex flex-wrap items-center justify-center gap-x-1 gap-y-1 sm:gap-2 bg-white/80 dark:bg-zinc-900/80 backdrop-blur border border-zinc-200 dark:border-zinc-800 rounded-3xl sm:rounded-full px-3 py-1.5 shadow-sm">
-                    <button id="prevBtn" onclick="prevSlide()"
-                        class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center"
-                        aria-label="上一頁"><i class="fa-solid fa-chevron-left text-xs"></i></button>
-                    <span id="slideCounter" class="text-xs font-mono tabular-nums w-14 text-center">01 / 03</span>
-                    <button id="nextBtn" onclick="nextSlide()"
-                        class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center"
-                        aria-label="下一頁"><i class="fa-solid fa-chevron-right text-xs"></i></button>
-                    <div class="w-px h-5 bg-zinc-200 dark:bg-zinc-700 mx-1"></div>
-                    <button id="autoBtn" onclick="toggleAutoplay()"
-                        class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
-                        aria-label="自動播放">
-                        <i id="autoIcon" class="fa-solid fa-play text-[10px]"></i><span class="hidden sm:inline" id="autoLabel">自動播放</span>
-                    </button>
-                    <button onclick="toggleFullscreen()"
-                        class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
-                        aria-label="全螢幕">
-                        <i id="fsIcon" class="fa-solid fa-expand text-[11px]"></i><span class="hidden sm:inline" id="fsLabel">全螢幕</span>
-                    </button>
-                    <button id="notesBtn" onclick="toggleNotesPanel()" aria-pressed="false"
-                        class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
-                        aria-label="講者備註" title="顯示 / 隱藏講者備註 (N)">
-                        <i class="fa-regular fa-note-sticky text-[11px]"></i><span class="hidden sm:inline">備註</span>
-                    </button>
-                    <button onclick="openPresenterView()"
-                        class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
-                        aria-label="講者檢視" title="另開視窗顯示目前頁、下一頁、講者備註與計時器 (P)">
-                        <i class="fa-solid fa-person-chalkboard text-[11px]"></i><span class="hidden lg:inline">講者檢視</span>
-                    </button>
-                    <button id="editBtn" onclick="toggleEditMode()" aria-pressed="false"
-                        class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
-                        aria-label="編輯投影片" title="直接修改投影片上的文字、圖片與圖表（不呼叫 AI）">
-                        <i id="editIcon" class="fa-solid fa-pen-to-square text-[11px]"></i><span class="hidden sm:inline" id="editLabel">編輯</span>
-                    </button>
-                    <button onclick="addBlankSlide(currentSlideIdx, true)" data-edit-only
-                        class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
-                        aria-label="新增空白頁" title="在目前頁面之後新增空白頁（沿用目前頁面的背景）">
-                        <i class="fa-solid fa-file-circle-plus text-[11px]"></i><span class="hidden xl:inline">空白頁</span>
-                    </button>
-                    <button onclick="insertTextBox()" data-edit-only
-                        class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
-                        aria-label="插入文字" title="插入可自由移動的文字方塊">
-                        <i class="fa-solid fa-font text-[11px]"></i><span class="hidden xl:inline">文字</span>
-                    </button>
-                    <button onclick="pickSlideImage()" data-edit-only
-                        class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
-                        aria-label="插入圖片" title="插入圖片（也可直接把圖片拖到投影片上）">
-                        <i class="fa-regular fa-image text-[11px]"></i><span class="hidden xl:inline">圖片</span>
-                    </button>
-                    <button onclick="openChartEditor(null)" data-edit-only
-                        class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
-                        aria-label="插入圖表" title="輸入數據插入圖表">
-                        <i class="fa-solid fa-chart-column text-[11px]"></i><span class="hidden xl:inline">圖表</span>
-                    </button>
-                    <button id="iconPickerBtn" onclick="toggleIconPicker()" data-edit-only aria-haspopup="dialog" aria-expanded="false" aria-controls="iconPicker"
-                        class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
-                        aria-label="插入圖示" title="從常用圖示中快速插入（可搜尋關鍵字）">
-                        <i class="fa-solid fa-icons text-[11px]"></i><span class="hidden xl:inline">圖示</span>
-                    </button>
-                    <button id="shapePickerBtn" onclick="toggleShapePicker()" data-edit-only aria-haspopup="dialog" aria-expanded="false" aria-controls="shapePicker"
-                        class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
-                        aria-label="插入圖案" title="插入矩形、三角形、箭頭等圖案（可調整外框粗細與填滿顏色）">
-                        <i class="fa-solid fa-shapes text-[11px]"></i><span class="hidden xl:inline">圖案</span>
-                    </button>
-                    <!-- 企業 / 品牌識別圖示：brand_icon 資料夾有圖片時才顯示（static/app/brand.js） -->
-                    <button id="brandPickerBtn" onclick="toggleBrandPicker()" aria-haspopup="dialog" aria-expanded="false" aria-controls="brandPicker"
-                        class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
-                        aria-label="插入品牌識別圖示" title="插入公司統一的 Logo 與品牌識別圖片">
-                        <i class="fa-solid fa-certificate text-[11px]"></i><span class="hidden xl:inline">品牌</span>
-                    </button>
-                    <input id="slideImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" class="hidden">
-                    <button id="versionCurrentBtn" onclick="openVersionModal(currentSlideIdx)"
-                        class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
-                        aria-label="比較或還原此頁的舊版本">
-                        <i class="fa-solid fa-clock-rotate-left text-[11px]"></i><span class="hidden sm:inline">舊版本</span>
-                    </button>
-                    <button id="regenCurrentBtn" onclick="regenerateCurrentSlide()"
-                        class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
-                        aria-label="重產此頁">
-                        <i id="regenCurrentIcon" class="fa-solid fa-arrows-rotate text-[11px]"></i><span class="hidden sm:inline"
-                            id="regenCurrentLabel">重產此頁</span>
-                    </button>
-                    <div id="exportMenu" class="relative">
-                        <button id="exportBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="exportList"
-                            class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-60 disabled:cursor-wait text-xs font-semibold flex items-center gap-1.5"
-                            aria-label="匯出" title="匯出為 PDF、PowerPoint 或 HTML">
-                            <i id="exportIcon" class="fa-solid fa-file-export text-[11px]"></i><span class="hidden sm:inline tabular-nums" id="exportLabel">匯出</span><i
-                                class="fa-solid fa-chevron-up text-[9px] text-zinc-400"></i>
+                    <!-- 頁面導覽 -->
+                    <div class="bar-zone">
+                        <button id="prevBtn" onclick="prevSlide()"
+                            class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center"
+                            aria-label="上一頁"><i class="fa-solid fa-chevron-left text-xs"></i></button>
+                        <span id="slideCounter" class="text-xs font-mono tabular-nums w-14 text-center">01 / 03</span>
+                        <button id="nextBtn" onclick="nextSlide()"
+                            class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center"
+                            aria-label="下一頁"><i class="fa-solid fa-chevron-right text-xs"></i></button>
+                    </div>
+                    <div class="bar-sep"></div>
+                    <!-- 一般模式：播放與簡報 -->
+                    <div class="bar-zone" data-view-only>
+                        <button id="autoBtn" onclick="toggleAutoplay()" class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5" aria-label="自動播放">
+                            <i id="autoIcon" class="fa-solid fa-play text-[10px]"></i><span class="hidden sm:inline" id="autoLabel">自動播放</span>
                         </button>
-                        <div id="exportList" role="menu" aria-label="匯出格式"
-                            class="hidden absolute z-40 bottom-full mb-2 right-0 w-64 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl p-1">
-                            <button type="button" role="menuitem" data-export="pdf" class="export-item">
-                                <i class="fa-solid fa-file-pdf text-red-500"></i>
-                                <span><b>PDF 文件</b><small>適合列印、寄送與分享</small></span>
+                        <button onclick="toggleFullscreen()" class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5" aria-label="全螢幕">
+                            <i id="fsIcon" class="fa-solid fa-expand text-[11px]"></i><span class="hidden sm:inline" id="fsLabel">全螢幕</span>
+                        </button>
+                        <button id="notesBtn" onclick="toggleNotesPanel()" aria-pressed="false" class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
+                            aria-label="講者備註" title="顯示 / 隱藏講者備註 (N)">
+                            <i class="fa-regular fa-note-sticky text-[11px]"></i><span class="hidden sm:inline">備註</span>
+                        </button>
+                        <button onclick="openPresenterView()" class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5"
+                            aria-label="講者檢視" title="另開視窗顯示目前頁、下一頁、講者備註與計時器 (P)">
+                            <i class="fa-solid fa-person-chalkboard text-[11px]"></i><span class="hidden lg:inline">講者檢視</span>
+                        </button>
+                    </div>
+                    <!-- 編輯模式：插入（選單）、撤銷、重做 -->
+                    <div class="bar-zone" data-edit-zone hidden>
+                        <div id="insertMenu" class="relative">
+                            <button id="insertBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="insertList"
+                                class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                                aria-label="插入" title="插入文字、圖片、圖表、圖示、圖案、品牌識別或空白頁">
+                                <i class="fa-solid fa-plus text-[11px]"></i><span>插入</span><i class="fa-solid fa-chevron-up text-[9px] text-zinc-400"></i>
                             </button>
-                            <button type="button" role="menuitem" data-export="pptx" class="export-item">
-                                <i class="fa-solid fa-file-powerpoint text-orange-500"></i>
-                                <span><b>PowerPoint（PPTX）</b><small>每頁為一張圖片，文字無法再編輯；講者備註寫入備忘稿</small></span>
+                            <div id="insertList" role="menu" aria-label="插入"
+                                class="hidden absolute z-40 bottom-full mb-2 left-1/2 -translate-x-1/2 w-64 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl p-1">
+                                <button type="button" role="menuitem" data-insert="text" class="export-item">
+                                    <i class="fa-solid fa-font text-zinc-500"></i><span><b>文字</b><small>可自由移動的文字方塊</small></span>
+                                </button>
+                                <button type="button" role="menuitem" data-insert="image" class="export-item">
+                                    <i class="fa-regular fa-image text-emerald-500"></i><span><b>圖片</b><small>也可直接拖放或貼上圖片</small></span>
+                                </button>
+                                <button type="button" role="menuitem" data-insert="chart" class="export-item">
+                                    <i class="fa-solid fa-chart-column text-blue-500"></i><span><b>圖表</b><small>輸入數據畫成圖表</small></span>
+                                </button>
+                                <button id="iconPickerBtn" type="button" role="menuitem" data-insert="icon" aria-haspopup="dialog" aria-expanded="false" aria-controls="iconPicker" class="export-item">
+                                    <i class="fa-solid fa-icons text-amber-500"></i><span><b>圖示</b><small>從常用圖示中搜尋插入</small></span>
+                                </button>
+                                <button id="shapePickerBtn" type="button" role="menuitem" data-insert="shape" aria-haspopup="dialog" aria-expanded="false" aria-controls="shapePicker" class="export-item">
+                                    <i class="fa-solid fa-shapes text-violet-500"></i><span><b>圖案</b><small>矩形、箭頭、線條等</small></span>
+                                </button>
+                                <!-- 企業 / 品牌識別圖示：brand_icon 資料夾有圖片時才顯示（static/app/brand.js） -->
+                                <button id="brandPickerBtn" type="button" role="menuitem" data-insert="brand" aria-haspopup="dialog" aria-expanded="false" aria-controls="brandPicker" class="export-item hidden">
+                                    <i class="fa-solid fa-certificate text-rose-500"></i><span><b>品牌</b><small>公司統一的 Logo 與識別圖片</small></span>
+                                </button>
+                                <div class="my-1 border-t border-zinc-100 dark:border-zinc-800"></div>
+                                <button type="button" role="menuitem" data-insert="blank" class="export-item">
+                                    <i class="fa-solid fa-file-circle-plus text-zinc-500"></i><span><b>空白頁</b><small>加在目前頁面之後，沿用背景</small></span>
+                                </button>
+                            </div>
+                        </div>
+                        <input id="slideImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" class="hidden">
+                        <button data-undo onclick="undo()" aria-label="撤銷" title="撤銷 (Ctrl+Z)"
+                            class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent">
+                            <i class="fa-solid fa-rotate-left text-[11px]"></i><span class="hidden sm:inline">撤銷</span>
+                        </button>
+                        <button data-redo onclick="redo()" aria-label="重做" title="重做 (Ctrl+Shift+Z)"
+                            class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent">
+                            <i class="fa-solid fa-rotate-right text-[11px]"></i><span class="hidden sm:inline">重做</span>
+                        </button>
+                    </div>
+                    <div class="bar-sep"></div>
+                    <!-- 動作 -->
+                    <div class="bar-zone">
+                        <button id="editBtn" onclick="toggleEditMode()" aria-pressed="false"
+                            class="icon-btn h-8 px-3.5 rounded-full bg-black text-white hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200 text-xs font-semibold flex items-center gap-1.5"
+                            aria-label="編輯投影片" title="直接修改投影片上的文字、圖片與圖表（不呼叫 AI）">
+                            <i id="editIcon" class="fa-solid fa-pen-to-square text-[11px]"></i><span id="editLabel">編輯</span>
+                        </button>
+                        <button id="versionCurrentBtn" onclick="openVersionModal(currentSlideIdx)"
+                            class="hidden icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold items-center gap-1.5"
+                            aria-label="比較或還原此頁的舊版本">
+                            <i class="fa-solid fa-clock-rotate-left text-[11px]"></i><span class="hidden sm:inline">舊版本</span>
+                        </button>
+                        <button id="regenCurrentBtn" onclick="regenerateCurrentSlide()" class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5" aria-label="重產此頁">
+                            <i id="regenCurrentIcon" class="fa-solid fa-arrows-rotate text-[11px]"></i><span class="hidden sm:inline"
+                                id="regenCurrentLabel">重產此頁</span>
+                        </button>
+                        <div id="exportMenu" class="relative">
+                            <button id="exportBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="exportList"
+                                class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
+                                aria-label="匯出" title="匯出為 PDF、PowerPoint 或 HTML">
+                                <i id="exportIcon" class="fa-solid fa-file-export text-[11px]"></i><span class="hidden sm:inline tabular-nums" id="exportLabel">匯出</span><i
+                                    class="fa-solid fa-chevron-up text-[9px] text-zinc-400"></i>
                             </button>
-                            <button type="button" role="menuitem" data-export="html" class="export-item">
-                                <i class="fa-solid fa-file-code text-sky-500"></i>
-                                <span><b>HTML 網頁</b><small>單一檔案，用瀏覽器即可播放</small></span>
-                            </button>
+                            <div id="exportList" role="menu" aria-label="匯出格式"
+                                class="hidden absolute z-40 bottom-full mb-2 right-0 w-64 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl p-1">
+                                <button type="button" role="menuitem" data-export="pdf" class="export-item">
+                                    <i class="fa-solid fa-file-pdf text-red-500"></i>
+                                    <span><b>PDF 文件</b><small>適合列印、寄送與分享</small></span>
+                                </button>
+                                <button type="button" role="menuitem" data-export="pptx" class="export-item">
+                                    <i class="fa-solid fa-file-powerpoint text-orange-500"></i>
+                                    <span><b>PowerPoint（PPTX）</b><small>每頁為一張圖片，文字無法再編輯；講者備註寫入備忘稿</small></span>
+                                </button>
+                                <button type="button" role="menuitem" data-export="html" class="export-item">
+                                    <i class="fa-solid fa-file-code text-sky-500"></i>
+                                    <span><b>HTML 網頁</b><small>單一檔案，用瀏覽器即可播放</small></span>
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    <div class="w-px h-5 bg-zinc-200 dark:bg-zinc-700 mx-1"></div>
-                    <button data-undo onclick="undo()" aria-label="撤銷" title="撤銷 (Ctrl+Z)"
-                        class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent text-xs font-semibold flex items-center gap-1.5">
-                        <i class="fa-solid fa-rotate-left text-[11px]"></i><span class="hidden sm:inline">撤銷</span>
-                    </button>
-                    <button data-redo onclick="redo()" aria-label="重做" title="重做 (Ctrl+Shift+Z)"
-                        class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent text-xs font-semibold flex items-center gap-1.5">
-                        <i class="fa-solid fa-rotate-right text-[11px]"></i><span class="hidden sm:inline">重做</span>
-                    </button>
                 </div>
 
                 <!-- 講者備註 -->
@@ -710,6 +711,46 @@
                     class="icon-btn h-9 px-4 rounded-full bg-black text-white dark:bg-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 text-sm font-semibold flex items-center gap-2">
                     <i id="regenModalConfirmIcon" class="fa-solid fa-arrows-rotate text-[11px]"></i>
                     <span id="regenModalConfirmLabel">確認重產</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI 修改此元素 Modal（static/app/aiedit.js） -->
+    <div id="aiEditModal" role="dialog" aria-modal="true" aria-labelledby="aiEditTitle"
+        class="hidden fixed inset-0 z-[90] bg-black/45 backdrop-blur-sm p-4 flex items-center justify-center">
+        <div class="w-full max-w-xl rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xl p-5 sm:p-6">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <h3 id="aiEditTitle" class="text-base sm:text-lg font-bold"><i class="fa-solid fa-wand-magic-sparkles text-violet-500 mr-1.5"></i>AI 修改此元素</h3>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">只會重新設計選取的元素，頁面其他部分不變；留白則由 AI 自動優化。</p>
+                </div>
+                <button onclick="closeAiEditModal()" class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="關閉">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="mt-4">
+                <label for="aiEditPrompt" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">修改需求（選填）</label>
+                <textarea id="aiEditPrompt" rows="3" maxlength="2000"
+                    class="mt-1.5 w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-500 dark:focus:ring-purple-400/40 dark:focus:border-purple-400 transition-shadow resize-y"
+                    placeholder="例如：改成長條圖、只留三個重點、把數字放大並加上圖示"></textarea>
+                <div id="aiEditChips" class="mt-2 flex flex-wrap gap-1.5 text-xs">
+                    <span class="text-zinc-400 py-1">快速選擇：</span>
+                    <button type="button" data-prompt="精簡文字，只保留重點" class="px-2.5 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800">精簡文字</button>
+                    <button type="button" data-prompt="改成條列重點" class="px-2.5 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800">改成條列</button>
+                    <button type="button" data-prompt="改用圖表呈現數據" class="px-2.5 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800">改成圖表</button>
+                    <button type="button" data-prompt="放大並強調關鍵數字" class="px-2.5 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800">強調數字</button>
+                    <button type="button" data-prompt="每個項目加上合適的圖示" class="px-2.5 py-1 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800">加上圖示</button>
+                </div>
+            </div>
+            <div class="mt-5 flex flex-wrap items-center justify-end gap-2">
+                <span class="mr-auto text-[11px] text-zinc-400">Ctrl + Enter 送出 · 算一次 AI 用量 · 可撤銷</span>
+                <button id="aiEditCancelBtn" onclick="closeAiEditModal()"
+                    class="icon-btn h-9 px-4 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-sm font-semibold">取消</button>
+                <button id="aiEditConfirmBtn" onclick="confirmAiEdit()"
+                    class="icon-btn h-9 px-4 rounded-full bg-black text-white dark:bg-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 text-sm font-semibold flex items-center gap-2 disabled:opacity-60">
+                    <i id="aiEditConfirmIcon" class="fa-solid fa-wand-magic-sparkles text-[11px]"></i>
+                    <span id="aiEditConfirmLabel">開始修改</span>
                 </button>
             </div>
         </div>
@@ -864,16 +905,18 @@
                         <h5>修改 AI 生成的版面</h5>
                         <ul>
                             <li>點擊文字即可修改；選取元素後，投影片上方的編輯列會顯示格式工具列，可調整字級、粗細、對齊、顏色、圓角與陰影，或刪除元素；AI 版面元素另有「還原位置」「還原大小」，複製與圖層順序（物件重疊時誰在上面：上移 / 下移一層、移到最上 / 最下層，快捷鍵 <kbd>Ctrl</kbd> + <kbd>↑</kbd> / <kbd>↓</kbd>，加 <kbd>Shift</kbd> 移到最上 / 最下層）在「更多」選單中。工具列只顯示該類元素有作用的設定，例如圖片沒有字級與對齊。</li>
+                            <li><b>AI 修改此元素</b>：選取一個元素（例如一張卡片），按工具列的「AI 修改此元素」並輸入需求（例如「改成長條圖」「只留三個重點」），AI 只會重新設計這個元素，頁面其他部分不變；算一次 AI 用量，可按 <kbd>Ctrl</kbd> + <kbd>Z</kbd> 復原。要重做整頁請用「重產此頁」。</li>
                             <li>AI 生成的元素可以移動與縮放：先單擊選取（必要時按「選取父層」選到整張卡片），按住拖曳或用方向鍵微調位置，拉四個角可等比例縮放（文字一起放大縮小），旁邊的元素不會跟著變動；拉四邊中點（或按住 <kbd>Shift</kbd> 拉角落）可不鎖定比例調整寬高（文字依新寬度換行，旁邊的元素同樣不變動）；工具列可設定外框（顏色、粗細、樣式）與陰影，「還原位置」「還原大小」可恢復原狀。AI 產生的圖表可修改數據。</li>
                             <li>元素被拖出所在的卡片或區塊時，超出的部分可能被裁掉，建議選取外層卡片整個移動。</li>
                         </ul>
                         <h5>插入內容</h5>
+                        <p>進入編輯後，下方控制列中間會換成「插入」「撤銷」「重做」；以下內容都從「插入」選單加入（播放、全螢幕等按鈕在完成編輯後回到原位）。</p>
                         <div class="guide-grid">
                             <div class="guide-card"><b><i class="fa-solid fa-font"></i>文字</b><span>插入可自由移動的文字方塊。</span></div>
                             <div class="guide-card"><b><i class="fa-regular fa-image"></i>圖片</b><span>上傳、拖放或貼上圖片，在瀏覽器端壓縮後內嵌；可設定圓角、邊框（顏色、粗細、實線 / 虛線 / 點線）與透明圖片的底色；拉角落等比例縮放，拉四邊中點（或按住 <kbd>Shift</kbd> 拉角落）可不鎖定比例調整寬高，「還原比例」可恢復原圖比例。</span></div>
                             <div class="guide-card"><b><i class="fa-solid fa-chart-column"></i>圖表</b><span>以試算表輸入數據，可直接貼上 Excel 多格資料，並可加參考虛線、勾選要凸顯的項目；拉四邊中點只調整寬或高（文字不變形），按住 <kbd>Shift</kbd> 拉角落可等比例縮放。</span></div>
                             <div class="guide-card"><b><i class="fa-solid fa-icons"></i>圖示</b><span>內建 300 個常用圖示，可用中英文關鍵字搜尋，Enter 插入第一個。</span></div>
-                            <div class="guide-card"><b><i class="fa-solid fa-certificate"></i>品牌</b><span>插入公司統一的 Logo 與品牌識別圖片（由管理者放在伺服器上），插入後與一般圖片相同，可移動、縮放、加外框與陰影；沒有設定品牌圖片時不顯示這個按鈕。</span></div>
+                            <div class="guide-card"><b><i class="fa-solid fa-certificate"></i>品牌</b><span>插入公司統一的 Logo 與品牌識別圖片（由管理者放在伺服器上），插入後與一般圖片相同，可移動、縮放、加外框與陰影；沒有設定品牌圖片時，選單中不顯示這一項。</span></div>
                             <div class="guide-card"><b><i class="fa-solid fa-shapes"></i>圖案</b><span>16 種圖案，可調整填滿、外框、線條樣式與圓角，雙擊輸入文字；拉四邊中點只調整寬或高，按住 <kbd>Shift</kbd> 拉角落可等比例縮放。</span></div>
                             <div class="guide-card"><b><i class="fa-regular fa-square-plus"></i>空白頁</b><span>在目前頁面之後新增空白頁並直接切換過去。</span></div>
                         </div>
@@ -881,7 +924,7 @@
                         <ul>
                             <li>選取的元素可拖曳移動，會自動對齊邊緣、中線與其他元素（按住 <kbd>Alt</kbd> 暫停吸附）；自行插入的內容還可拉角落縮放；圖片、圖案與圖表另可拉四邊中點只調整寬或高。</li>
                             <li>選取後用方向鍵微調位置（<kbd>Shift</kbd> 一次 10px）；<kbd>Delete</kbd> 刪除、<kbd>Esc</kbd> 取消選取。</li>
-                            <li>操作失誤可按「撤銷」「重做」，或使用 <kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd>。</li>
+                            <li>操作失誤可按控制列的「撤銷」「重做」（編輯中顯示），或在任何時候使用 <kbd>Ctrl</kbd> + <kbd>Z</kbd> / <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd>。</li>
                         </ul>
                     </section>
 
@@ -1089,16 +1132,17 @@
     <script src="/static/app/input.js?v=7"></script>
     <script src="/static/app/generate.js?v=24"></script>
     <script src="/static/app/outline.js?v=1"></script>
-    <script src="/static/app/shapes.js?v=3"></script>
-    <script src="/static/app/editor.js?v=17"></script>
-    <script src="/static/app/media.js?v=16"></script>
-    <script src="/static/app/brand.js?v=1"></script>
-    <script src="/static/app/player.js?v=4"></script>
+    <script src="/static/app/shapes.js?v=4"></script>
+    <script src="/static/app/editor.js?v=19"></script>
+    <script src="/static/app/media.js?v=17"></script>
+    <script src="/static/app/aiedit.js?v=1"></script>
+    <script src="/static/app/brand.js?v=2"></script>
+    <script src="/static/app/player.js?v=5"></script>
     <script src="/static/app/versions.js?v=2"></script>
     <script src="/static/app/auth.js?v=5"></script>
     <script src="/static/app/guide.js?v=2"></script>
     <script src="/static/app/feedback.js?v=2"></script>
-    <script src="/static/app/main.js?v=11"></script>
+    <script src="/static/app/main.js?v=13"></script>
 </body>
 
 </html>

@@ -72,7 +72,7 @@ let editMode = false;
 const PLAINTEXT_EDIT = (() => { const d = document.createElement('div'); try { d.contentEditable = 'plaintext-only'; } catch (e) { } return d.contentEditable === 'plaintext-only'; })();
 
 // 序列化投影片 DOM：移除編輯用的標記屬性（文字編輯中 / 拼字檢查 / 選取標記），得到可存回 html_content 的字串
-const EDIT_ATTRS = ['contenteditable', 'spellcheck', 'data-rs-sel'];
+const EDIT_ATTRS = ['contenteditable', 'spellcheck', 'data-rs-sel', 'data-rs-busy'];
 function serializeScaler(scaler) {
     const c = scaler.cloneNode(true);
     c.querySelectorAll(EDIT_ATTRS.map(a => `[${a}]`).join(',')).forEach(el => EDIT_ATTRS.forEach(a => el.removeAttribute(a)));
@@ -97,6 +97,7 @@ function toggleEditMode(force) {
         closeIconPicker();
         closeShapePicker();
         closeBrandPicker();
+        setInsertMenuOpen(false);
         stopTextEdit();
         clearSelection();
         commitSlideEdit();
@@ -109,6 +110,9 @@ function toggleEditMode(force) {
     document.getElementById('editLabel').textContent = editMode ? '完成編輯' : '編輯';
     document.getElementById('editIcon').className = 'fa-solid text-[11px] ' + (editMode ? 'fa-check' : 'fa-pen-to-square');
     document.querySelectorAll('[data-edit-only]').forEach(b => { b.classList.toggle('hidden', !editMode); b.classList.toggle('flex', editMode); });
+    // 控制列中間區：一般模式顯示播放與簡報，編輯模式改為插入、撤銷、重做
+    document.querySelectorAll('[data-view-only]').forEach(z => { z.hidden = editMode; });
+    document.querySelectorAll('[data-edit-zone]').forEach(z => { z.hidden = !editMode; });
     if (editMode) {
         prepareEditing();   // 操作提示顯示在投影片上方的編輯列（#fmtDockHint），不另外跳出提示
         revealFmtDock();
@@ -574,6 +578,7 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
     tb.innerHTML = `
 <div class="frow">
   ${group('', btn('parent', '<i class="fa-solid fa-turn-up text-[11px]"></i><span class="bt">選取外層</span>', '選取包住這個元素的外層元素（例如整張卡片）', '', 'parent'))}
+  ${group('', btn('aiEdit', '<i class="fa-solid fa-wand-magic-sparkles text-[11px]"></i><span class="bt">AI 修改此元素</span>', '輸入需求，只讓 AI 重新設計這個元素，頁面其他部分不變', 'ai-edit', 'aiEdit'))}
   ${group('字級', `${btn('sizeDown', '<i class="fa-solid fa-minus text-[10px]"></i>', '縮小字級', '', 'size')}
     <span id="fmtSize" data-ctl="size" class="px-1 tabular-nums min-w-[2.6rem] text-center" title="目前字級"></span>
     ${btn('sizeUp', '<i class="fa-solid fa-plus text-[10px]"></i>', '放大字級', '', 'size')}`, 'size')}
@@ -651,6 +656,7 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
         if (!b || b.disabled) return;
         const id = b.dataset.fmt;
         if (id === 'chart') openChartEditor(selectedEl);
+        else if (id === 'aiEdit') openAiEditModal();
         else if (id === 'more') toggleMoreMenu(b);
         else if (id.startsWith('align-')) runFmt('align', id.slice(6));
         else if (id.startsWith('pal-')) togglePalette(id.slice(4), b);
@@ -736,10 +742,10 @@ function hideMoreMenu() {
  * 圖示：<i> 的 Font Awesome class 自帶字重、外框固定置中，粗細與對齊無效；字級 ± 為縮放圖示。
  * 圖表：SVG 文字用 currentColor 與固定字重，對齊與粗細看不出差別。 */
 const TOOLBAR_CTLS = {
-    text: ['size', 'weight', 'align', 'text', 'bg', 'radius', 'border', 'shadow'],     // 文字方塊與 AI 版面元素
+    text: ['aiEdit', 'size', 'weight', 'align', 'text', 'bg', 'radius', 'border', 'shadow'],     // 文字方塊與 AI 版面元素
     image: ['bg', 'radius', 'border', 'shadow', 'imgRatio'],
     icon: ['size', 'text', 'bg', 'radius', 'shadow'],
-    chart: ['size', 'text', 'bg', 'radius', 'border', 'shadow', 'chart'],
+    chart: ['aiEdit', 'size', 'text', 'bg', 'radius', 'border', 'shadow', 'chart'],
     shape: ['size', 'weight', 'align', 'text', 'shape', 'shadow'],
 };
 // 依元素類型替換的文字標籤（data-lbl，沒列出的沿用預設）
@@ -810,6 +816,7 @@ function refreshToolbar() {
     const root = isRootBlock(el);
     const sizeIdx = currentSizeIndex(el);
     fmtEl('parent').disabled = root;
+    fmtEl('aiEdit').disabled = root || aiEditBusy;     // 最外層容器是整頁，請用「重產此頁」
     fmtEl('sizeDown').disabled = isIcon ? el.offsetWidth <= ICON_MIN : sizeIdx <= 0;
     fmtEl('sizeUp').disabled = isIcon ? el.offsetWidth >= ICON_MAX : sizeIdx >= (isChart ? CHART_SIZE_MAX : SIZE_STEPS.length - 1);
     fmtEl('duplicate').disabled = root;
