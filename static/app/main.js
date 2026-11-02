@@ -14,6 +14,14 @@ document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') { e.preventDefault(); closeGuide(); }
         return;                                   // 使用教學開啟時不觸發換頁等快捷鍵
     }
+    if (isConfirmOpen()) {
+        if (e.key === 'Escape') { e.preventDefault(); closeConfirmDialog(false); }
+        return;                                   // 確認對話框開啟時不觸發換頁、刪除元素等快捷鍵
+    }
+    if (isShareOpen()) {
+        if (e.key === 'Escape') { e.preventDefault(); closeShareModal(); }
+        return;
+    }
     if (isFeedbackOpen()) {
         if (e.key === 'Escape') { e.preventDefault(); closeFeedback(); }
         return;                                   // 意見回饋開啟時不觸發換頁等快捷鍵（Ctrl+Enter 送出由 feedback.js 處理）

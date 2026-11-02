@@ -24,7 +24,7 @@
 app.py            FastAPI 主程式：生成、大綱、重產（整頁與單一元素）、檔案匯入、匯出 PPTX 的 API，與生成用的提示規則
 deck_design.py    整份簡報的設計規範（theme）、版型目錄、頁面節奏與內容正確性規則
 charts.py         圖表資料的格式、正規化與提示規則
-accounts.py       登入、註冊、歷史記錄與意見回饋的 API（/api/auth/*、/api/history、/api/feedback）
+accounts.py       登入、註冊、歷史記錄（含複製給其他帳號 /api/history/{id}/copy）與意見回饋的 API（/api/auth/*、/api/history、/api/feedback）
 ldap_auth.py      登入方式（AUTH_MODE）的設定檢查與公司 LDAP 驗證
 admin.py          後台管理的 API（/api/admin/*）
 brand_icons.py    企業 / 品牌識別圖示的 API（/api/brand-icons）：列出並提供 brand_icon 資料夾中的圖片
@@ -65,6 +65,7 @@ static/app/           主畫面的樣式與程式：
   auth.js             登入、註冊、登出
   guide.js            使用教學視窗
   feedback.js         意見回饋視窗
+  dialogs.js          確認對話框（confirmDialog，取代瀏覽器的 confirm()）與歷史記錄「複製給其他帳號」視窗
   main.js             全域快捷鍵與啟動（最後載入）
 ```
 

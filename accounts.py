@@ -211,6 +211,33 @@ async def history_update(item_id: str, request: Request, user: dict = Depends(cu
     return {"ok": True}
 
 
+class HistoryCopy(BaseModel):
+    username: str = Field(max_length=64)
+
+
+@router.post("/api/history/{item_id}/copy")
+async def history_copy(item_id: str, body: HistoryCopy, user: dict = Depends(current_user)):
+    """把自己的一筆紀錄複製一份給另一個帳號：對方的歷史記錄多一筆獨立的簡報（不是共同編輯），
+    對方修改後可用同樣的方式再複製回來。"""
+    username = body.username.strip()
+    if not username:
+        raise HTTPException(status_code=400, detail="請輸入對方的帳號")
+    if username.lower() == user["username"].lower():
+        raise HTTPException(status_code=400, detail="不能複製給自己")
+    try:
+        result = await run_in_threadpool(store.copy_history, user, item_id, username)
+    except store.CopyTargetNotFound:
+        hint = "（公司帳號需至少登入過一次）" if auth_mode() == "ldap" else ""
+        raise HTTPException(status_code=404, detail=f"找不到帳號「{username}」{hint}")
+    except store.CopyRateLimited as e:
+        raise HTTPException(status_code=429, headers={"Retry-After": str(e.retry_after)},
+                            detail=f"每小時最多可複製 {store.HISTORY_COPY_LIMIT_PER_HOUR} 份簡報給其他人，"
+                                   f"請於 {store.fmt_wait(e.retry_after)}後再試")
+    if result is None:
+        raise HTTPException(status_code=404, detail="找不到此紀錄")
+    return {"ok": True, "username": result["username"]}
+
+
 @router.delete("/api/history/{item_id}")
 def history_delete(item_id: str, user: dict = Depends(current_user)):
     store.delete_history(user["id"], item_id)

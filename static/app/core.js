@@ -213,6 +213,8 @@ window.addEventListener('beforeunload', e => {
 });
 
 async function loadHistory() {
+    lastHistoryRefresh = Date.now();
+    historyLoaded = true;
     try {
         historyItems = await historyFetch('GET');
     } catch (err) {
@@ -221,6 +223,32 @@ async function loadHistory() {
     }
     renderHistory(true);
 }
+
+// 其他帳號複製過來的簡報：切回此分頁或打開側邊欄時，把伺服器上新增的紀錄併入列表（不覆蓋本機尚未送出的修改）
+const HISTORY_REFRESH_INTERVAL = 15000;
+let lastHistoryRefresh = 0;
+let historyLoaded = false;               // 登入並讀取過列表後才合併（頁面載入途中 auth.js 的 currentUser 尚未宣告）
+async function refreshHistoryList() {
+    if (!historyLoaded) return;
+    const user = currentUser;
+    if (!user || document.hidden || Date.now() - lastHistoryRefresh < HISTORY_REFRESH_INTERVAL) return;
+    if (pendingSaves.size || inflightSaves) return;
+    lastHistoryRefresh = Date.now();
+    let list;
+    try { list = await historyFetch('GET'); } catch (_) { return; }
+    // 讀取期間換了帳號或有新的新增 / 刪除：這份列表可能已過時，下次再併入
+    if (currentUser !== user || pendingSaves.size || inflightSaves) { lastHistoryRefresh = 0; return; }
+    const known = new Set(historyItems.map(h => h.id));
+    const fresh = list.filter(h => !known.has(h.id));
+    if (!fresh.length) return;
+    historyItems = [...fresh, ...historyItems].sort((a, b) => b.createdAt - a.createdAt).slice(0, MAX_HISTORY);
+    renderHistory();
+    const received = fresh.filter(h => h.sharedFrom);
+    if (received.length === 1) showToast(`收到「${received[0].sharedFrom}」複製給你的簡報「${received[0].title}」`, 'info', 4000);
+    else if (received.length > 1) showToast(`收到其他帳號複製給你的 ${received.length} 份簡報`, 'info', 4000);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshHistoryList(); });
+window.addEventListener('focus', () => refreshHistoryList());
 
 function renderHistory(animate = false) {
     const list = document.getElementById('historyList');
@@ -258,10 +286,12 @@ function renderHistory(animate = false) {
       <div class="min-w-0 flex-1">
         <div class="text-sm font-semibold truncate ${active ? 'text-violet-700 dark:text-violet-200' : ''}" title="${esc(h.title)}">${esc(h.title)}</div>
         <div class="text-[11px] text-zinc-400 mt-0.5 truncate">${fmtTime(h.createdAt)} · ${pages} 頁${style ? ' · ' + esc(style) : ''}</div>
+        ${h.sharedFrom ? `<div class="text-[11px] text-violet-500 dark:text-violet-300 mt-0.5 truncate" title="由「${esc(h.sharedFrom)}」複製給你的副本"><i class="fa-solid fa-inbox mr-1"></i>來自 ${esc(h.sharedFrom)}</div>` : ''}
       </div>
-      <div class="flex flex-col gap-1 lg:opacity-0 lg:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+      <div class="grid grid-cols-2 gap-1 lg:opacity-0 lg:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+        <button data-act="share" class="icon-btn w-6 h-6 rounded-md text-[11px] text-zinc-400 hover:text-violet-500 hover:bg-zinc-100 dark:hover:bg-zinc-700" title="複製給其他帳號" aria-label="複製給其他帳號"><i class="fa-solid fa-share-from-square"></i></button>
         <button data-act="rename" class="icon-btn w-6 h-6 rounded-md text-[11px] text-zinc-400 hover:text-blue-500 hover:bg-zinc-100 dark:hover:bg-zinc-700" title="重新命名" aria-label="重新命名"><i class="fa-solid fa-pen"></i></button>
-        <button data-act="delete" class="icon-btn w-6 h-6 rounded-md text-[11px] text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-700" title="刪除" aria-label="刪除"><i class="fa-solid fa-trash"></i></button>
+        <button data-act="delete" class="col-start-2 icon-btn w-6 h-6 rounded-md text-[11px] text-zinc-400 hover:text-red-500 hover:bg-zinc-100 dark:hover:bg-zinc-700" title="刪除" aria-label="刪除"><i class="fa-solid fa-trash"></i></button>
       </div>
     </div>
   </div>`;
@@ -385,7 +415,17 @@ function renameHistory(id) {
     renderHistory();
 }
 
-function deleteHistory(id, el) {
+async function deleteHistory(id) {
+    const h = historyItems.find(x => x.id === id);
+    if (!h) return;
+    const ok = await confirmDialog({
+        title: '刪除這份簡報？',
+        message: `「${h.title}」將從歷史記錄中刪除，此動作無法復原。`,
+        confirmText: '刪除'
+    });
+    if (!ok || !historyItems.some(x => x.id === id)) return;
+    // 對話框開啟期間列表可能重畫過，重新找這筆紀錄的元素來播放移除動畫
+    const el = [...document.querySelectorAll('#historyList .hist-item')].find(x => x.dataset.id === id);
     const finish = () => {
         historyItems = historyItems.filter(x => x.id !== id);
         cancelHistorySave(id);
@@ -397,9 +437,14 @@ function deleteHistory(id, el) {
     if (el) { el.classList.add('hist-out'); setTimeout(finish, 330); } else finish();
 }
 
-function clearHistory() {
+async function clearHistory() {
     if (!historyItems.length) { showToast('目前沒有歷史記錄', 'info', 1800); return; }
-    if (!confirm('確定要清除所有歷史記錄嗎？此動作無法復原。')) return;
+    const ok = await confirmDialog({
+        title: '清除全部歷史記錄？',
+        message: `將刪除全部 ${historyItems.length} 份簡報，此動作無法復原。`,
+        confirmText: '全部清除'
+    });
+    if (!ok || !historyItems.length) return;
     const ids = historyItems.map(h => h.id);
     ids.forEach(cancelHistorySave);
     historyItems = [];
@@ -419,7 +464,8 @@ document.getElementById('historyList').addEventListener('click', e => {
     const actEl = e.target.closest('[data-act]');
     const act = actEl ? actEl.dataset.act : 'open';
     if (act === 'rename') { e.stopPropagation(); renameHistory(id); }
-    else if (act === 'delete') { e.stopPropagation(); deleteHistory(id, item); }
+    else if (act === 'share') { e.stopPropagation(); openShareModal(id); }
+    else if (act === 'delete') { e.stopPropagation(); deleteHistory(id); }
     else openHistory(id);
 });
 document.getElementById('historySearch').addEventListener('input', () => renderHistory());
@@ -452,6 +498,7 @@ function newPresentation() {
 /* ----- 側邊欄開關 ----- */
 function setSidebar(open) {
     document.body.classList.toggle('sb-open', open);
+    if (open) refreshHistoryList();
     document.getElementById('sbIcon').className = open && window.innerWidth < 1024 ? 'fa-solid fa-xmark' : 'fa-solid fa-bars';
     if (window.innerWidth >= 1024) {
         try { localStorage.setItem('rslide_sb', open ? '1' : '0'); } catch (e) { }

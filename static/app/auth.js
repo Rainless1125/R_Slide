@@ -92,6 +92,7 @@ async function logout() {
     try { await flushAllHistorySaves(); } catch (_) { }
     try { await fetch('/api/auth/logout', { method: 'POST' }); } catch (_) { }
     historyItems = [];
+    historyLoaded = false;
     currentHistoryId = null;
     resetWorkspace(true);
     renderHistory();
