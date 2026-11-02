@@ -43,9 +43,17 @@ CREATE TABLE IF NOT EXISTS history (
     pages      INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL,          -- 毫秒，與前端 Date.now() 一致
     updated_at INTEGER NOT NULL,
+    shared_from TEXT,                     -- 由其他帳號複製過來時為對方的帳號名稱（當時的名稱），自己建立的為 NULL
     PRIMARY KEY (user_id, id)
 );
 CREATE INDEX IF NOT EXISTS idx_history_user_created ON history(user_id, created_at DESC);
+-- 「複製給其他帳號」的紀錄，只用來限制每個帳號的複製次數（對方刪除收到的簡報不影響次數）
+CREATE TABLE IF NOT EXISTS history_copies (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    sender_id  INTEGER NOT NULL,
+    created_at INTEGER NOT NULL           -- 毫秒
+);
+CREATE INDEX IF NOT EXISTS idx_history_copies_sender_time ON history_copies(sender_id, created_at);
 -- 每次呼叫 LLM 一筆（失敗也記），供查詢各使用者用量；不存提示詞與回覆內容，素材只記字數與雜湊。
 -- user_id 刻意不設外鍵：刪除帳號後仍保留稽核紀錄，username 為當時的帳號名稱
 CREATE TABLE IF NOT EXISTS llm_usage (
@@ -136,6 +144,7 @@ def init_db(path: str):
 # CREATE TABLE IF NOT EXISTS 不會替已存在的資料表加欄位：之後新增的欄位列在這裡，啟動時補上
 _ADDED_COLUMNS = {
     "feedback": {"rating": "INTEGER"},
+    "history": {"shared_from": "TEXT"},
     "llm_usage": {"thinking": "TEXT"},
     "sessions": {"auth_mode": "TEXT"},
 }
@@ -385,13 +394,13 @@ def _pages(data: dict) -> int:
 
 def _summary(row) -> dict:
     return {"id": row["id"], "title": row["title"], "createdAt": row["created_at"],
-            "pages": row["pages"], "input": json.loads(row["input_json"])}
+            "pages": row["pages"], "input": json.loads(row["input_json"]), "sharedFrom": row["shared_from"]}
 
 
 def list_history(user_id: int) -> list[dict]:
     """列表只回摘要（不含投影片內容），投影片可能內嵌圖片，開啟時再個別讀取。"""
     with connect() as conn:
-        rows = conn.execute("SELECT id, title, created_at, pages, input_json FROM history "
+        rows = conn.execute("SELECT id, title, created_at, pages, input_json, shared_from FROM history "
                             "WHERE user_id = ? ORDER BY created_at DESC", (user_id,)).fetchall()
     return [_summary(r) for r in rows]
 
@@ -448,6 +457,58 @@ def delete_history(user_id: int, item_id: str | None = None):
             conn.execute("DELETE FROM history WHERE user_id = ?", (user_id,))
         else:
             conn.execute("DELETE FROM history WHERE user_id = ? AND id = ?", (user_id, item_id))
+
+
+# 複製給其他帳號：每個帳號每小時的次數上限，避免短時間塞滿對方的歷史記錄（超過 200 筆會擠掉對方最舊的紀錄）
+HISTORY_COPY_LIMIT_PER_HOUR = 30
+
+
+class CopyTargetNotFound(Exception):
+    pass
+
+
+class CopyRateLimited(Exception):
+    def __init__(self, retry_after: int):
+        super().__init__(retry_after)
+        self.retry_after = retry_after
+
+
+def copy_history(sender: dict, item_id: str, target_username: str) -> dict | None:
+    """把 sender 的一筆紀錄複製一份到 target_username 的歷史記錄（各自獨立，之後的修改互不影響）。
+    回傳對方的帳號名稱（資料庫中的大小寫）；找不到這筆紀錄時回傳 None。
+    對方帳號不存在時丟出 CopyTargetNotFound，超過每小時上限時丟出 CopyRateLimited。"""
+    now = now_ms()
+    with connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")      # 同時送出的複製依序檢查次數
+        src = conn.execute("SELECT * FROM history WHERE user_id = ? AND id = ?", (sender["id"], item_id)).fetchone()
+        if src is None:
+            return None
+        target = conn.execute("SELECT id, username FROM users WHERE username = ?", (target_username,)).fetchone()
+        if target is None:
+            raise CopyTargetNotFound(target_username)
+        conn.execute("DELETE FROM history_copies WHERE created_at <= ?", (now - HOUR_MS,))
+        rows = conn.execute("SELECT created_at FROM history_copies WHERE sender_id = ? ORDER BY created_at DESC LIMIT ?",
+                            (sender["id"], HISTORY_COPY_LIMIT_PER_HOUR)).fetchall()
+        if len(rows) >= HISTORY_COPY_LIMIT_PER_HOUR:
+            raise CopyRateLimited(max(1, -(-(rows[-1][0] + HOUR_MS - now) // 1000)))
+        # 新的 id：與前端 addHistory 相同的格式（時間 + 亂數），不沿用原本的 id，避免與對方既有的紀錄（例如之前複製回去的）相撞
+        new_id = _base36(now) + secrets.token_hex(4)
+        conn.execute("INSERT INTO history (user_id, id, title, input_json, data_json, pages, created_at, updated_at, shared_from) "
+                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                     (target["id"], new_id, src["title"], src["input_json"], src["data_json"], src["pages"], now, now,
+                      sender["username"]))
+        conn.execute("INSERT INTO history_copies (sender_id, created_at) VALUES (?, ?)", (sender["id"], now))
+        _trim(conn, target["id"])
+        return {"username": target["username"]}
+
+
+def _base36(n: int) -> str:
+    digits = "0123456789abcdefghijklmnopqrstuvwxyz"
+    out = ""
+    while n:
+        n, r = divmod(n, 36)
+        out = digits[r] + out
+    return out or "0"
 
 
 # ===================== LLM 使用紀錄 =====================
