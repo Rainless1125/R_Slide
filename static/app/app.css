@@ -1127,6 +1127,35 @@ body:has(#slideCanvas.editing) #toastRoot {
     color: #c4b5fd;
 }
 
+/* 多選（multisel.js）：與單選相同的藍框，框選中的範圍 */
+#slideCanvas.editing [data-rs-msel] {
+    outline: 2px solid #3b82f6 !important;
+    outline-offset: 2px;
+}
+
+#multiSelBar[hidden],
+#marqueeBox[hidden] {
+    display: none !important;
+}
+
+#marqueeBox {
+    position: fixed;
+    z-index: 60;
+    pointer-events: none;
+    border: 1px solid #3b82f6;
+    background: rgba(59, 130, 246, .1);
+    border-radius: 2px;
+}
+
+body.rs-marquee,
+body.rs-marquee * {
+    user-select: none !important;
+}
+
+#fmtDock:has(#multiSelBar:not([hidden])) #fmtDockHint {
+    display: none;
+}
+
 /* 版面檢查：超出畫面（投影片範圍）的元素（選取中的元素維持藍色選取框） */
 #slideCanvas.editing [data-rs-overflow]:not([data-rs-sel]) {
     outline: 2px dashed #ef4444 !important;

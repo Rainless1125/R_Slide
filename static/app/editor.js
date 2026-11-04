@@ -72,7 +72,7 @@ let editMode = false;
 const PLAINTEXT_EDIT = (() => { const d = document.createElement('div'); try { d.contentEditable = 'plaintext-only'; } catch (e) { } return d.contentEditable === 'plaintext-only'; })();
 
 // 序列化投影片 DOM：移除編輯用的標記屬性（文字編輯中 / 拼字檢查 / 選取標記），得到可存回 html_content 的字串
-const EDIT_ATTRS = ['contenteditable', 'spellcheck', 'data-rs-sel', 'data-rs-busy', 'data-rs-overflow'];
+const EDIT_ATTRS = ['contenteditable', 'spellcheck', 'data-rs-sel', 'data-rs-msel', 'data-rs-busy', 'data-rs-overflow'];
 function serializeScaler(scaler) {
     const c = scaler.cloneNode(true);
     c.querySelectorAll(EDIT_ATTRS.map(a => `[${a}]`).join(',')).forEach(el => EDIT_ATTRS.forEach(a => el.removeAttribute(a)));
@@ -168,7 +168,11 @@ let editingEl = null;
 function hasOwnText(el) { return [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()); }
 function isRootBlock(el) { return !!el && el.parentElement === getScaler(); }
 
+// 單選與多選（multisel.js）互斥：選取單一元素時清除多選
+function dropMultiSel() { if (typeof clearMultiSel === 'function') clearMultiSel(); }
+
 function selectElement(el) {
+    dropMultiSel();
     if (selectedEl && selectedEl !== el) selectedEl.removeAttribute('data-rs-sel');
     selectedEl = el;
     el.setAttribute('data-rs-sel', '1');
@@ -178,6 +182,7 @@ function selectElement(el) {
 }
 
 function clearSelection() {
+    dropMultiSel();
     if (selectedEl) selectedEl.removeAttribute('data-rs-sel');
     selectedEl = null;
     fmtRO.disconnect();

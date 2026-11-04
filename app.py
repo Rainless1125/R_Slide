@@ -504,7 +504,7 @@ def check_field_lengths(req):
     limits = [("內容", req.content, MAX_CONTENT_CHARS), ("目標受眾", req.target_audience, MAX_AUDIENCE_CHARS),
               ("視覺風格", req.style_preference, MAX_STYLE_CHARS), ("平台", req.provider, MAX_MODEL_CHARS),
               ("模型名稱", req.model, MAX_MODEL_CHARS)]
-    if isinstance(req, (RegenerateSlideRequest, RegenerateElementRequest)):
+    if isinstance(req, (RegenerateSlideRequest, RegenerateElementRequest, RegenerateElementsRequest)):
         limits += [("簡報標題", req.presentation_title, MAX_TITLE_CHARS),
                    ("重產提示詞", req.custom_prompt, MAX_CUSTOM_PROMPT_CHARS)]
     outline = getattr(req, "outline", None)
@@ -575,6 +575,49 @@ class RegenerateElementRequest(BaseModel):
     thinking: ThinkingLevel = "medium"
 
 
+MAX_MULTI_ELEMENTS = 8                        # 一次交給 AI 修改的元素數上限（框選 / Shift 多選）
+
+
+class ElementInput(BaseModel):
+    html: str
+    width: int = Field(ge=1, le=4096)
+    height: int = Field(ge=1, le=4096)
+
+
+class RegenerateElementsRequest(BaseModel):
+    """AI 一次修改多個元素：slide_html 是整頁 HTML（要修改的元素依序標有 data-rs-target="1"、"2"…），elements 是各元素本身與尺寸。
+    圖表容器的 data-rs-chart 已改為所有元素共用、從 0 開始的索引（charts）。
+    merge=False：各自修改、內容互相呼應，回傳與 elements 數量相同的元素；merge=True：合併成一個元素，
+    放在第 1 個元素的位置，大小為 merge_width × merge_height（前端量測的選取範圍）。"""
+    content: str
+    target_audience: str = "商務主管 / 技術決策者"
+    num_pages: int = Field(0, ge=0, le=MAX_REGEN_SLIDES)
+    style_preference: str = "蘋果極簡白 (Apple Minimalist)"
+    presentation_title: str = "未命名簡報"
+    deck_mode: DeckMode = "speaker"
+    theme: dict | None = None
+    slide_title: str = ""
+    slide_html: str
+    elements: list[ElementInput] = Field(min_length=2, max_length=MAX_MULTI_ELEMENTS)
+    merge: bool = False
+    merge_width: int = Field(1, ge=1, le=4096)
+    merge_height: int = Field(1, ge=1, le=4096)
+    charts: list[dict | None] = Field(default_factory=list)
+    custom_prompt: str = ""
+    provider: str = "gemini"
+    model: str = ""
+    thinking: ThinkingLevel = "medium"
+
+
+class ElementHtml(BaseModel):
+    html_content: str = Field(description="取代對應元素的 HTML（純 HTML + Tailwind CSS class），必須是單一根元素")
+
+
+class ElementsRewrite(BaseModel):
+    elements: list[ElementHtml] = Field(description="依【要修改的元素】的編號順序，每個元素一筆；數量必須與選取的元素相同")
+    charts: list[ChartSpec] = Field(description="所有新元素內的圖表資料，依 data-rs-chart 索引（從 0 開始，所有元素共用）對應；沒有圖表時為空陣列")
+
+
 class ElementRewrite(BaseModel):
     html_content: str = Field(description="取代選取元素的 HTML（純 HTML + Tailwind CSS class），必須是單一根元素，規則見【只修改單一元素】")
     charts: list[ChartSpec] = Field(description="新元素內的圖表資料，依 data-rs-chart 索引（從 0 開始）對應；沒有圖表時為空陣列")
@@ -595,8 +638,33 @@ ELEMENT_EDIT_RULES = """
     9. 使用者沒有指定需求時，在不改變元素用途與資訊的前提下，讓排版更清楚、重點更突出。
 """
 
+MULTI_ELEMENT_COMMON_RULES = """
+    1. 使用者在投影片上選取了 {count} 個元素（整頁 HTML 中依序標有 data-rs-target="1" 到 "{count}"，原始 HTML 另附在【要修改的元素】）。
+       你只能重新設計這些元素，頁面上其他部分完全不變，也不要輸出 data-rs-target 屬性。
+    2. 把這些元素當成一組來設計：內容要彼此關聯、前後呼應（例如步驟、對照、因果或同一主題的不同面向），不可遺漏原本元素中的重點與數字。
+    3. 配色、字級、圓角、卡片樣式沿用【整份簡報的設計規範】與頁面上相鄰的元素，讓新元素看起來和整頁一致。
+    4. 僅使用 Tailwind CSS class；禁止使用 emoji，請使用 font-awesome 圖示（<i class="fa-solid fa-...">）。
+    5. <img data-rs-img src="rs-img:數字"> 是使用者上傳的圖片：除非使用者要求移除，否則保留該 <img> 標籤與 src 原樣。
+    6. 需要圖表時放入 <div data-rs-chart="索引"></div>，資料寫在 charts，索引從 0 開始、所有元素共用；原元素的圖表資料附在【原圖表資料】，可沿用、修改或刪除。
+    7. 使用者沒有指定需求時，在不改變元素用途與資訊的前提下，讓這組元素的排版更一致、重點更突出、彼此的關聯更清楚。
+"""
+MULTI_ELEMENT_EACH_RULES = """
+    【一次修改多個元素：各自修改、互相呼應（最優先）】：
+""" + MULTI_ELEMENT_COMMON_RULES + """
+    8. 輸出 elements 陣列，數量必須剛好 {count} 筆，第 N 筆取代 data-rs-target="N" 的元素；每筆都是「單一根元素」。
+    9. 每筆的根元素保留原元素決定它在版面中位置與大小的 class（例如 flex-1、col-span-2、w-1/2、h-full、min-h-0），
+       新內容必須完整放進該元素原本的寬高（見【要修改的元素】中各自的尺寸），不可撐大或超出。
+    10. 同類的元素（例如三張並排的卡片）使用相同的結構與樣式，只有內容不同。
+"""
+MULTI_ELEMENT_MERGE_RULES = """
+    【一次修改多個元素：合併成一個元素（最優先）】：
+""" + MULTI_ELEMENT_COMMON_RULES + """
+    8. 把這 {count} 個元素整合成「一個」新元素（例如比較表、流程圖、時間軸、合併的資訊卡），取代全部選取的元素；只輸出 html_content 一個單一根元素。
+    9. 新元素會放在第 1 個元素的位置，內容必須完整放進 {width} × {height} px（所有選取元素合起來的範圍）內，不可撐大或超出：內容多時精簡文字、縮小字級與間距。
+"""
+
 # 2. API 端點
-LLM_PATHS = {"/api/generate", "/api/outline", "/api/regenerate-slide", "/api/regenerate-element"}
+LLM_PATHS = {"/api/generate", "/api/outline", "/api/regenerate-slide", "/api/regenerate-element", "/api/regenerate-elements"}
 
 
 @app.middleware("http")
@@ -1007,6 +1075,83 @@ def regenerate_element(req: RegenerateElementRequest, request: Request, user: di
             data["charts"] = normalize_charts(data.get("charts"), max(MAX_CHARTS_PER_SLIDE, len(req.charts)))
             usage["slides_returned"] = 1
             return data
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/regenerate-elements")
+def regenerate_elements(req: RegenerateElementsRequest, request: Request, user: dict = Depends(current_user)):
+    """AI 一次修改投影片上的多個元素（框選或 Shift 多選）：各自修改並互相呼應，或合併成一個元素；頁面其他部分不變。"""
+    check_field_lengths(req)
+    if any(not e.html.strip() for e in req.elements):
+        raise HTTPException(status_code=400, detail="缺少要修改的元素")
+    if len(req.slide_html) > MAX_SLIDE_HTML_CHARS or sum(len(e.html) for e in req.elements) > MAX_SLIDE_HTML_CHARS:
+        raise HTTPException(status_code=400, detail="選取的元素內容過多，無法修改；請減少選取的元素後再試")
+    if len(req.slide_title) > MAX_SLIDE_META_CHARS:
+        raise HTTPException(status_code=400, detail="頁面標題過長，無法修改")
+    if len(json.dumps(req.charts, ensure_ascii=False)) > MAX_SLIDE_CHARTS_CHARS:
+        raise HTTPException(status_code=400, detail="選取元素的圖表資料過多，無法修改")
+    theme = theme_from_input(req.theme)
+    theme_block = (format_theme(theme) if theme
+                   else "（這份簡報沒有記錄設計規範，請沿用頁面上其他元素的配色、卡片與標題樣式）")
+    count = len(req.elements)
+    rules = (MULTI_ELEMENT_MERGE_RULES if req.merge else MULTI_ELEMENT_EACH_RULES) \
+        .replace("{count}", str(count)).replace("{width}", str(req.merge_width)).replace("{height}", str(req.merge_height))
+
+    system_instruction = """
+    你是一位榮獲世界設計大獎的簡報 UI 設計師。
+    你的任務是依使用者的需求，一起重新設計投影片上選取的幾個元素，頁面的其他部分保持不變。
+    """ + rules + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + CONTENT_ACCURACY_RULES
+    elements_block = "\n".join(f"    - 元素 {i}（寬 {e.width} px、高 {e.height} px）：\n    {e.html}"
+                               for i, e in enumerate(req.elements, 1))
+
+    prompt = f"""
+    【簡報標題】：{req.presentation_title}
+    【簡報目標客群】：{req.target_audience}
+    【簡報模式】：{DECK_MODE_LABELS[req.deck_mode]}
+    【指定視覺風格】：{req.style_preference}
+    【原始素材內容】：
+    {req.content}
+
+    【整份簡報的設計規範】：
+    {theme_block}
+
+    【此頁標題】：{req.slide_title or "（無）"}
+    【整頁 HTML（要修改的元素標有 data-rs-target，僅供參考，不要輸出）】：
+    {req.slide_html}
+
+    【要修改的元素】（共 {count} 個）：
+{elements_block}
+
+    【原圖表資料】（JSON，索引從 0 開始，所有元素共用）：
+    {json.dumps(req.charts, ensure_ascii=False) if req.charts else "（無）"}
+
+    【使用者的修改需求】：
+    {req.custom_prompt.strip() or "（無，請你自行優化這組元素）"}
+
+    {f"請把這 {count} 個元素合併成一個元素，只輸出它的單一根元素 HTML 與圖表資料。" if req.merge
+     else f"請輸出剛好 {count} 個元素（依編號順序）的 HTML 與圖表資料。"}
+    """
+
+    with llm_usage_log(request, user, "element", req) as usage:
+        try:
+            schema = ElementRewrite if req.merge else ElementsRewrite
+            data = call_llm(req.provider, req.model, system_instruction, prompt, schema, 0.6, usage, thinking=req.thinking)
+            charts = normalize_charts(data.get("charts"), max(MAX_CHARTS_PER_SLIDE, len(req.charts)))
+            if req.merge:
+                html = (data.get("html_content") or "").strip()
+                if not html:
+                    raise HTTPException(status_code=502, detail="模型沒有回傳新的元素內容")
+                result = {"elements": [html], "charts": charts}
+            else:
+                items = data.get("elements") if isinstance(data.get("elements"), list) else []
+                htmls = [(it.get("html_content") or "").strip() if isinstance(it, dict) else "" for it in items]
+                if len(htmls) != count or not all(htmls):
+                    raise HTTPException(status_code=502, detail=f"模型回傳的元素數量不符（選取 {count} 個，回傳 {len(htmls)} 個），請再試一次")
+                result = {"elements": htmls, "charts": charts}
+            usage["slides_returned"] = 1
+            return result
         except HTTPException:
             raise
         except Exception as e:
