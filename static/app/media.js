@@ -538,6 +538,7 @@ function endFloatDrag(e) {
 let suppressNextClick = false;
 slideCanvasEl.addEventListener('pointerdown', e => {
     if (!editMode || editingEl) return;
+    if (e.shiftKey || e.ctrlKey || e.metaKey) return;      // Shift / Ctrl + 點擊是多選（multisel.js），不要先選成單選再拖曳
     const obj = e.target.closest('[data-rs-float]');
     if (!obj || !getScaler()?.contains(obj) || !isFloat(obj)) return;
     if (selectedEl !== obj) selectElement(obj);
