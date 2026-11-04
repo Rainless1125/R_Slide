@@ -1134,6 +1134,8 @@ body:has(#slideCanvas.editing) #toastRoot {
 }
 
 #multiSelBar[hidden],
+#aiEditChips[hidden],
+#aiEditImageChips[hidden],
 #marqueeBox[hidden] {
     display: none !important;
 }

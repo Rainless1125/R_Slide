@@ -122,6 +122,8 @@ function friendlyError(err) {
     else if (status === 503 || has(/overloaded|unavailable|UNAVAILABLE|high demand/i)) msg = 'AI 服務目前忙碌中，請稍後再試，或換一個模型。';
     else if (has(/拒絕回應|safety|blocked|refus/i)) msg = '模型拒絕處理這段內容，請調整素材後再試。';
     else if (has(/MAX_TOKENS|長度上限/)) msg = 'AI 輸出太長被截斷，請減少頁數或精簡內容後再試。';
+    // AI 轉換圖片：後端判斷可能是模型不支援圖片輸入（額度、逾時等原因已在上面先判斷）
+    else if (has(/不支援圖片輸入/)) msg = '圖片辨識失敗，所選的模型可能不支援圖片輸入，請改用支援圖片的模型後再試。';
     else if (has(/沒有回傳內容/)) msg = 'AI 沒有回傳任何內容，請稍後再試，或換一個模型。';
     else if (has(/JSON|Unterminated|Expecting|validation|parse/i)) msg = 'AI 回傳的格式有誤，通常重試一次即可。';
     else if (has(/not.?found|404|model/i) && has(/model/i)) msg = '找不到所選模型，請改選其他模型。';
