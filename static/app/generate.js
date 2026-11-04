@@ -632,10 +632,24 @@ function openRegenerateModal(idx) {
     // 預設沿用這份簡報的模式（不是輸入區目前選的模式）
     const mode = currentDeckMode();
     document.querySelectorAll('input[name="regenDeckMode"]').forEach(r => { r.checked = r.value === mode; });
+    // 每次開啟都預設保留內容，避免剛改好的文字被 AI 依原始素材重寫
+    document.getElementById('regenKeepContent').checked = true;
+    updateRegenKeepContentHint();
     modal.classList.remove('hidden');
     setTimeout(() => ta.focus(), 0);
     refreshQuota();
 }
+
+function updateRegenKeepContentHint() {
+    const keep = document.getElementById('regenKeepContent').checked;
+    document.getElementById('regenKeepContentHint').textContent = keep
+        ? '此頁的文字與數字（包含你手動修改的部分）維持不變，AI 只重新設計排版'
+        : 'AI 會參考原始素材重新整理此頁的文字與重點，版面與內容都可能改變';
+    document.getElementById('regenPromptInput').placeholder = keep
+        ? '例如：改成左右對照、重點改用 KPI 資訊卡、標題放大'
+        : '例如：請改成更商務、重點三點式、減少文字並加上 KPI 資訊卡';
+}
+document.getElementById('regenKeepContent').addEventListener('change', updateRegenKeepContentHint);
 
 function closeRegenerateModal(force = false) {
     if (!force && regeneratingSlideIdx !== null) return;
@@ -648,11 +662,13 @@ async function confirmRegenerateFromModal() {
     if (regenerateModalSlideIdx === null) return;
     const prompt = document.getElementById('regenPromptInput').value.trim();
     const mode = document.querySelector('input[name="regenDeckMode"]:checked')?.value;
-    await regenerateSingleSlide(regenerateModalSlideIdx, prompt, mode);
+    const keepContent = document.getElementById('regenKeepContent').checked;
+    await regenerateSingleSlide(regenerateModalSlideIdx, prompt, mode, keepContent);
 }
 
 // deckMode 省略時沿用這份簡報的模式；與原模式不同時，成功後寫回簡報設定
-async function regenerateSingleSlide(idx, customPrompt = '', deckMode) {
+// keepContent：保留此頁目前的內容（含手動修改），只換版面；false 時 AI 可依原始素材重寫內容
+async function regenerateSingleSlide(idx, customPrompt = '', deckMode, keepContent = true) {
     if (!currentPresentationData || !Array.isArray(currentPresentationData.slides)) {
         showToast('目前沒有可重產的簡報內容', 'info', 2200);
         return;
@@ -710,6 +726,7 @@ async function regenerateSingleSlide(idx, customPrompt = '', deckMode) {
                 slide_index: idx,
                 slides: slim.slides,
                 custom_prompt: customPrompt,
+                keep_content: keepContent,
                 theme: currentPresentationData.theme || null,   // 整份簡報的設計規範，讓重產的頁面沿用（舊簡報沒有）
                 ...getLlmChoice()
             })
@@ -729,7 +746,7 @@ async function regenerateSingleSlide(idx, customPrompt = '', deckMode) {
         }
         pushUndoSnapshot();
         deck.slides[at] = {
-            ...slideWithNewVersion(targetSlide, newSlide, customPrompt ? `重產：${customPrompt}` : '重產：AI 自動優化'),
+            ...slideWithNewVersion(targetSlide, newSlide, (keepContent ? '換版面' : '重產') + '：' + (customPrompt || 'AI 自動優化')),
             page_number: targetSlide.page_number || at + 1
         };
 
@@ -754,7 +771,7 @@ async function regenerateSingleSlide(idx, customPrompt = '', deckMode) {
             }
         });
     } catch (err) {
-        if (!err.handled) showToast(friendlyError(err), 'error', 8000, retryAction(err, () => regenerateSingleSlide(idx, customPrompt, mode)));
+        if (!err.handled) showToast(friendlyError(err), 'error', 8000, retryAction(err, () => regenerateSingleSlide(idx, customPrompt, mode, keepContent)));
     } finally {
         setReviewRegenerateState(idx, false);
         setCurrentRegenerateState(false);
