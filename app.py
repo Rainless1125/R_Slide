@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
@@ -31,6 +31,7 @@ from exporter import ExportError, build_pptx
 from extract import MAX_REQUEST_BYTES, ExtractError, extract_text
 from ldap_auth import check_config as check_auth_config
 from slide_images import SlideImageReadings, read_slide_images
+from static_assets import NO_CACHE, cache_control_for, versioned_html
 
 logger = logging.getLogger("rslide")
 
@@ -729,6 +730,15 @@ async def limit_llm_body(request: Request, call_next):
             return JSONResponse({"detail": "請求內容過大，請精簡素材或投影片內容後再試"}, status_code=413)
     return await call_next(request)
 
+@app.middleware("http")
+async def static_cache_headers(request: Request, call_next):
+    """帶有版本號（?v=）的靜態檔案內容不會變，讓瀏覽器長期快取（版本號由 static_assets.versioned_html 自動加上）。"""
+    response = await call_next(request)
+    cache = cache_control_for(request.url.path, request.url.query)
+    if cache and response.status_code == 200:
+        response.headers["Cache-Control"] = cache
+    return response
+
 @app.get("/api/models")
 async def list_models():
     data = {provider: {"available": provider_client(provider) is not None, "models": models}
@@ -1227,13 +1237,17 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 async def favicon():
     return FileResponse(STATIC_DIR / "favicon.svg", media_type="image/svg+xml")
 
+# 頁面中引用的 JS 與 CSS 自動加上內容雜湊的版本號（static_assets.py），修改前端檔案後不需要手動更新 ?v=
+def html_page(name: str) -> HTMLResponse:
+    return HTMLResponse(versioned_html(STATIC_DIR, name), headers={"Cache-Control": NO_CACHE})
+
 @app.get("/")
-async def root():
-    return FileResponse(STATIC_DIR / "index.html")
+def root():
+    return html_page("index.html")
 
 @app.get("/admin", include_in_schema=False)
-async def admin_page():
-    return FileResponse(STATIC_DIR / "admin.html")
+def admin_page():
+    return html_page("admin.html")
 
 if __name__ == "__main__":
     import uvicorn
