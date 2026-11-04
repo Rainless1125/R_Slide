@@ -693,7 +693,7 @@
             <div class="flex items-center justify-between gap-3">
                 <div>
                     <h3 class="text-base sm:text-lg font-bold">重產此頁</h3>
-                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">可輸入提示詞引導 AI；留白則由 AI 自動優化。</p>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-1">可輸入提示詞引導 AI；留白則由 AI 自動優化版面。</p>
                 </div>
                 <button onclick="closeRegenerateModal()" class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800"
                     aria-label="關閉重產視窗">
@@ -710,6 +710,15 @@
                 </div>
                 <p class="text-[11px] text-zinc-400 mt-1.5">預設沿用此簡報的模式；改選後，這份簡報之後的重產都會改用新模式。</p>
             </fieldset>
+            <!-- 保留目前內容：開啟時 AI 只換版面，手動修改過的文字與數字不會被原始素材取代（app.py 的 REGEN_KEEP_CONTENT_RULES） -->
+            <label class="outline-toggle mt-4 p-3 w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950">
+                <input type="checkbox" id="regenKeepContent" role="switch" class="sr-only" checked>
+                <span class="outline-switch" aria-hidden="true"></span>
+                <span class="min-w-0">
+                    <span class="block text-sm font-semibold">保留目前內容，只換版面</span>
+                    <span id="regenKeepContentHint" class="block text-[11px] text-zinc-500 dark:text-zinc-400">此頁的文字與數字（包含你手動修改的部分）維持不變，AI 只重新設計排版</span>
+                </span>
+            </label>
             <div class="mt-4">
                 <label for="regenPromptInput" class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">重產提示詞（選填）</label>
                 <textarea id="regenPromptInput" rows="4" maxlength="2000"
@@ -922,7 +931,7 @@
                             <li><b>修改標題</b>：直接點擊卡片上的標題文字修改，Enter 確定、Esc 取消。</li>
                             <li><b>調整頁序與刪除</b>：拖曳卡片左上角的把手，或用左右箭頭前移 / 後移；「刪除」可移除該頁。</li>
                             <li><b>新增空白頁</b>：每張卡片的「+」可在該頁後新增空白頁，最後一格可新增到最後；空白頁沿用參考頁的背景與文字顏色。</li>
-                            <li><b>重產此頁</b>：對某頁不滿意時，可輸入提示詞（例如「重點三點式、加上 KPI 資訊卡」）單獨重新生成，其他頁面維持不變。</li>
+                            <li><b>重產此頁</b>：對某頁不滿意時，可輸入提示詞（例如「重點三點式、加上 KPI 資訊卡」）單獨重新生成，其他頁面維持不變。預設開啟「保留目前內容，只換版面」：此頁的文字與數字（包含你手動修改的部分）維持不變，AI 只重新排版；關閉後 AI 會參考原始素材重新整理此頁內容。</li>
                             <li><b>切換模式重產</b>：重產視窗可改用另一種簡報模式，之後這份簡報的重產都會沿用。</li>
                             <li><b>還原舊版</b>：重產前的版本會自動保留（每頁最多 3 個，跟著簡報存入歷史記錄）。點縮圖右上角的「舊版本」或播放器的「舊版本」按鈕，所有版本會排成預覽圖，點擊即可改用該版本，可以來回切換比較；關閉後若要回到原本的版本，可按提示中的「撤銷」。</li>
                         </ul>
@@ -1245,7 +1254,7 @@
     <script src="/static/icons.js?v=2"></script>
     <script src="/static/app/core.js?v=11"></script>
     <script src="/static/app/input.js?v=7"></script>
-    <script src="/static/app/generate.js?v=24"></script>
+    <script src="/static/app/generate.js?v=25"></script>
     <script src="/static/app/outline.js?v=1"></script>
     <script src="/static/app/shapes.js?v=4"></script>
     <script src="/static/app/editor.js?v=22"></script>
