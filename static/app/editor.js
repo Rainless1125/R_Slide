@@ -129,9 +129,42 @@ function toggleEditMode(force) {
     document.querySelectorAll('[data-edit-zone]').forEach(z => { z.hidden = !editMode; });
     if (editMode) {
         prepareEditing();   // 操作提示顯示在投影片上方的編輯列（#fmtDockHint），不另外跳出提示
+        reserveFmtDockHeight();
         revealFmtDock();
     }
 }
+
+// 編輯列固定高度：沒有選取時只顯示一行提示，選取後換成兩排的格式工具列，編輯列變高會把投影片往下推。
+// 雙擊文字時第一下點擊就開啟工具列，投影片下移，第二下點到別的位置（外層容器），無法進入文字編輯。
+// 進入編輯模式與視窗改變大小時，先量出工具列展開時（文字元素，控制項最多）的高度，作為編輯列的最小高度；
+// 之後若有更高的工具列（例如視窗變窄後換行），也只增不減，選取前後投影片不再跳動。
+function reserveFmtDockHeight() {
+    const dock = document.getElementById('fmtDock');
+    const tb = document.getElementById('fmtToolbar');
+    if (!editMode || !dock || !tb) return;
+    dock.style.minHeight = '';
+    let h;
+    if (tb.classList.contains('open')) h = dock.offsetHeight;
+    else {
+        tb.style.visibility = 'hidden';
+        tb.classList.add('open');
+        applyToolbarCtls(tb, 'text', ['aiReset', 'scaleReset']);
+        h = dock.offsetHeight;
+        tb.classList.remove('open');
+        tb.style.visibility = '';
+    }
+    dock.style.minHeight = h + 'px';
+}
+new ResizeObserver(() => {
+    const dock = document.getElementById('fmtDock');
+    if (!editMode || !dock?.style.minHeight) return;
+    if (dock.offsetHeight > parseFloat(dock.style.minHeight)) dock.style.minHeight = dock.offsetHeight + 'px';
+}).observe(document.getElementById('fmtDock'));
+let dockResizeTimer = null;
+window.addEventListener('resize', () => {
+    clearTimeout(dockResizeTimer);
+    dockResizeTimer = setTimeout(reserveFmtDockHeight, 150);
+});
 
 // 進入編輯模式時，投影片頂端若太靠近頁首，往下捲讓編輯列完整出現在投影片上方，而不是疊在投影片上
 // （編輯列黏在頁首下方 72px，見 app.css 的 #fmtDock）
