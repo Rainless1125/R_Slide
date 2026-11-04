@@ -20,7 +20,8 @@ function slimSlidesForLlm(slides) {
             img.setAttribute('src', 'rs-img:' + (images.length - 1));
             img.setAttribute('data-rs-img', '');
         });
-        return { ...withoutVersions(s), html_content: doc.body.innerHTML, charts: s.charts || [] };
+        // 標題以投影片上顯示的為準（複製頁面後改寫內容時，slide_title 仍是原頁的標題）
+        return { ...withoutVersions(s), slide_title: slideTitleForLlm(s), html_content: doc.body.innerHTML, charts: s.charts || [] };
     });
     return { slides: out, images };
 }

@@ -144,6 +144,51 @@ function revealFmtDock() {
     });
 }
 
+/* ----- 頁面上實際顯示的標題與文字 ----- */
+// slide_title / speaker_notes 是生成時的資料，在投影片上編輯文字不會跟著改（例如複製頁面後改寫成其他主題）；
+// 送給 AI 時若沿用舊標題，AI 會依它與原始素材把內容改回原頁。這裡從 HTML 讀出目前顯示的標題。
+const TITLE_SIZE_RANK = { '3xl': 3, '4xl': 4, '5xl': 5, '6xl': 6, '7xl': 7, '8xl': 8, '9xl': 9 };
+function parseSlideHtml(html) {
+    return new DOMParser().parseFromString(`<!DOCTYPE html><html><body>${html || ''}</body></html>`, 'text/html').body;
+}
+function titleRank(el) {
+    let rank = 0;
+    el.classList.forEach(c => {
+        const m = c.match(/^(?:[a-z0-9]+:)*text-(\dxl)$/) || [];
+        const px = c.match(/^(?:[a-z0-9]+:)*text-\[(\d+)px\]$/);
+        rank = Math.max(rank, TITLE_SIZE_RANK[m[1]] || 0, px && Number(px[1]) >= 30 ? Number(px[1]) / 10 : 0);
+    });
+    return rank;
+}
+// 第一個 h1，沒有時第一個 h2，再沒有時取字級最大（text-3xl 以上）的文字；都沒有時回傳空字串
+function htmlDisplayTitle(html) {
+    const body = parseSlideHtml(html);
+    body.querySelectorAll('svg,[data-rs-chart]').forEach(n => n.remove());
+    let el = body.querySelector('h1') || body.querySelector('h2');
+    if (!el) {
+        let best = 0;
+        body.querySelectorAll('*').forEach(n => {
+            const r = hasOwnText(n) || n.matches('h3,h4,p,span,div') ? titleRank(n) : 0;
+            if (r > best && n.textContent.trim()) { best = r; el = n; }
+        });
+    }
+    return (el?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+}
+function htmlPlainText(html) { return parseSlideHtml(html).textContent.replace(/\s+/g, ' ').trim(); }
+// 送給 AI 的頁面標題：以投影片上顯示的標題為準，讀不到時才用 slide_title
+function slideTitleForLlm(slide, html = slide?.html_content) {
+    return htmlDisplayTitle(html) || slide?.slide_title || '';
+}
+// 編輯寫回時同步頁面資料：
+// - 標題：原本與畫面上的標題一致（使用者沒有在審查頁另外改名）時，跟著畫面上的新標題更新
+// - 講者備註：頁面文字改過後標記為可能已過時（notes_stale），重產此頁時提醒 AI 以目前內容為準；編輯備註或重產後清除
+function syncSlideMetaAfterEdit(slide, oldHtml, newHtml) {
+    const oldTitle = htmlDisplayTitle(oldHtml), newTitle = htmlDisplayTitle(newHtml);
+    const placeholder = !slide.slide_title || slide.slide_title === oldTitle || (!oldTitle && slide.slide_title === '空白頁');  // 空白頁的預設標題（player.js）
+    if (newTitle && newTitle !== oldTitle && placeholder) slide.slide_title = newTitle;
+    if ((slide.speaker_notes || '').trim() && htmlPlainText(oldHtml) !== htmlPlainText(newHtml)) slide.notes_stale = true;
+}
+
 // 把畫面上的修改寫回資料（一次編輯 = 一個撤銷步驟）
 // withUndo=false：呼叫端已自行 pushUndoSnapshot（例如同時修改了 slide.charts）
 function commitSlideEdit(withUndo = true) {
@@ -154,6 +199,7 @@ function commitSlideEdit(withUndo = true) {
     scheduleOverflowCheck();
     if (html === scaler.dataset.base) { if (!withUndo) syncCurrentPresentationToHistory(); return; }
     if (withUndo) pushUndoSnapshot();
+    syncSlideMetaAfterEdit(slide, slide.html_content, html);
     slide.html_content = html;
     scaler.dataset.base = html;
     const thumbScaler = document.querySelector(`#thumbnailContainer .thumb[data-idx="${currentSlideIdx}"] .slide-scaler`);
