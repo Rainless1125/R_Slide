@@ -546,6 +546,8 @@ class RegenerateSlideRequest(BaseModel):
     slide_index: int
     slides: list[SlideInput]
     custom_prompt: str = ""
+    # True：保留此頁目前的內容（含使用者手動修改），只重新設計版面；False：可依原始素材重寫此頁內容
+    keep_content: bool = True
     theme: dict | None = None                     # 整份簡報的設計規範（舊簡報沒有），見 deck_design.py
     provider: str = "gemini"
     model: str = ""
@@ -836,6 +838,22 @@ async def export_pptx(request: Request, user: dict = Depends(current_user)):
     return Response(content=data, media_type=PPTX_MEDIA_TYPE,
                     headers={"Content-Disposition": 'attachment; filename="presentation.pptx"'})
 
+# 重產此頁的兩種方式（重產視窗的「保留目前內容，只換版面」選項）
+REGEN_KEEP_CONTENT_RULES = """
+    【重產方式：保留內容，只換版面】：
+    1. 保留【此頁目前的內容】中所有的標題、文字、數字、項目與圖表資料，用字盡量不變；不可刪除重點、不可新增素材中的其他資訊，
+       也不可依【原始素材內容】把文字或數字改回去。
+    2. 重新設計的是版型、排列、卡片、圖示、層次與視覺強調；為了放進新版型可以把句子稍微精簡，但意思與數字必須相同。
+    3. 使用者的額外需求若明確要求修改、增加或刪除內容，依其需求調整，未提到的部分仍保留原樣。
+    4. 指定的【簡報模式】與此頁原本的寫法不同時（例如改成演講型），可依模式調整文字的詳略，但數字與重點不變。
+"""
+REGEN_REWRITE_RULES = """
+    【重產方式：重寫此頁】：
+    1. 可依【原始素材內容】重新整理此頁的重點與文字，使版面與內容都比原本更好，並與原本有明顯差異。
+    2. 【此頁目前的內容】中使用者修改過、與素材不同的文字或數字仍代表使用者的意圖，請保留其意思，不可改回素材的說法。
+"""
+
+
 @app.post("/api/regenerate-slide")
 def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict = Depends(current_user)):
     check_field_lengths(req)
@@ -874,10 +892,12 @@ def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict =
     3. 禁止使用 emoji，請使用 font-awesome 圖示。
     4. 必須服從指定視覺風格與【整份簡報的設計規範】，版型從【版型目錄】挑選，並避免與前後頁使用相同的版型。
     5. 使用者的額外需求若會讓內容超出畫面（例如要求加入更多內容），請以精簡文字的方式達成，不可違反版面尺寸限制。
-    6. 原 HTML 中 <img data-rs-img src="rs-img:數字"> 是使用者上傳的圖片：除非使用者要求移除，否則請保留該 <img> 標籤與 src 原樣，
-       可調整它的位置與大小。原 HTML 中的 data-rs-chart 容器內容已省略，圖表資料請參考【原圖表資料】。
+    6. 【此頁目前的內容】的 HTML 中 <img data-rs-img src="rs-img:數字"> 是使用者上傳的圖片：除非使用者要求移除，否則請保留該 <img> 標籤與 src 原樣，
+       可調整它的位置與大小。HTML 中的 data-rs-chart 容器內容已省略，圖表資料請參考【原圖表資料】。
     7. 講者備註需配合新版面重新撰寫；使用者的額外需求若只針對版面，仍可沿用【原講者備註】的重點。
-    """ + LAYOUT_CATALOG + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + SPEAKER_NOTES_RULES \
+    8. 【此頁目前的內容】是最新版本，可能包含使用者手動修改過的文字與數字；【原始素材內容】只是產生簡報時的背景資料，
+       兩者不一致時一律以【此頁目前的內容】為準，不可改回素材的說法；下方【內容正確性】所說的「素材」也包含【此頁目前的內容】。
+    """ + (REGEN_KEEP_CONTENT_RULES if req.keep_content else REGEN_REWRITE_RULES) + LAYOUT_CATALOG + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + SPEAKER_NOTES_RULES \
         + CONTENT_ACCURACY_RULES + one_page_rules(len(req.slides))
 
     prompt = f"""
@@ -886,8 +906,6 @@ def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict =
     【總頁數】：{req.num_pages}
     【簡報模式】：{DECK_MODE_LABELS[req.deck_mode]}
     【指定視覺風格】：{req.style_preference}
-    【原始素材內容】：
-    {req.content}
 
     【整份簡報的設計規範】：
     {theme_block}
@@ -897,19 +915,22 @@ def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict =
 
     【需要重產的頁面】：
     - 頁碼：{target_slide.page_number}
-    - 原標題：{target_slide.slide_title}
+    - 原標題（若與下方 HTML 中顯示的標題不同，以 HTML 為準）：{target_slide.slide_title}
     - 原版型概念：{target_slide.layout_concept}
-    - 原 HTML：
+    - 【此頁目前的內容】（HTML，包含使用者手動修改，為最新版本）：
     {target_slide.html_content}
     - 原圖表資料（JSON，可沿用、修改或刪除）：
     {json.dumps(target_slide.charts, ensure_ascii=False) if target_slide.charts else "（無）"}
     - 原講者備註：
     {target_slide.speaker_notes.strip() or "（無）"}
 
-    【使用者額外重產需求】：
-    {req.custom_prompt.strip() if req.custom_prompt.strip() else "（無，請你自行優化此頁）"}
+    【使用者額外重產需求】（優先於一般規則）：
+    {req.custom_prompt.strip() if req.custom_prompt.strip() else ("（無，請保留此頁內容，只重新設計版面與視覺呈現）" if req.keep_content else "（無，請你自行優化此頁）")}
 
-    請重新設計這一頁，使其與原本明顯不同但仍符合整體脈絡，並回傳單一頁的 JSON。
+    【原始素材內容】（產生簡報時的背景資料，僅供參考；與此頁目前的內容不一致時，以此頁目前的內容為準）：
+    {req.content}
+
+    {"請保留【此頁目前的內容】中的文字、數字與重點，只重新設計這一頁的版面，" if req.keep_content else "請重新設計這一頁的版面與內容，"}並回傳單一頁的 JSON。
     注意：page_number 請維持為 {target_slide.page_number}。
     """
 
