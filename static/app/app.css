@@ -1638,6 +1638,8 @@ body.rs-marquee * {
 /* 四邊中點：只調整寬或高（不鎖定比例），只在圖片、圖案與圖表顯示（media.js 的 positionFloatBox） */
 #floatBox .fh-side { display: none; border-radius: 6px; }
 #floatBox.sides .fh-side { display: block; }
+#floatBox.ew-sides .fh[data-h="e"],
+#floatBox.ew-sides .fh[data-h="w"] { display: block; }
 #floatBox .fh[data-h="n"] { left: 50%; top: 0; cursor: ns-resize; }
 #floatBox .fh[data-h="s"] { left: 50%; top: 100%; cursor: ns-resize; }
 #floatBox .fh[data-h="e"] { left: 100%; top: 50%; cursor: ew-resize; }

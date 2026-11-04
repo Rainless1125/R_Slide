@@ -390,7 +390,7 @@ function resetImgRatio(el) {
 (function buildFloatBox() {
     const box = document.createElement('div');
     box.id = 'floatBox';
-    // 四角：等比例縮放（圖片、圖示、AI 版面元素）；四邊中點：只調整寬或高，在圖片、圖案、圖表與 AI 版面元素顯示
+    // 四角：等比例縮放（圖片、圖示、文字方塊、AI 版面元素）；四邊中點：只調整寬或高，在圖片、圖案、圖表與 AI 版面元素顯示，文字方塊只有左右
     box.innerHTML = ['nw', 'ne', 'sw', 'se'].map(h => `<span class="fh" data-h="${h}"></span>`).join('') +
         ['n', 'e', 's', 'w'].map(h => `<span class="fh fh-side" data-h="${h}" title="拖曳只調整${'ns'.includes(h) ? '高度' : '寬度'}（不鎖定長寬比例）"></span>`).join('') +
         '<span class="fsize"></span>';
@@ -413,9 +413,10 @@ function positionFloatBox() {
     const r = el.getBoundingClientRect();
     Object.assign(box.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
     const pct = getScale(el) === 1 ? '' : ` · ${Math.round(getScale(el) * 100)}%`;
-    box.querySelector('.fsize').textContent = float ? `${el.offsetWidth} × ${el.offsetHeight}`
+    box.querySelector('.fsize').textContent = float ? `${el.offsetWidth} × ${el.offsetHeight}${pct}`
         : isSized(el) ? `${el.offsetWidth} × ${el.offsetHeight}${pct}` : `${Math.round(getScale(el) * 100)}%`;
     box.classList.toggle('sides', !float || ['data-rs-img', 'data-rs-shape', 'data-rs-chart'].some(a => el.hasAttribute(a)));
+    box.classList.toggle('ew-sides', float && el.hasAttribute('data-rs-text'));    // 文字方塊：左右調寬度（高度隨文字）
     box.classList.add('open');
 }
 
@@ -426,7 +427,8 @@ function startFloatDrag(e, handle) {
     e.preventDefault();
     e.stopPropagation();
     stopTextEdit();
-    floatDrag = { el, handle, sx: e.clientX, sy: e.clientY, r: floatRect(el), s: slideScale(), moved: false, snap: collectSnapTargets(el) };
+    // sc：文字方塊等比例縮放用的 CSS scale（其他浮動物件為 1）
+    floatDrag = { el, handle, sx: e.clientX, sy: e.clientY, r: floatRect(el), s: slideScale(), sc: getScale(el), shift: e.shiftKey, moved: false, snap: collectSnapTargets(el) };
     e.target.setPointerCapture?.(e.pointerId);
     e.target.addEventListener('pointermove', onFloatDragMove);
     e.target.addEventListener('pointerup', endFloatDrag, { once: true });
@@ -443,7 +445,9 @@ function onFloatDragMove(e) {
     const dx = (e.clientX - d.sx) / d.s, dy = (e.clientY - d.sy) / d.s;
     if (!d.moved && Math.abs(dx) + Math.abs(dy) < 2) return;
     d.moved = true;
-    const { x, y, w, h } = d.r;
+    const { x, y } = d.r;
+    // 畫面上的大小（含文字方塊的 scale）；寬高設定值為未縮放的大小
+    const w = d.r.w * d.sc, h = d.r.h * d.sc;
     const MIN = 24;
     const snapOn = !e.altKey;                     // 按住 Alt 暫時關閉吸附
     const th = SNAP_PX / d.s;
@@ -460,6 +464,8 @@ function onFloatDragMove(e) {
         [nx, ny] = clampFloatPos(nx, ny, w, h);
         d.el.style.left = Math.round(nx) + 'px';
         d.el.style.top = Math.round(ny) + 'px';
+    } else if (d.el.hasAttribute('data-rs-text') && /^(?:nw|ne|sw|se)$/.test(d.handle) && !(e.shiftKey || d.shift)) {
+        scaleTextBoxMove(d, dx, dy, e.altKey, guides);
     } else {
         const west = d.handle.includes('w'), north = d.handle.includes('n');
         const horiz = /[ew]/.test(d.handle), vert = /[ns]/.test(d.handle);   // 四邊中點只動一個方向
@@ -489,13 +495,33 @@ function onFloatDragMove(e) {
         if (keepRatio) nh = nw * h / w;
         if (isText) nh = h;
         if (freeImg) d.el.style.objectFit = 'fill';
-        // 從左 / 上方的控制點縮放時，對側固定不動
-        setFloatRect(d.el, west ? x + w - nw : x, north ? y + h - nh : y, nw, autoH ? null : nh);
+        // 從左 / 上方的控制點縮放時，對側固定不動；寬高設定值換回未縮放的大小（文字方塊放大過時）
+        setFloatRect(d.el, west ? x + w - nw : x, north ? y + h - nh : y, nw / d.sc, autoH ? null : nh / d.sc);
         if (d.el.hasAttribute('data-rs-icon')) d.el.style.fontSize = iconFontPx(nw);
         if (d.el.hasAttribute('data-rs-shape')) renderShape(d.el);       // 圖案依新尺寸重畫，外框粗細不變形
     }
     showSnapGuides(guides);
     positionToolbar();
+}
+// 文字方塊拉角落：與 AI 版面元素相同，以 CSS scale 等比例縮放（文字、圖示、間距一起放大縮小），對角固定不動。
+// 只調寬度（文字換行、高度隨內容）改拉左右兩側，或按住 Shift 拉角落。
+function scaleTextBoxMove(d, dx, dy, noSnap, guides) {
+    const { x, y } = d.r;
+    const w = d.r.w * d.sc, h = d.r.h * d.sc;
+    const west = d.handle.includes('w'), north = d.handle.includes('n');
+    // 比例取拖曳量在對角線方向的投影：文字方塊通常又寬又矮，取兩個方向中較大的比例時，往下拖一點就會放大好幾倍
+    const ux = west ? -dx : dx, uy = north ? -dy : dy;
+    let nw = w * (1 + (ux * w + uy * h) / (w * w + h * h));
+    if (!noSnap) {
+        const sx = snapAxis([west ? x + w - nw : x + nw], d.snap.x, SNAP_PX / d.s);
+        nw += west ? -sx.delta : sx.delta;
+        guides.x = sx.lines;
+    }
+    const sc = setScale(d.el, d.sc * Math.max(nw, 1) / w);
+    nw = w * sc / d.sc;
+    const nh = h * sc / d.sc;
+    d.el.style.left = Math.round(west ? x + w - nw : x) + 'px';
+    d.el.style.top = Math.round(north ? y + h - nh : y) + 'px';
 }
 function endFloatDrag(e) {
     e.target.removeEventListener('pointermove', onFloatDragMove);

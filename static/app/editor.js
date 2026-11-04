@@ -771,7 +771,7 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
   ${group('', btn('resetRatio', '<i class="fa-solid fa-expand text-[11px]"></i><span class="bt">還原圖片比例</span>', '還原為原圖的長寬比例（保留目前寬度）', '', 'imgRatio'))}
   <span class="fspacer"></span>
   ${group('', `${btn('resetPos', '<i class="fa-solid fa-arrows-to-dot text-[11px]"></i><span class="bt">還原位置</span>', '移回 AI 版面的原始位置', '', 'aiReset')}
-    ${btn('resetScale', '<i class="fa-solid fa-compress text-[11px]"></i><span class="bt">還原大小</span>', '還原為 AI 版面的原始大小與寬高', '', 'aiReset')}`)}
+    ${btn('resetScale', '<i class="fa-solid fa-compress text-[11px]"></i><span class="bt">還原大小</span>', '還原為原始大小（AI 版面元素也還原寬高）', '', 'scaleReset')}`)}
 </div>`;
     // 工具列固定在投影片上方的編輯列（#fmtDock）內，不會蓋住投影片內容
     document.getElementById('fmtDock').appendChild(tb);
@@ -904,7 +904,7 @@ function hideMoreMenu() {
 }
 
 /* 各類元素實際有作用的控制項群組（data-ctl）；parent 與 common（刪除、更多選單的複製與排序）一律顯示，
- * aiReset（還原位置 / 大小）只在 AI 版面元素顯示。
+ * aiReset（還原位置）與 scaleReset（還原大小）在 AI 版面元素顯示；拉角落等比例放大過的文字方塊也顯示 scaleReset。
  * 圖片：文字類設定對 <img> 無效；背景只在透明圖片看得到，仍保留作為去背圖的底色。
  * 圖示：<i> 的 Font Awesome class 自帶字重、外框固定置中，粗細與對齊無效；字級 ± 為縮放圖示。
  * 圖表：SVG 文字用 currentColor 與固定字重，對齊與粗細看不出差別。 */
@@ -992,9 +992,11 @@ function refreshToolbar() {
     ['layerTop', 'layerUp', 'layerDown', 'layerBottom'].forEach(id => { fmtEl(id).disabled = root; });
     // 還原位置 / 大小：AI 版面元素一律顯示在工具列，沒有移動或縮放過時停用（浮動物件沒有原始位置可還原）
     const ai = !isFloat(el);
-    applyToolbarCtls(tb, kind, ai ? ['aiReset'] : ['float']);     // float：自行插入的物件（可複製到所有頁面）
+    const scaledText = !ai && el.hasAttribute('data-rs-text') && getScale(el) !== 1;
+    // float：自行插入的物件（可複製到所有頁面）
+    applyToolbarCtls(tb, kind, ai ? ['aiReset', 'scaleReset'] : ['float', ...(scaledText ? ['scaleReset'] : [])]);
     fmtEl('resetPos').disabled = !ai || !getOffset(el).some(Boolean);
-    fmtEl('resetScale').disabled = !ai || (getScale(el) === 1 && !isSized(el));
+    fmtEl('resetScale').disabled = getScale(el) === 1 && !isSized(el);
     fmtEl('resetRatio').disabled = !isImgStretched(el);
     // 圖案：填滿 / 外框；線條沒有填滿，沒有轉角的圖案沒有圓角
     const shape = kind === 'shape' ? shapeOf(el) : null;
