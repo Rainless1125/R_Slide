@@ -12,22 +12,37 @@ const AI_EDIT_KEEP_ATTRS = ['data-rs-float', 'data-rs-text', 'data-rs-size'];
 const LAYOUT_CLASS_RE = /^(?:flex-(?:1|auto|initial|none)|grow|shrink|basis-|col-|row-|self-|justify-self-|order-|w-|h-|min-|max-|size-)/;
 
 function canAiEdit(el) {
-    return !!el && el.isConnected && !isRootBlock(el) && ['text', 'chart'].includes(elementKind(el));
+    if (!el || !el.isConnected || isRootBlock(el)) return false;
+    const kind = elementKind(el);
+    return ['text', 'chart'].includes(kind) || (kind === 'image' && isConvertibleImage(el));
 }
+// 可辨識並轉換的圖片：使用者上傳或貼上的圖片（存在簡報中的 data URL，送出前一律轉成 PNG / JPEG）；企業識別圖示等由伺服器提供的圖片不轉換
+function isConvertibleImage(el) {
+    return el.tagName === 'IMG' && /^data:image\/(?:png|jpe?g|webp|gif|bmp|svg\+xml)/i.test(el.getAttribute('src') || '');
+}
+// 多選一起修改：AI 看不到圖片內容（只送出圖片代號），圖片不加入多選
+function canAiEditGroup(el) { return canAiEdit(el) && elementKind(el) !== 'image'; }
 
 function openAiEditModal() {
     const multi = typeof isMultiSel === 'function' && isMultiSel() ? [...multiSel] : null;
     const el = selectedEl;
-    if (!editMode || (multi ? !multi.every(canAiEdit) : !canAiEdit(el))) return;
+    if (!editMode || (multi ? !multi.every(canAiEditGroup) : !canAiEdit(el))) return;
     if (aiEditBusy) { showToast('AI 正在修改元素，請稍候', 'info', 2200); return; }
     if (regeneratingSlideIdx !== null || isGenerating()) { showToast('請等待目前的生成完成後再試', 'info', 2200); return; }
     stopTextEdit();
     aiEditTarget = multi ? null : el;
     aiEditTargets = multi;
-    document.getElementById('aiEditTitleText').textContent = multi ? `AI 修改 ${multi.length} 個元素` : 'AI 修改此元素';
+    const image = !multi && elementKind(el) === 'image';
+    document.getElementById('aiEditTitleText').textContent = multi ? `AI 修改 ${multi.length} 個元素` : image ? 'AI 轉換圖片' : 'AI 修改此元素';
     document.getElementById('aiEditSubtitle').textContent = multi
         ? '只會重新設計選取的元素，頁面其他部分不變；AI 會把它們當成一組，讓內容互相關聯。'
+        : image ? 'AI 會讀出圖片中的內容（例如表格截圖），依需求轉成可編輯的表格、圖表或條列，取代這張圖片；留白則由 AI 選擇最適合的呈現。'
         : '只會重新設計選取的元素，頁面其他部分不變；留白則由 AI 自動優化。';
+    document.getElementById('aiEditChips').hidden = image;
+    document.getElementById('aiEditImageChips').hidden = !image;
+    document.getElementById('aiEditPrompt').placeholder = image
+        ? '例如：轉成表格，表頭用深藍底白字；或：轉成長條圖'
+        : '例如：改成長條圖、只留三個重點、把數字放大並加上圖示';
     document.getElementById('aiEditMultiMode').hidden = !multi;
     if (multi) document.querySelector('input[name="aiEditMulti"][value="each"]').checked = true;
     const ta = document.getElementById('aiEditPrompt');
@@ -46,7 +61,7 @@ function closeAiEditModal(force = false) {
 function isAiEditModalOpen() { return !document.getElementById('aiEditModal').classList.contains('hidden'); }
 
 // 快速需求：點一下填入（可再修改）
-document.getElementById('aiEditChips').addEventListener('click', e => {
+document.getElementById('aiEditModal').addEventListener('click', e => {
     const b = e.target.closest('[data-prompt]');
     if (!b) return;
     const ta = document.getElementById('aiEditPrompt');
@@ -123,6 +138,12 @@ async function confirmAiEdit() {
     const prompt = document.getElementById('aiEditPrompt').value.trim();
     const w = el.offsetWidth, h = el.offsetHeight;
     const payload = buildAiEditPayload(el, slide);
+    const isImage = elementKind(el) === 'image';
+    let sourceImage = null;
+    if (isImage) {
+        try { sourceImage = await imageForRecognition(el); }
+        catch (err) { showToast(err.message || '無法讀取這張圖片', 'error', 5000); return; }
+    }
 
     setAiEditBusy(true);
     el.setAttribute('data-rs-busy', '1');
@@ -145,6 +166,7 @@ async function confirmAiEdit() {
                 element_height: Math.max(1, Math.round(h)),
                 charts: payload.charts,
                 custom_prompt: prompt,
+                source_image: sourceImage,
                 ...getLlmChoice()
             })
         });
@@ -172,6 +194,7 @@ async function confirmAiEdit() {
             n.setAttribute('data-rs-chart', String(slide.charts.length - 1));
         });
         carryLayout(el, next);
+        if (isImage) placeConvertedImage(el, next);
         el.removeAttribute('data-rs-busy');
         if (selectedEl === el) clearSelection();
         el.replaceWith(next);
@@ -181,8 +204,10 @@ async function confirmAiEdit() {
         closeAiEditModal(true);
         // 元素調整過寬高（或沿用固定大小的 class）時框的大小不變，多出的內容會溢出框外：一併比較內容的實際尺寸
         const grew = Math.max(next.offsetWidth, next.scrollWidth) > w + 8 || Math.max(next.offsetHeight, next.scrollHeight) > h + 8;
-        showToast(grew ? 'AI 已修改此元素，但新內容比原本大，可能超出外框或蓋到旁邊的元素' : 'AI 已修改此元素，頁面其他部分不變',
-            grew ? 'info' : 'success', 6000, { label: '復原', onClick: undo });
+        const done = isImage ? 'AI 已把圖片轉成可編輯的內容，請核對數字與原圖是否一致' : 'AI 已修改此元素，頁面其他部分不變';
+        showToast(grew ? (isImage ? 'AI 已把圖片轉成可編輯的內容，但比原圖大，可能蓋到旁邊的元素；請核對數字與原圖是否一致'
+            : 'AI 已修改此元素，但新內容比原本大，可能超出外框或蓋到旁邊的元素') : done,
+            grew ? 'info' : 'success', isImage ? 9000 : 6000, { label: '復原', onClick: undo });
     } catch (err) {
         if (!err.handled) showToast(friendlyError(err), 'error', 8000);
     } finally {
@@ -190,6 +215,45 @@ async function confirmAiEdit() {
         setAiEditBusy(false);
         refreshQuota();
     }
+}
+
+/* ===================== 辨識並轉換圖片 ===================== */
+// 送給 AI 前縮小並壓縮：長邊最多 2048px（表格文字仍清楚），檔案不超過約 1.1 MB（後端上限見 app.py 的 MAX_SOURCE_IMAGE_BYTES）
+const RECOGNIZE_MAX_SIDE = 2048;
+const RECOGNIZE_MAX_BYTES = 1_100_000;
+function dataUrlBytes(url) { return Math.floor((url.length - url.indexOf(',') - 1) * 3 / 4); }
+async function imageForRecognition(img) {
+    const src = img.getAttribute('src') || '';
+    const im = new Image();
+    im.src = src;
+    try { await im.decode(); } catch (e) { throw new Error('無法讀取這張圖片，請重新插入後再試'); }
+    for (const side of [RECOGNIZE_MAX_SIDE, 1600, 1200]) {
+        const k = Math.min(1, side / Math.max(im.naturalWidth, im.naturalHeight));
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(im.naturalWidth * k));
+        c.height = Math.max(1, Math.round(im.naturalHeight * k));
+        const g = c.getContext('2d');
+        g.fillStyle = '#fff';                      // 透明背景補白，避免轉 JPEG 後變黑
+        g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(im, 0, 0, c.width, c.height);
+        // 截圖多為文字與色塊，PNG 較清楚；太大時改用 JPEG
+        for (const [type, q] of [['image/png'], ['image/jpeg', 0.9], ['image/jpeg', 0.8]]) {
+            const url = c.toDataURL(type, q);
+            if (dataUrlBytes(url) <= RECOGNIZE_MAX_BYTES) return url;
+        }
+    }
+    throw new Error('圖片太大，無法辨識；請改用較小的圖片');
+}
+// 轉換後的新元素取代圖片：自行插入的浮動圖片改為文字方塊（高度隨內容、拉角落等比例縮放），
+// 不沿用圖片的固定高度與填滿方式，避免表格被截掉或變形
+function placeConvertedImage(img, next) {
+    next.style.removeProperty('object-fit');
+    next.style.removeProperty('aspect-ratio');
+    if (next.hasAttribute('data-rs-float')) {
+        next.setAttribute('data-rs-text', '');
+        next.style.height = 'auto';
+    } else if (img.style.height) next.style.removeProperty('height');
+    next.removeAttribute('data-rs-img');
 }
 
 /* ===================== 一次修改多個元素 ===================== */

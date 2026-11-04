@@ -775,7 +775,7 @@ const fmtRO = new ResizeObserver(() => positionToolbar());
 <div class="frow">
   ${group('', btn('parent', '<i class="fa-solid fa-turn-up text-[11px]"></i><span class="bt">選取外層</span>', '選取包住這個元素的外層元素（例如整張卡片）', '', 'parent'))}
   ${group('', btn('painter', '<i class="fa-solid fa-paintbrush text-[11px]"></i><span class="bt">格式刷</span>', '格式刷：複製這個元素的格式，再點選要套用的元素（Esc 取消）', '', 'common'))}
-  ${group('', btn('aiEdit', '<i class="fa-solid fa-wand-magic-sparkles text-[11px]"></i><span class="bt">AI 修改此元素</span>', '輸入需求，只讓 AI 重新設計這個元素，頁面其他部分不變', 'ai-edit', 'aiEdit'))}
+  ${group('', btn('aiEdit', '<i class="fa-solid fa-wand-magic-sparkles text-[11px]"></i><span class="bt" data-lbl="aiEdit">AI 修改此元素</span>', '輸入需求，只讓 AI 重新設計這個元素，頁面其他部分不變', 'ai-edit', 'aiEdit'))}
   ${group('字級', `${btn('sizeDown', '<i class="fa-solid fa-minus text-[10px]"></i>', '縮小字級', '', 'size')}
     <span id="fmtSize" data-ctl="size" class="px-1 tabular-nums min-w-[2.6rem] text-center" title="目前字級"></span>
     ${btn('sizeUp', '<i class="fa-solid fa-plus text-[10px]"></i>', '放大字級', '', 'size')}`, 'size')}
@@ -943,20 +943,20 @@ function hideMoreMenu() {
  * 圖表：SVG 文字用 currentColor 與固定字重，對齊與粗細看不出差別。 */
 const TOOLBAR_CTLS = {
     text: ['aiEdit', 'size', 'weight', 'align', 'text', 'bg', 'radius', 'border', 'shadow'],     // 文字方塊與 AI 版面元素
-    image: ['bg', 'radius', 'border', 'shadow', 'imgRatio'],
+    image: ['aiEdit', 'bg', 'radius', 'border', 'shadow', 'imgRatio'],     // aiEdit：辨識上傳圖片的內容並轉成表格、圖表或條列
     icon: ['size', 'text', 'bg', 'radius', 'shadow'],
     chart: ['aiEdit', 'size', 'text', 'bg', 'radius', 'border', 'shadow', 'chart'],
     shape: ['size', 'weight', 'align', 'text', 'shape', 'shadow'],
 };
 // 依元素類型替換的文字標籤（data-lbl，沒列出的沿用預設）
 const TOOLBAR_LABELS = {
-    image: { bgColor: '底色' },
+    image: { bgColor: '底色', aiEdit: 'AI 轉換圖片' },
     icon: { size: '大小', textColor: '圖示顏色' },
     chart: { size: '圖表文字', textColor: '標籤顏色' },
 };
 // 依元素類型替換的按鈕提示（沒列出的沿用預設）
 const TOOLBAR_TITLES = {
-    image: { 'pal-bg': '背景顏色（透明圖片的底色）' },
+    image: { 'pal-bg': '背景顏色（透明圖片的底色）', aiEdit: 'AI 讀出圖片內容（例如表格截圖），轉成可編輯的表格、圖表或條列' },
     icon: { sizeDown: '縮小圖示', sizeUp: '放大圖示', 'pal-text': '圖示顏色' },
     chart: { sizeDown: '縮小圖表文字', sizeUp: '放大圖表文字', 'pal-text': '標籤與座標軸顏色' },
     shape: { 'pal-text': '圖案文字顏色' },
@@ -1016,7 +1016,7 @@ function refreshToolbar() {
     const root = isRootBlock(el);
     const sizeIdx = currentSizeIndex(el);
     fmtEl('parent').disabled = root;
-    fmtEl('aiEdit').disabled = root || aiEditBusy;     // 最外層容器是整頁，請用「重產此頁」
+    fmtEl('aiEdit').disabled = root || aiEditBusy || !canAiEdit(el);     // 最外層容器是整頁，請用「重產此頁」；企業識別圖示不能轉換
     fmtEl('sizeDown').disabled = isIcon ? el.offsetWidth <= ICON_MIN : sizeIdx <= 0;
     fmtEl('sizeUp').disabled = isIcon ? el.offsetWidth >= ICON_MAX : sizeIdx >= (isChart ? CHART_SIZE_MAX : SIZE_STEPS.length - 1);
     fmtEl('duplicate').disabled = root;

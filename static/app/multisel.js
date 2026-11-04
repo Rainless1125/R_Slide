@@ -60,7 +60,7 @@ function normalizeClickTarget(t) {
 }
 function currentSelectionList() {
     if (isMultiSel()) return [...multiSel];
-    return selectedEl && canAiEdit(selectedEl) ? [selectedEl] : [];
+    return selectedEl && canAiEditGroup(selectedEl) ? [selectedEl] : [];
 }
 
 /* ----- Shift / Ctrl / ⌘ + 點擊：加入或移除 ----- */
@@ -76,7 +76,7 @@ slideCanvasEl.addEventListener('click', e => {
     const hit = base.find(m => m.contains(t));
     if (hit) { setMultiSel(base.filter(m => m !== hit)); return; }
     const target = firstClickTarget(t);
-    if (!canAiEdit(target)) {
+    if (!canAiEditGroup(target)) {
         showToast('多選只支援文字、卡片與圖表（整頁容器、圖片、圖示與圖案除外）', 'info', 3000);
         return;
     }
@@ -145,7 +145,7 @@ function elementsInRect(r) {
     if (!root) return [];
     const tol = 2;
     const hits = [...root.querySelectorAll('*')].filter(el => {
-        if (el === root || !canAiEdit(el)) return false;
+        if (el === root || !canAiEditGroup(el)) return false;
         if (el.parentElement.closest('svg') || el.parentElement.closest('[data-rs-chart]')) return false;
         if (!(isVisualBox(el) || hasOwnText(el) || el.hasAttribute('data-rs-chart') || el.hasAttribute('data-rs-text'))) return false;
         const b = el.getBoundingClientRect();

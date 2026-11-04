@@ -572,9 +572,47 @@ class RegenerateElementRequest(BaseModel):
     element_height: int = Field(ge=1, le=4096)
     charts: list[dict | None] = Field(default_factory=list)
     custom_prompt: str = ""
+    # 要修改的元素是使用者上傳的圖片時，附上圖片本身（data URL，前端已縮小），讓 AI 讀出內容後轉成表格、圖表或條列
+    source_image: str | None = None
     provider: str = "gemini"
     model: str = ""
     thinking: ThinkingLevel = "medium"
+
+
+# AI 辨識並轉換圖片：圖片大小上限（解碼後）。前端送出前會縮小並壓縮，正常遠小於此；
+# base64 後約為 1.33 倍，加上整頁 HTML 仍需小於 MAX_LLM_BODY_BYTES
+MAX_SOURCE_IMAGE_BYTES = 1_200_000
+SOURCE_IMAGE_RE = re.compile(r"^data:(image/(?:png|jpeg|webp|gif));base64,([A-Za-z0-9+/=\s]+)$")
+
+
+def decode_source_image(value: str) -> tuple[bytes, str]:
+    m = SOURCE_IMAGE_RE.match(value.strip())
+    if not m:
+        raise HTTPException(status_code=400, detail="圖片格式不支援，請使用 PNG、JPEG、WebP 或 GIF 圖片")
+    try:
+        data = base64.b64decode(m.group(2), validate=False)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="圖片資料無法讀取")
+    if not data:
+        raise HTTPException(status_code=400, detail="圖片資料無法讀取")
+    if len(data) > MAX_SOURCE_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="圖片過大，無法辨識；請改用較小的圖片")
+    return data, m.group(1)
+
+
+IMAGE_CONVERT_RULES = """
+    【辨識並轉換圖片（最優先）】：
+    1. 要修改的元素是使用者上傳的一張圖片，圖片附在提示的最後面（【要修改的元素】中的 <img> 只是它在頁面上的位置）。
+       請先讀出圖片中的資訊（表格、圖表、文字、流程），再依使用者的需求重新以 HTML 呈現，取代這張圖片。
+    2. 輸出的新元素不要再包含這張圖片（不要輸出 <img data-rs-img>），也不要描述「這是一張圖片」。
+    3. 數字、名稱、單位與表頭照圖片中的內容抄寫，不可捏造或自行換算；看不清楚的字以「?」標示，不要猜測。
+       圖片中的資訊也是素材，下方【內容正確性】所說的「素材」包含圖片中的內容。
+    4. 表格：使用 <table>，有表頭列（<thead>）與資料列，欄位對齊（數字靠右），以設計規範的配色做出清楚的表頭、斑馬紋或分隔線與適當的內距；
+       欄位很多時縮小字級，不要省略欄位或資料列。
+    5. 圖表：放入 <div data-rs-chart="0"></div>，數據寫在 charts（類別與數值照圖片讀出，圖上沒有標出數值時依座標軸讀出近似值）。
+    6. 使用者沒有指定呈現方式時，依圖片內容選擇最適合的：表格截圖轉成表格、圖表截圖轉成圖表、文字或條列轉成條列重點。
+    7. 圖片內容無法辨識（例如只是照片或裝飾）時，輸出一個簡短說明「無法從圖片讀出可整理的內容」的文字元素。
+"""
 
 
 MAX_MULTI_ELEMENTS = 8                        # 一次交給 AI 修改的元素數上限（框選 / Shift 多選）
@@ -1043,6 +1081,7 @@ def regenerate_element(req: RegenerateElementRequest, request: Request, user: di
             raise HTTPException(status_code=400, detail=f"{label}內容過多，無法修改；請先刪減內容後再試")
     if len(json.dumps(req.charts, ensure_ascii=False)) > MAX_SLIDE_CHARTS_CHARS:
         raise HTTPException(status_code=400, detail="此元素的圖表資料過多，無法修改")
+    source_image = decode_source_image(req.source_image) if req.source_image else None
     theme = theme_from_input(req.theme)
     theme_block = (format_theme(theme) if theme
                    else "（這份簡報沒有記錄設計規範，請沿用頁面上其他元素的配色、卡片與標題樣式）")
@@ -1052,7 +1091,10 @@ def regenerate_element(req: RegenerateElementRequest, request: Request, user: di
     你是一位榮獲世界設計大獎的簡報 UI 設計師。
     你的任務是依使用者的需求，重新設計投影片上「單一個元素」，頁面的其他部分保持不變。
     """ + ELEMENT_EDIT_RULES.replace("{width}", str(w)).replace("{height}", str(h)) \
+        + (IMAGE_CONVERT_RULES if source_image else "") \
         + ELEMENT_CURRENT_CONTENT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + CONTENT_ACCURACY_RULES
+    default_need = ("（無，請依圖片內容轉成最適合的呈現：表格、圖表或條列重點）" if source_image
+                    else "（無，請你自行優化這個元素）")
 
     prompt = f"""
     【簡報標題】：{req.presentation_title}
@@ -1074,7 +1116,7 @@ def regenerate_element(req: RegenerateElementRequest, request: Request, user: di
     {json.dumps(req.charts, ensure_ascii=False) if req.charts else "（無）"}
 
     【使用者的修改需求】：
-    {req.custom_prompt.strip() or "（無，請你自行優化這個元素）"}
+    {req.custom_prompt.strip() or default_need}
 
     【原始素材內容】（產生簡報時的背景資料，僅供參考；與頁面上目前的內容不一致時，以目前的內容為準）：
     {req.content}
@@ -1085,7 +1127,7 @@ def regenerate_element(req: RegenerateElementRequest, request: Request, user: di
     with llm_usage_log(request, user, "element", req) as usage:
         try:
             data = call_llm(req.provider, req.model, system_instruction, prompt, ElementRewrite, 0.6, usage,
-                            thinking=req.thinking)
+                            thinking=req.thinking, **({"images": [source_image]} if source_image else {}))
             if not (data.get("html_content") or "").strip():
                 raise HTTPException(status_code=502, detail="模型沒有回傳新的元素內容")
             data["charts"] = normalize_charts(data.get("charts"), max(MAX_CHARTS_PER_SLIDE, len(req.charts)))
@@ -1094,6 +1136,8 @@ def regenerate_element(req: RegenerateElementRequest, request: Request, user: di
         except HTTPException:
             raise
         except Exception as e:
+            if source_image:      # 最常見的原因是所選的模型不支援圖片輸入（公司內部端點的部分模型）
+                raise HTTPException(status_code=502, detail=f"圖片辨識失敗，所選的模型可能不支援圖片輸入，請改用支援圖片的模型後再試（{str(e)[:200]}）")
             raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/regenerate-elements")
