@@ -28,6 +28,7 @@ accounts.py       登入、註冊、歷史記錄（含複製給其他帳號 /api
 ldap_auth.py      登入方式（AUTH_MODE）的設定檢查與公司 LDAP 驗證
 admin.py          後台管理的 API（/api/admin/*）
 brand_icons.py    企業 / 品牌識別圖示的 API（/api/brand-icons）：列出並提供 brand_icon 資料夾中的圖片
+static_assets.py  頁面中 JS / CSS 的快取版本號（依檔案內容自動加上 ?v=）
 store.py          SQLite 資料存取：帳號、session、登入鎖定、註冊次數、歷史記錄、用量紀錄、意見回饋
 manage_users.py   帳號管理指令
 extract.py        讀取上傳檔案的文字（PDF、DOCX、PPTX、Markdown、TXT）
@@ -90,9 +91,9 @@ tests/            後端測試（pytest）；test_sanitize_html.py 在 Chromium 
 
 - `static/app/` 的檔案是一般的 `<script>`，不是 ES module。所有檔案共用全域變數。
 - 載入順序很重要。順序寫在 `static/index.html` 的 `<script>` 標籤。
-- 修改 `static/` 的檔案後，把 `static/index.html` 中該檔案的版本號加 1，例如 `editor.js?v=11` 改為 `editor.js?v=12`。
-
-注意：如果沒有更新版本號，使用者的瀏覽器可能繼續使用舊的檔案。
+- 在 HTML 中引用 JS 與 CSS 時直接寫路徑，例如 `<script src="/static/app/editor.js"></script>`，不要加 `?v=`。
+- 伺服器送出 `index.html` 與 `admin.html` 時，自動依檔案內容加上版本號（`?v=` 內容雜湊，見 `static_assets.py`）。修改檔案後不需要手動更新版本號，使用者重新整理就會拿到新檔案。
+- 帶有版本號的靜態檔案讓瀏覽器長期快取；HTML 本身每次向伺服器確認。
 
 ### 前端元件
 
