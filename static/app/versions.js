@@ -3,7 +3,7 @@
  * 所有 app/*.js 是一般 <script>（非 module），共用全域，須依 index.html 中的順序載入。 */
 const MAX_SLIDE_VERSIONS = 3;
 // version_id 讓比較視窗在切換版本時維持卡片順序（同一個版本切換前後是不同物件）
-const VERSION_FIELDS = ['slide_title', 'layout_concept', 'html_content', 'charts', 'speaker_notes', 'version_note', 'version_id'];
+const VERSION_FIELDS = ['slide_title', 'layout_concept', 'html_content', 'charts', 'speaker_notes', 'notes_stale', 'version_note', 'version_id'];
 
 let versionModalIdx = null;
 let versionModalOrder = [];          // 開啟視窗時的版本順序（version_id），切換版本時卡片位置不變
@@ -32,6 +32,7 @@ function slideWithNewVersion(oldSlide, newSlide, note) {
     return {
         ...oldSlide,
         ...newSlide,
+        notes_stale: false,                // 重產後的講者備註是依新內容寫的
         version_note: note,
         version_id: newVersionId(),
         versions: [slideSnapshot(oldSlide), ...slideVersions(oldSlide)].slice(0, MAX_SLIDE_VERSIONS)

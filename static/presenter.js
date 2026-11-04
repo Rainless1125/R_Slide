@@ -47,6 +47,7 @@ function commitNotes() {
     if (value === slideNotes(slide).trim()) return;
     pushUndoSnapshot();
     slide.speaker_notes = value;
+    delete slide.notes_stale;          // 使用者自己改過備註：視為與目前內容一致
     syncCurrentPresentationToHistory();
 }
 

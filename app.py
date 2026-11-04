@@ -360,6 +360,8 @@ class SlideInput(AdaptiveSlide):
     charts 可能含 None（無法使用的圖表保留索引位置，見 normalize_charts）。"""
     charts: list[dict | None] = Field(default_factory=list)
     speaker_notes: str = ""
+    # 講者備註寫好之後，使用者又改過此頁的文字（例如複製頁面後改寫）：備註可能已不符合目前的內容
+    notes_stale: bool = False
 
 class AdaptivePresentation(BaseModel):
     presentation_title: str = Field(description="整份簡報的大標題")
@@ -661,6 +663,17 @@ MULTI_ELEMENT_MERGE_RULES = """
 """ + MULTI_ELEMENT_COMMON_RULES + """
     8. 把這 {count} 個元素整合成「一個」新元素（例如比較表、流程圖、時間軸、合併的資訊卡），取代全部選取的元素；只輸出 html_content 一個單一根元素。
     9. 新元素會放在第 1 個元素的位置，內容必須完整放進 {width} × {height} px（所有選取元素合起來的範圍）內，不可撐大或超出：內容多時精簡文字、縮小字級與間距。
+"""
+
+# AI 修改元素（單一與多選）：頁面上現有的文字優先於原始素材與標題。複製頁面後改寫內容時，
+# 標題與原始素材仍指向原本那頁，若以素材為準，AI 會把使用者改好的文字改回原頁的內容
+ELEMENT_CURRENT_CONTENT_RULES = """
+    【以頁面上目前的內容為準】：
+    1. 整頁 HTML 與要修改的元素中現有的文字、數字是最新版本（可能是使用者手動輸入，或從其他頁複製後改寫的），也算素材；
+       【原始素材內容】只是產生簡報時的背景參考。
+    2. 不可因為【原始素材內容】沒有提到，就刪除元素中現有的資訊，或改回素材、其他頁的說法；
+       下方【內容正確性】所說的「素材」也包含這些現有內容。使用者的修改需求明確要求改寫內容時，依其需求。
+    3. 【此頁標題】只用來理解此頁的主題；元素內容與標題的主題不同時，以元素內容為準。
 """
 
 # 2. API 端點
@@ -965,6 +978,8 @@ def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict =
     7. 講者備註需配合新版面重新撰寫；使用者的額外需求若只針對版面，仍可沿用【原講者備註】的重點。
     8. 【此頁目前的內容】是最新版本，可能包含使用者手動修改過的文字與數字；【原始素材內容】只是產生簡報時的背景資料，
        兩者不一致時一律以【此頁目前的內容】為準，不可改回素材的說法；下方【內容正確性】所說的「素材」也包含【此頁目前的內容】。
+    9. 原標題、原版型概念與原講者備註可能是舊資料（例如從其他頁複製後改寫了內容），與【此頁目前的內容】的主題不一致時，
+       以【此頁目前的內容】為準，不可依它們把內容改回原本的主題；講者備註依目前的內容重新撰寫。
     """ + (REGEN_KEEP_CONTENT_RULES if req.keep_content else REGEN_REWRITE_RULES) + LAYOUT_CATALOG + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + SPEAKER_NOTES_RULES \
         + CONTENT_ACCURACY_RULES + one_page_rules(len(req.slides))
 
@@ -984,12 +999,12 @@ def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict =
     【需要重產的頁面】：
     - 頁碼：{target_slide.page_number}
     - 原標題（若與下方 HTML 中顯示的標題不同，以 HTML 為準）：{target_slide.slide_title}
-    - 原版型概念：{target_slide.layout_concept}
+    - 原版型概念（可能已過時）：{target_slide.layout_concept}
     - 【此頁目前的內容】（HTML，包含使用者手動修改，為最新版本）：
     {target_slide.html_content}
     - 原圖表資料（JSON，可沿用、修改或刪除）：
     {json.dumps(target_slide.charts, ensure_ascii=False) if target_slide.charts else "（無）"}
-    - 原講者備註：
+    - 原講者備註{"（此頁的文字在備註寫好之後改過，備註可能已過時，僅供參考）" if target_slide.notes_stale else ""}：
     {target_slide.speaker_notes.strip() or "（無）"}
 
     【使用者額外重產需求】（優先於一般規則）：
@@ -1037,20 +1052,18 @@ def regenerate_element(req: RegenerateElementRequest, request: Request, user: di
     你是一位榮獲世界設計大獎的簡報 UI 設計師。
     你的任務是依使用者的需求，重新設計投影片上「單一個元素」，頁面的其他部分保持不變。
     """ + ELEMENT_EDIT_RULES.replace("{width}", str(w)).replace("{height}", str(h)) \
-        + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + CONTENT_ACCURACY_RULES
+        + ELEMENT_CURRENT_CONTENT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + CONTENT_ACCURACY_RULES
 
     prompt = f"""
     【簡報標題】：{req.presentation_title}
     【簡報目標客群】：{req.target_audience}
     【簡報模式】：{DECK_MODE_LABELS[req.deck_mode]}
     【指定視覺風格】：{req.style_preference}
-    【原始素材內容】：
-    {req.content}
 
     【整份簡報的設計規範】：
     {theme_block}
 
-    【此頁標題】：{req.slide_title or "（無）"}
+    【此頁標題】（取自頁面上顯示的標題）：{req.slide_title or "（無）"}
     【整頁 HTML（要修改的元素標有 data-rs-target，僅供參考，不要輸出）】：
     {req.slide_html}
 
@@ -1062,6 +1075,9 @@ def regenerate_element(req: RegenerateElementRequest, request: Request, user: di
 
     【使用者的修改需求】：
     {req.custom_prompt.strip() or "（無，請你自行優化這個元素）"}
+
+    【原始素材內容】（產生簡報時的背景資料，僅供參考；與頁面上目前的內容不一致時，以目前的內容為準）：
+    {req.content}
 
     請只輸出取代這個元素的單一根元素 HTML 與它的圖表資料。
     """
@@ -1102,7 +1118,7 @@ def regenerate_elements(req: RegenerateElementsRequest, request: Request, user: 
     system_instruction = """
     你是一位榮獲世界設計大獎的簡報 UI 設計師。
     你的任務是依使用者的需求，一起重新設計投影片上選取的幾個元素，頁面的其他部分保持不變。
-    """ + rules + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + CONTENT_ACCURACY_RULES
+    """ + rules + ELEMENT_CURRENT_CONTENT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + CONTENT_ACCURACY_RULES
     elements_block = "\n".join(f"    - 元素 {i}（寬 {e.width} px、高 {e.height} px）：\n    {e.html}"
                                for i, e in enumerate(req.elements, 1))
 
@@ -1111,13 +1127,11 @@ def regenerate_elements(req: RegenerateElementsRequest, request: Request, user: 
     【簡報目標客群】：{req.target_audience}
     【簡報模式】：{DECK_MODE_LABELS[req.deck_mode]}
     【指定視覺風格】：{req.style_preference}
-    【原始素材內容】：
-    {req.content}
 
     【整份簡報的設計規範】：
     {theme_block}
 
-    【此頁標題】：{req.slide_title or "（無）"}
+    【此頁標題】（取自頁面上顯示的標題）：{req.slide_title or "（無）"}
     【整頁 HTML（要修改的元素標有 data-rs-target，僅供參考，不要輸出）】：
     {req.slide_html}
 
@@ -1129,6 +1143,9 @@ def regenerate_elements(req: RegenerateElementsRequest, request: Request, user: 
 
     【使用者的修改需求】：
     {req.custom_prompt.strip() or "（無，請你自行優化這組元素）"}
+
+    【原始素材內容】（產生簡報時的背景資料，僅供參考；與頁面上目前的內容不一致時，以目前的內容為準）：
+    {req.content}
 
     {f"請把這 {count} 個元素合併成一個元素，只輸出它的單一根元素 HTML 與圖表資料。" if req.merge
      else f"請輸出剛好 {count} 個元素（依編號順序）的 HTML 與圖表資料。"}
