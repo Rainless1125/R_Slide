@@ -64,6 +64,7 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && e.target.isContentEditable && e.target.closest('#slideCanvas')) { e.target.blur(); return; }
     if (e.key === 'Escape' && editMode && painterClip) { setPainter(null); return; }   // 取消格式刷
     if (e.key === 'Escape' && editMode && selectedEl && !typing) { clearSelection(); return; }
+    if (e.key === 'Escape' && editMode && isMultiSel() && !typing) { clearMultiSel(); return; }
     if ((e.key === 'Delete' || e.key === 'Backspace') && editMode && selectedEl && !typing) { e.preventDefault(); runFmt('remove'); return; }
     // 選取元素時方向鍵微調位置（Shift：10px），不換頁
     const nudge = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
