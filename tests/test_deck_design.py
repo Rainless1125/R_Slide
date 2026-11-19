@@ -115,3 +115,18 @@ def test_theme_from_input_filters_values():
     assert theme_from_input({"accent": "rose-500", "chart_colors": "#fff"}) == {"accent": "rose-500", "chart_colors": []}
     colors = theme_from_input({"accent": "a", "chart_colors": ["#000000"] * 10})["chart_colors"]
     assert len(colors) == 6
+
+
+def test_flowchart_layouts_in_catalog_and_rules(monkeypatch):
+    """流程圖版型：直向、決策分支、循環、泳道；流程圖的畫法規則送進生成、重產與 AI 修改元素。"""
+    for name in ("直向流程", "決策分支流程", "循環流程", "泳道流程"):
+        assert f"- {name}：" in app_module.LAYOUT_CATALOG
+    assert "流程中有判斷條件用決策分支流程" in app_module.DECK_RHYTHM_RULES
+    captured = capture_llm(monkeypatch, {"presentation_title": "t", "theme": THEME, "slides": [SLIDE]})
+    assert client.post("/api/generate", json={"content": "素材"}).status_code == 200
+    assert "【流程圖的畫法" in captured["system"] and "每兩個相鄰的步驟之間都要有箭頭" in captured["system"]
+    assert "【流程圖的畫法" in regenerate(monkeypatch)["system"]
+    captured = capture_llm(monkeypatch, {"html_content": "<div>流程</div>", "charts": []})
+    res = client.post("/api/regenerate-element", json={"content": "素材", "slide_html": "<div></div>", "element_html": "<div>a</div>",
+                                                        "element_width": 400, "element_height": 200, "custom_prompt": "改成流程圖"})
+    assert res.status_code == 200 and "【流程圖的畫法" in captured["system"]

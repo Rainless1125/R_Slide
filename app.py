@@ -22,7 +22,7 @@ from starlette.datastructures import UploadFile
 
 import store
 from accounts import current_user, env_flag, router as accounts_router
-from deck_design import (CONTENT_ACCURACY_RULES, DECK_RHYTHM_RULES, LAYOUT_CATALOG, THEME_RULES, DeckTheme,
+from deck_design import (CONTENT_ACCURACY_RULES, DECK_RHYTHM_RULES, FLOW_RULES, LAYOUT_CATALOG, THEME_RULES, DeckTheme,
                          format_theme, theme_from_input)
 from admin import router as admin_router
 from brand_icons import router as brand_icons_router
@@ -778,7 +778,7 @@ def generate_slides(req: GenerateRequest, request: Request, user: dict = Depends
        - 僅輸出 Tailwind CSS class。
        - 禁止使用emoji，請一律使用font-awesome圖示。
        - 【重要】你必須絕對服從使用者指定的「視覺風格」。如果要求明亮風，請多用 bg-white/bg-slate-50；如果要求科技風，才使用深色底 bg-slate-900 搭配螢光點綴色。
-    """ + THEME_RULES + LAYOUT_CATALOG + DECK_RHYTHM_RULES + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] \
+    """ + THEME_RULES + LAYOUT_CATALOG + FLOW_RULES + DECK_RHYTHM_RULES + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] \
         + CHART_RULES + SPEAKER_NOTES_RULES + CONTENT_ACCURACY_RULES \
         + one_page_rules(len(req.outline.slides) if req.outline else req.num_pages)
 
@@ -1039,7 +1039,7 @@ def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict =
        兩者不一致時一律以【此頁目前的內容】為準，不可改回素材的說法；下方【內容正確性】所說的「素材」也包含【此頁目前的內容】。
     9. 原標題、原版型概念與原講者備註可能是舊資料（例如從其他頁複製後改寫了內容），與【此頁目前的內容】的主題不一致時，
        以【此頁目前的內容】為準，不可依它們把內容改回原本的主題；講者備註依目前的內容重新撰寫。
-    """ + (REGEN_KEEP_CONTENT_RULES if req.keep_content else REGEN_REWRITE_RULES) + LAYOUT_CATALOG + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + SPEAKER_NOTES_RULES \
+    """ + (REGEN_KEEP_CONTENT_RULES if req.keep_content else REGEN_REWRITE_RULES) + LAYOUT_CATALOG + FLOW_RULES + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + SPEAKER_NOTES_RULES \
         + CONTENT_ACCURACY_RULES + one_page_rules(len(req.slides))
 
     prompt = f"""
@@ -1113,7 +1113,7 @@ def regenerate_element(req: RegenerateElementRequest, request: Request, user: di
     你的任務是依使用者的需求，重新設計投影片上「單一個元素」，頁面的其他部分保持不變。
     """ + ELEMENT_EDIT_RULES.replace("{width}", str(w)).replace("{height}", str(h)) \
         + (IMAGE_CONVERT_RULES if source_image else "") \
-        + ELEMENT_CURRENT_CONTENT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + CONTENT_ACCURACY_RULES
+        + ELEMENT_CURRENT_CONTENT_RULES + FLOW_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + CONTENT_ACCURACY_RULES
     default_need = ("（無，請依圖片內容轉成最適合的呈現：表格、圖表或條列重點）" if source_image
                     else "（無，請你自行優化這個元素）")
 
@@ -1183,7 +1183,7 @@ def regenerate_elements(req: RegenerateElementsRequest, request: Request, user: 
     system_instruction = """
     你是一位榮獲世界設計大獎的簡報 UI 設計師。
     你的任務是依使用者的需求，一起重新設計投影片上選取的幾個元素，頁面的其他部分保持不變。
-    """ + rules + ELEMENT_CURRENT_CONTENT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + CONTENT_ACCURACY_RULES
+    """ + rules + ELEMENT_CURRENT_CONTENT_RULES + FLOW_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + CONTENT_ACCURACY_RULES
     elements_block = "\n".join(f"    - 元素 {i}（寬 {e.width} px、高 {e.height} px）：\n    {e.html}"
                                for i, e in enumerate(req.elements, 1))
 
