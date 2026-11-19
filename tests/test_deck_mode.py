@@ -69,3 +69,21 @@ def test_ai_decided_page_count_has_no_fixed_hint(monkeypatch):
     res, captured = generate(monkeypatch, num_pages=0)
     assert res.status_code == 200
     assert "自行決定" in captured["prompt"] and "必須剛好" not in captured["prompt"]
+
+
+def test_document_mode_allows_rich_single_page_layouts(monkeypatch):
+    """詳細模式：同一主題盡量在同一頁完整呈現，卡片可分小段、加結果標籤並與圖表並列（例如多欄分類卡 + 圖表）。"""
+    res, captured = generate(monkeypatch, deck_mode="document")
+    assert res.status_code == 200
+    system = captured["system"]
+    for text in ("同一個主題的資訊盡量在同一頁完整呈現", "卡片可以分成 2 ~ 3 個小段", "底部可放一個結果標籤",
+                 "3 欄分類卡加 1 欄圖表", "卡片內距 p-4 ~ p-5", "分類比較卡：2~4 欄並排的類別"):
+        assert text in system
+    assert "絕對不要把所有文字硬塞進同一頁" not in system
+
+
+def test_speaker_mode_stays_minimal(monkeypatch):
+    res, captured = generate(monkeypatch)
+    system = captured["system"]
+    assert "條列最多 3 點、每點不超過 15 字" in system and "卡片內距 p-5 ~ p-6" in system
+    assert "卡片可以分成 2 ~ 3 個小段" not in system
