@@ -136,7 +136,60 @@ DENSE_FLOW = """<div class="w-full h-full overflow-hidden flex flex-col gap-3 p-
   </div>
 </div>"""
 
-DENSE_EXAMPLES = [("一頁營運報告", DENSE_REPORT), ("一頁專案摘要", DENSE_SUMMARY), ("帶編號的決策流程", DENSE_FLOW)]
+# 效益對比：上方一列 KPI 小卡（前 → 後、變化百分比標籤、迷你比較條，列高依內容），下方橫跨 2 欄的圖表與前後對照
+DENSE_BENEFIT = """<div class="w-full h-full overflow-hidden flex flex-col gap-3 p-8 bg-slate-100">
+  <div class="flex items-end justify-between gap-4">
+    <div>
+      <div class="text-xs font-semibold tracking-widest text-indigo-600">自動化包裝線 · 導入效益</div>
+      <h1 class="text-2xl font-bold text-slate-900 mt-1">包裝時間縮短六成，每月加班減少 200 小時</h1>
+    </div>
+    <span class="shrink-0 text-xs font-semibold text-indigo-700 bg-indigo-100 rounded-full px-3 py-1">導入前後比較</span>
+  </div>
+  <div class="flex-1 min-h-0 grid grid-cols-4 grid-rows-[auto_1fr] gap-3">
+    <div class="bg-white rounded-2xl p-4 shadow-sm">
+      <div class="flex items-center justify-between"><div class="flex items-center gap-2 text-xs font-bold text-slate-500"><span class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center"><i class="fa-solid fa-stopwatch text-[11px]"></i></span>每箱包裝時間</div><span class="text-[11px] font-bold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">−61%</span></div>
+      <div class="mt-2 flex items-baseline gap-2"><span class="text-base font-bold text-slate-400">90</span><i class="fa-solid fa-arrow-right text-xs text-slate-300"></i><span class="text-3xl font-extrabold text-indigo-600">35</span><span class="text-xs text-slate-500">秒</span></div>
+      <div class="mt-2 space-y-1"><div class="h-1.5 rounded-full bg-slate-200"></div><div class="h-1.5 rounded-full bg-indigo-500 w-[39%]"></div></div>
+    </div>
+    <div class="bg-white rounded-2xl p-4 shadow-sm">
+      <div class="flex items-center justify-between"><div class="flex items-center gap-2 text-xs font-bold text-slate-500"><span class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center"><i class="fa-solid fa-circle-xmark text-[11px]"></i></span>包裝錯誤率</div><span class="text-[11px] font-bold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">−78%</span></div>
+      <div class="mt-2 flex items-baseline gap-2"><span class="text-base font-bold text-slate-400">1.8</span><i class="fa-solid fa-arrow-right text-xs text-slate-300"></i><span class="text-3xl font-extrabold text-indigo-600">0.4</span><span class="text-xs text-slate-500">%</span></div>
+      <div class="mt-2 space-y-1"><div class="h-1.5 rounded-full bg-slate-200"></div><div class="h-1.5 rounded-full bg-indigo-500 w-[22%]"></div></div>
+    </div>
+    <div class="bg-white rounded-2xl p-4 shadow-sm">
+      <div class="flex items-center justify-between"><div class="flex items-center gap-2 text-xs font-bold text-slate-500"><span class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center"><i class="fa-solid fa-clock text-[11px]"></i></span>每月加班時數</div><span class="text-[11px] font-bold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">−63%</span></div>
+      <div class="mt-2 flex items-baseline gap-2"><span class="text-base font-bold text-slate-400">320</span><i class="fa-solid fa-arrow-right text-xs text-slate-300"></i><span class="text-3xl font-extrabold text-indigo-600">120</span><span class="text-xs text-slate-500">小時</span></div>
+      <div class="mt-2 space-y-1"><div class="h-1.5 rounded-full bg-slate-200"></div><div class="h-1.5 rounded-full bg-indigo-500 w-[38%]"></div></div>
+    </div>
+    <div class="bg-white rounded-2xl p-4 shadow-sm">
+      <div class="flex items-center justify-between"><div class="flex items-center gap-2 text-xs font-bold text-slate-500"><span class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center"><i class="fa-solid fa-people-group text-[11px]"></i></span>包裝線人力</div><span class="text-[11px] font-bold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">−5 人</span></div>
+      <div class="mt-2 flex items-baseline gap-2"><span class="text-base font-bold text-slate-400">12</span><i class="fa-solid fa-arrow-right text-xs text-slate-300"></i><span class="text-3xl font-extrabold text-indigo-600">7</span><span class="text-xs text-slate-500">人</span></div>
+      <div class="mt-2 space-y-1"><div class="h-1.5 rounded-full bg-slate-200"></div><div class="h-1.5 rounded-full bg-indigo-500 w-[58%]"></div></div>
+    </div>
+    <div class="col-span-2 bg-white rounded-2xl p-4 shadow-sm flex flex-col min-h-0">
+      <div class="flex items-center gap-2 text-sm font-bold text-slate-800"><i class="fa-solid fa-chart-column text-indigo-600"></i>每月包裝量（千箱）</div>
+      <div data-rs-chart="0" class="flex-1 min-h-0 mt-2"></div>
+    </div>
+    <div class="col-span-2 bg-white rounded-2xl p-4 shadow-sm flex flex-col">
+      <div class="flex items-center gap-2 text-sm font-bold text-slate-800"><i class="fa-solid fa-right-left text-indigo-600"></i>作業方式的改變</div>
+      <div class="flex-1 mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+        <div class="rounded-xl bg-slate-50 p-4">
+          <div class="text-xs font-bold text-slate-500">導入前</div>
+          <ul class="mt-2 space-y-2 text-sm text-slate-600 list-disc pl-4"><li>人工摺箱、封箱與貼標</li><li>紙本記錄每班產量</li><li>旺季需臨時加派人力</li></ul>
+        </div>
+        <i class="fa-solid fa-arrow-right text-indigo-400 text-lg"></i>
+        <div class="rounded-xl bg-indigo-50 border border-indigo-100 p-4">
+          <div class="text-xs font-bold text-indigo-700">導入後</div>
+          <ul class="mt-2 space-y-2 text-sm text-slate-700 list-disc pl-4"><li>機器自動成型與封箱</li><li>產量即時上傳看板</li><li>人力轉調品質檢驗</li></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="rounded-xl bg-indigo-600 text-white text-sm px-4 py-2.5 flex items-center gap-2"><i class="fa-solid fa-bullseye"></i><b>效益焦點</b><span>同樣人力下產能提升，省下的工時轉投入品質檢驗</span></div>
+</div>"""
+
+DENSE_EXAMPLES = [("一頁營運報告", DENSE_REPORT), ("效益對比", DENSE_BENEFIT), ("一頁專案摘要", DENSE_SUMMARY),
+                  ("帶編號的決策流程", DENSE_FLOW)]
 
 
 def examples_block(examples: list[tuple[str, str]]) -> str:
@@ -144,7 +197,8 @@ def examples_block(examples: list[tuple[str, str]]) -> str:
     pages = "\n\n".join(f"    ▍範例：{name}\n{html}" for name, html in examples)
     return f"""
     【範例頁（只學版面結構、層次與設計手法）】：
-    以下 HTML 示範這個模式該有的版面品質：區塊的大小變化、區塊標題列、數字與單位的比例、狀態標籤、留白與對齊。
+    以下 HTML 示範這個模式該有的版面品質：區塊的大小變化、區塊標題列、數字與單位的比例、狀態標籤、留白與對齊，
+    以及「一列 KPI 小卡 + 下方大區塊」的配置與前後對比的呈現方式（變化百分比標籤、迷你比較條）。
     1. 依素材內容選擇並組合這些手法，不要每一頁都套用同一個範例的格局。
     2. 範例的配色只是示意，一律換成這份簡報 theme 的顏色與卡片樣式（狀態色可保留綠 / 黃 / 紅的語意）。
     3. 範例中的主題、文字與數字都是虛構的，不可出現在簡報中；內容只能來自原始素材。

@@ -134,3 +134,12 @@ def test_regenerate_and_outline_accept_dense_mode(monkeypatch):
     res = client.post("/api/outline", json={"content": "素材", "deck_mode": "dense", "num_pages": 0})
     assert res.status_code == 200 and "密集資訊模式" in captured["system"] and "建議 1~4 頁" in captured["prompt"]
     assert client.post("/api/generate", json={"content": "素材", "deck_mode": "unknown"}).status_code == 422
+
+
+def test_dense_mode_layout_quality_rules(monkeypatch):
+    """密集資訊模式的版面品質：區塊大小要有變化、列高依重要性分配、不可重複資訊、非數字不做成 KPI 卡；範例含效益對比。"""
+    _, captured = generate(monkeypatch, deck_mode="dense")
+    system = captured["system"]
+    for text in ("每頁至少一個區塊橫跨 2 欄或 2 列", "列高依內容與重要性分配", "同一組資訊只能出現在一個區塊",
+                 "只有數字才做成 KPI 大數字卡", "▍範例：效益對比"):
+        assert text in system
