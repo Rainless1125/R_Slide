@@ -844,8 +844,32 @@ body.sb-open #sidebar {
 }
 
 .mode-card:has(input:checked) .mode-big,
-.mode-card:has(input:checked) i.mode-accent {
+.mode-card:has(input:checked) i.mode-accent,
+.mode-card:has(input:checked) .mode-thumb-grid b.mode-accent {
     background: linear-gradient(90deg, rgb(59 130 246), rgb(168 85 247));
+}
+
+/* 密集資訊模式的示意：不規則的區塊格線 */
+.mode-thumb.mode-thumb-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 2px;
+    padding: .25rem;
+}
+
+.mode-thumb-grid b {
+    border-radius: 2px;
+    background: rgb(228 228 231);
+    transition: background .2s;
+}
+
+.mode-thumb-grid b.mode-accent {
+    background: rgb(161 161 170);
+}
+
+.dark .mode-thumb-grid b {
+    background: rgb(63 63 70);
 }
 
 /* 簡報模式標籤（審查頁、播放器標題旁） */
@@ -874,6 +898,16 @@ body.sb-open #sidebar {
 .dark .deck-mode-badge[data-mode="document"] {
     color: rgb(221 214 254);
     background: rgb(139 92 246 / .25);
+}
+
+.deck-mode-badge[data-mode="dense"] {
+    color: rgb(4 120 87);
+    background: rgb(209 250 229);
+}
+
+.dark .deck-mode-badge[data-mode="dense"] {
+    color: rgb(167 243 208);
+    background: rgb(16 185 129 / .22);
 }
 
 /* 歷史記錄縮圖下方的模式標籤：縮小以配合縮圖寬度 */

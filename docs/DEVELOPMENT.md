@@ -23,6 +23,7 @@
 ```
 app.py            FastAPI 主程式：生成、大綱、重產（整頁與單一元素）、檔案匯入、匯出 PPTX 的 API，與生成用的提示規則
 deck_design.py    整份簡報的設計規範（theme）、版型目錄、頁面節奏與內容正確性規則
+deck_examples.py  附在提示詞中的範例頁（目前用於密集資訊模式），模型只學版面結構與手法，配色與內容依簡報而定
 charts.py         圖表資料的格式、正規化與提示規則
 accounts.py       登入、註冊、歷史記錄（含複製給其他帳號 /api/history/{id}/copy）與意見回饋的 API（/api/auth/*、/api/history、/api/feedback）
 ldap_auth.py      登入方式（AUTH_MODE）的設定檢查與公司 LDAP 驗證
