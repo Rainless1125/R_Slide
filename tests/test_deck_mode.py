@@ -141,5 +141,6 @@ def test_dense_mode_layout_quality_rules(monkeypatch):
     _, captured = generate(monkeypatch, deck_mode="dense")
     system = captured["system"]
     for text in ("每頁至少一個區塊橫跨 2 欄或 2 列", "列高依內容與重要性分配", "同一組資訊只能出現在一個區塊",
-                 "只有數字才做成 KPI 大數字卡", "▍範例：效益對比"):
+                 "只有成果或現況的數字才做成 KPI 大數字卡", "▍範例：效益對比",
+                 'flex-1 min-h-0 flex flex-col justify-center', "狀態清單（措施、專案、待辦）有 5 項以上時", "不要一項一張大卡片"):
         assert text in system

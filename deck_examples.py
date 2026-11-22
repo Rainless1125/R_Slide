@@ -15,24 +15,32 @@ DENSE_REPORT = """<div class="w-full h-full overflow-hidden flex flex-col gap-3 
     <span class="shrink-0 text-xs font-semibold text-indigo-700 bg-indigo-100 rounded-full px-3 py-1">第三季</span>
   </div>
   <div class="flex-1 min-h-0 grid grid-cols-4 grid-rows-[auto_1fr] gap-3">
-    <div class="bg-white rounded-2xl p-4 shadow-sm">
+    <div class="bg-white rounded-2xl p-4 shadow-sm flex flex-col">
       <div class="flex items-center gap-2 text-xs font-bold text-slate-500"><span class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center"><i class="fa-solid fa-sack-dollar text-[11px]"></i></span>季營收</div>
-      <div class="mt-2 flex items-baseline gap-1"><span class="text-3xl font-extrabold text-slate-900">4,820</span><span class="text-sm text-slate-500">萬元</span></div>
-      <div class="mt-1 text-xs font-semibold text-emerald-600"><i class="fa-solid fa-arrow-trend-up mr-1"></i>較上季 +18%</div>
+      <div class="flex-1 flex flex-col justify-center">
+        <div class="mt-2 flex items-baseline gap-1"><span class="text-3xl font-extrabold text-slate-900">4,820</span><span class="text-sm text-slate-500">萬元</span></div>
+        <div class="mt-1 text-xs font-semibold text-emerald-600"><i class="fa-solid fa-arrow-trend-up mr-1"></i>較上季 +18%</div>
+      </div>
     </div>
-    <div class="bg-white rounded-2xl p-4 shadow-sm">
+    <div class="bg-white rounded-2xl p-4 shadow-sm flex flex-col">
       <div class="flex items-center gap-2 text-xs font-bold text-slate-500"><span class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center"><i class="fa-solid fa-stopwatch text-[11px]"></i></span>平均回應時間</div>
-      <div class="mt-2 flex items-baseline gap-1"><span class="text-3xl font-extrabold text-slate-900">2.4</span><span class="text-sm text-slate-500">分鐘</span></div>
-      <div class="mt-1 text-xs font-semibold text-emerald-600"><i class="fa-solid fa-arrow-trend-down mr-1"></i>較上季 −32%</div>
+      <div class="flex-1 flex flex-col justify-center">
+        <div class="mt-2 flex items-baseline gap-1"><span class="text-3xl font-extrabold text-slate-900">2.4</span><span class="text-sm text-slate-500">分鐘</span></div>
+        <div class="mt-1 text-xs font-semibold text-emerald-600"><i class="fa-solid fa-arrow-trend-down mr-1"></i>較上季 −32%</div>
+      </div>
     </div>
-    <div class="bg-white rounded-2xl p-4 shadow-sm">
+    <div class="bg-white rounded-2xl p-4 shadow-sm flex flex-col">
       <div class="flex items-center gap-2 text-xs font-bold text-slate-500"><span class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center"><i class="fa-solid fa-face-smile text-[11px]"></i></span>客戶滿意度</div>
-      <div class="mt-2 flex items-baseline gap-1"><span class="text-3xl font-extrabold text-slate-900">4.6</span><span class="text-sm text-slate-500">/ 5 分</span></div>
-      <div class="mt-1 text-xs font-semibold text-emerald-600"><i class="fa-solid fa-arrow-up mr-1"></i>較上季 +0.3 分</div>
+      <div class="flex-1 flex flex-col justify-center">
+        <div class="mt-2 flex items-baseline gap-1"><span class="text-3xl font-extrabold text-slate-900">4.6</span><span class="text-sm text-slate-500">/ 5 分</span></div>
+        <div class="mt-1 text-xs font-semibold text-emerald-600"><i class="fa-solid fa-arrow-up mr-1"></i>較上季 +0.3 分</div>
+      </div>
     </div>
-    <div class="rounded-2xl p-4 bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm">
+    <div class="rounded-2xl p-4 bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm flex flex-col">
       <div class="flex items-center gap-2 text-xs font-bold text-indigo-100"><i class="fa-solid fa-lightbulb"></i>本季重點</div>
-      <p class="mt-2 text-sm leading-snug font-medium">智慧分流上線後，七成案件由系統直接派給專責人員，尖峰時段不再積壓。</p>
+      <div class="flex-1 flex flex-col justify-center">
+        <p class="mt-2 text-sm leading-snug font-medium">智慧分流上線後，七成案件由系統直接派給專責人員，尖峰時段不再積壓。</p>
+      </div>
     </div>
     <div class="col-span-2 bg-white rounded-2xl p-4 shadow-sm flex flex-col min-h-0">
       <div class="flex items-center gap-2 text-sm font-bold text-slate-800"><i class="fa-solid fa-chart-column text-indigo-600"></i>每月營收（萬元）</div>
@@ -40,7 +48,8 @@ DENSE_REPORT = """<div class="w-full h-full overflow-hidden flex flex-col gap-3 
     </div>
     <div class="col-span-2 bg-white rounded-2xl p-4 shadow-sm flex flex-col min-h-0">
       <div class="flex items-center gap-2 text-sm font-bold text-slate-800"><i class="fa-solid fa-list-check text-indigo-600"></i>重點專案進度</div>
-      <table class="w-full text-xs mt-2">
+      <div class="flex-1 flex flex-col justify-center">
+      <table class="w-full text-xs">
         <thead class="text-slate-400"><tr><th class="text-left font-semibold pb-2">專案</th><th class="text-left font-semibold pb-2">負責單位</th><th class="text-right font-semibold pb-2">狀態</th></tr></thead>
         <tbody class="divide-y divide-slate-100 text-slate-700">
           <tr><td class="py-2 font-semibold">智慧分流上線</td><td>產品部</td><td class="text-right"><span class="rounded-full px-2 py-0.5 bg-emerald-100 text-emerald-700 font-semibold">完成</span></td></tr>
@@ -49,6 +58,7 @@ DENSE_REPORT = """<div class="w-full h-full overflow-hidden flex flex-col gap-3 
           <tr><td class="py-2 font-semibold">語音機器人</td><td>研發部</td><td class="text-right"><span class="rounded-full px-2 py-0.5 bg-slate-100 text-slate-600 font-semibold">規劃中</span></td></tr>
         </tbody>
       </table>
+      </div>
     </div>
   </div>
   <div class="rounded-xl bg-indigo-600 text-white text-sm px-4 py-2.5 flex items-center gap-2"><i class="fa-solid fa-flag"></i><b>下一步</b><span>第四季擴大智慧分流至全部產品線，目標回應時間降到 2 分鐘內</span></div>
@@ -77,10 +87,12 @@ DENSE_SUMMARY = """<div class="w-full h-full overflow-hidden flex flex-col gap-3
         <span class="text-2xl font-extrabold text-indigo-600">1 天</span>
       </div>
     </div>
-    <div class="bg-white rounded-2xl p-4 shadow-sm">
+    <div class="bg-white rounded-2xl p-4 shadow-sm flex flex-col">
       <div class="flex items-center gap-2 text-sm font-bold text-slate-800"><i class="fa-solid fa-chart-pie text-indigo-600"></i>市場規模</div>
-      <div class="mt-3 text-3xl font-extrabold text-indigo-600">120<span class="text-base font-bold ml-1">億元</span></div>
-      <div class="mt-1 text-xs font-semibold text-emerald-600"><i class="fa-solid fa-arrow-up mr-1"></i>年成長 15%</div>
+      <div class="flex-1 flex flex-col justify-center">
+        <div class="mt-3 text-3xl font-extrabold text-indigo-600">120<span class="text-base font-bold ml-1">億元</span></div>
+        <div class="mt-1 text-xs font-semibold text-emerald-600"><i class="fa-solid fa-arrow-up mr-1"></i>年成長 15%</div>
+      </div>
     </div>
     <div class="row-span-2 bg-white rounded-2xl p-4 shadow-sm flex flex-col">
       <div class="flex items-center gap-2 text-sm font-bold text-slate-800"><i class="fa-solid fa-bullseye text-indigo-600"></i>首年目標</div>
@@ -100,12 +112,14 @@ DENSE_SUMMARY = """<div class="w-full h-full overflow-hidden flex flex-col gap-3
         <div><span class="inline-flex w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold items-center justify-center">3</span><div class="mt-1.5 text-sm font-bold text-slate-800">加值服務</div><div class="text-xs text-slate-500 leading-snug">報表與串接模組加購</div><span class="mt-2 inline-block text-[11px] font-semibold text-indigo-700 bg-indigo-50 rounded-full px-2 py-0.5">第 7~12 月</span></div>
       </div></div>
     </div>
-    <div class="bg-white rounded-2xl p-4 shadow-sm">
+    <div class="bg-white rounded-2xl p-4 shadow-sm flex flex-col">
       <div class="flex items-center gap-2 text-sm font-bold text-slate-800"><i class="fa-solid fa-users text-indigo-600"></i>專案團隊</div>
-      <div class="mt-2 space-y-2">
-        <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center justify-center">產</span><span class="text-xs text-slate-700">產品規劃 · 3 人</span></div>
-        <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center justify-center">行</span><span class="text-xs text-slate-700">行銷推廣 · 2 人</span></div>
-        <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center justify-center">業</span><span class="text-xs text-slate-700">通路業務 · 4 人</span></div>
+      <div class="flex-1 flex flex-col justify-center">
+        <div class="mt-2 space-y-2">
+          <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center justify-center">產</span><span class="text-xs text-slate-700">產品規劃 · 3 人</span></div>
+          <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center justify-center">行</span><span class="text-xs text-slate-700">行銷推廣 · 2 人</span></div>
+          <div class="flex items-center gap-2"><span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center justify-center">業</span><span class="text-xs text-slate-700">通路業務 · 4 人</span></div>
+        </div>
       </div>
     </div>
   </div>
@@ -146,25 +160,33 @@ DENSE_BENEFIT = """<div class="w-full h-full overflow-hidden flex flex-col gap-3
     <span class="shrink-0 text-xs font-semibold text-indigo-700 bg-indigo-100 rounded-full px-3 py-1">導入前後比較</span>
   </div>
   <div class="flex-1 min-h-0 grid grid-cols-4 grid-rows-[auto_1fr] gap-3">
-    <div class="bg-white rounded-2xl p-4 shadow-sm">
+    <div class="bg-white rounded-2xl p-4 shadow-sm flex flex-col">
       <div class="flex items-center justify-between"><div class="flex items-center gap-2 text-xs font-bold text-slate-500"><span class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center"><i class="fa-solid fa-stopwatch text-[11px]"></i></span>每箱包裝時間</div><span class="text-[11px] font-bold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">−61%</span></div>
-      <div class="mt-2 flex items-baseline gap-2"><span class="text-base font-bold text-slate-400">90</span><i class="fa-solid fa-arrow-right text-xs text-slate-300"></i><span class="text-3xl font-extrabold text-indigo-600">35</span><span class="text-xs text-slate-500">秒</span></div>
-      <div class="mt-2 space-y-1"><div class="h-1.5 rounded-full bg-slate-200"></div><div class="h-1.5 rounded-full bg-indigo-500 w-[39%]"></div></div>
+      <div class="flex-1 flex flex-col justify-center">
+        <div class="mt-2 flex items-baseline gap-2"><span class="text-base font-bold text-slate-400">90</span><i class="fa-solid fa-arrow-right text-xs text-slate-300"></i><span class="text-3xl font-extrabold text-indigo-600">35</span><span class="text-xs text-slate-500">秒</span></div>
+        <div class="mt-2 space-y-1"><div class="h-1.5 rounded-full bg-slate-200"></div><div class="h-1.5 rounded-full bg-indigo-500 w-[39%]"></div></div>
+      </div>
     </div>
-    <div class="bg-white rounded-2xl p-4 shadow-sm">
+    <div class="bg-white rounded-2xl p-4 shadow-sm flex flex-col">
       <div class="flex items-center justify-between"><div class="flex items-center gap-2 text-xs font-bold text-slate-500"><span class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center"><i class="fa-solid fa-circle-xmark text-[11px]"></i></span>包裝錯誤率</div><span class="text-[11px] font-bold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">−78%</span></div>
-      <div class="mt-2 flex items-baseline gap-2"><span class="text-base font-bold text-slate-400">1.8</span><i class="fa-solid fa-arrow-right text-xs text-slate-300"></i><span class="text-3xl font-extrabold text-indigo-600">0.4</span><span class="text-xs text-slate-500">%</span></div>
-      <div class="mt-2 space-y-1"><div class="h-1.5 rounded-full bg-slate-200"></div><div class="h-1.5 rounded-full bg-indigo-500 w-[22%]"></div></div>
+      <div class="flex-1 flex flex-col justify-center">
+        <div class="mt-2 flex items-baseline gap-2"><span class="text-base font-bold text-slate-400">1.8</span><i class="fa-solid fa-arrow-right text-xs text-slate-300"></i><span class="text-3xl font-extrabold text-indigo-600">0.4</span><span class="text-xs text-slate-500">%</span></div>
+        <div class="mt-2 space-y-1"><div class="h-1.5 rounded-full bg-slate-200"></div><div class="h-1.5 rounded-full bg-indigo-500 w-[22%]"></div></div>
+      </div>
     </div>
-    <div class="bg-white rounded-2xl p-4 shadow-sm">
+    <div class="bg-white rounded-2xl p-4 shadow-sm flex flex-col">
       <div class="flex items-center justify-between"><div class="flex items-center gap-2 text-xs font-bold text-slate-500"><span class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center"><i class="fa-solid fa-clock text-[11px]"></i></span>每月加班時數</div><span class="text-[11px] font-bold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">−63%</span></div>
-      <div class="mt-2 flex items-baseline gap-2"><span class="text-base font-bold text-slate-400">320</span><i class="fa-solid fa-arrow-right text-xs text-slate-300"></i><span class="text-3xl font-extrabold text-indigo-600">120</span><span class="text-xs text-slate-500">小時</span></div>
-      <div class="mt-2 space-y-1"><div class="h-1.5 rounded-full bg-slate-200"></div><div class="h-1.5 rounded-full bg-indigo-500 w-[38%]"></div></div>
+      <div class="flex-1 flex flex-col justify-center">
+        <div class="mt-2 flex items-baseline gap-2"><span class="text-base font-bold text-slate-400">320</span><i class="fa-solid fa-arrow-right text-xs text-slate-300"></i><span class="text-3xl font-extrabold text-indigo-600">120</span><span class="text-xs text-slate-500">小時</span></div>
+        <div class="mt-2 space-y-1"><div class="h-1.5 rounded-full bg-slate-200"></div><div class="h-1.5 rounded-full bg-indigo-500 w-[38%]"></div></div>
+      </div>
     </div>
-    <div class="bg-white rounded-2xl p-4 shadow-sm">
+    <div class="bg-white rounded-2xl p-4 shadow-sm flex flex-col">
       <div class="flex items-center justify-between"><div class="flex items-center gap-2 text-xs font-bold text-slate-500"><span class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center"><i class="fa-solid fa-people-group text-[11px]"></i></span>包裝線人力</div><span class="text-[11px] font-bold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">−5 人</span></div>
-      <div class="mt-2 flex items-baseline gap-2"><span class="text-base font-bold text-slate-400">12</span><i class="fa-solid fa-arrow-right text-xs text-slate-300"></i><span class="text-3xl font-extrabold text-indigo-600">7</span><span class="text-xs text-slate-500">人</span></div>
-      <div class="mt-2 space-y-1"><div class="h-1.5 rounded-full bg-slate-200"></div><div class="h-1.5 rounded-full bg-indigo-500 w-[58%]"></div></div>
+      <div class="flex-1 flex flex-col justify-center">
+        <div class="mt-2 flex items-baseline gap-2"><span class="text-base font-bold text-slate-400">12</span><i class="fa-solid fa-arrow-right text-xs text-slate-300"></i><span class="text-3xl font-extrabold text-indigo-600">7</span><span class="text-xs text-slate-500">人</span></div>
+        <div class="mt-2 space-y-1"><div class="h-1.5 rounded-full bg-slate-200"></div><div class="h-1.5 rounded-full bg-indigo-500 w-[58%]"></div></div>
+      </div>
     </div>
     <div class="col-span-2 bg-white rounded-2xl p-4 shadow-sm flex flex-col min-h-0">
       <div class="flex items-center gap-2 text-sm font-bold text-slate-800"><i class="fa-solid fa-chart-column text-indigo-600"></i>每月包裝量（千箱）</div>
@@ -198,7 +220,8 @@ def examples_block(examples: list[tuple[str, str]]) -> str:
     return f"""
     【範例頁（只學版面結構、層次與設計手法）】：
     以下 HTML 示範這個模式該有的版面品質：區塊的大小變化、區塊標題列、數字與單位的比例、狀態標籤、留白與對齊，
-    以及「一列 KPI 小卡 + 下方大區塊」的配置與前後對比的呈現方式（變化百分比標籤、迷你比較條）。
+    以及「一列 KPI 小卡 + 下方大區塊」的配置與前後對比的呈現方式（變化百分比標籤、迷你比較條）；
+    注意每個區塊都是「標題列 + 撐滿並垂直置中的內容區」的結構，狀態清單用一個表格呈現。
     1. 依素材內容選擇並組合這些手法，不要每一頁都套用同一個範例的格局。
     2. 範例的配色只是示意，一律換成這份簡報 theme 的顏色與卡片樣式（狀態色可保留綠 / 黃 / 紅的語意）。
     3. 範例中的主題、文字與數字都是虛構的，不可出現在簡報中；內容只能來自原始素材。
