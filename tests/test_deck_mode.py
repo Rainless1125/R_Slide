@@ -87,3 +87,50 @@ def test_speaker_mode_stays_minimal(monkeypatch):
     system = captured["system"]
     assert "條列最多 3 點、每點不超過 15 字" in system and "卡片內距 p-5 ~ p-6" in system
     assert "卡片可以分成 2 ~ 3 個小段" not in system
+
+
+def test_dense_mode_uses_dashboard_rules_and_examples(monkeypatch):
+    """密集資訊模式：每頁是儀表板，附上範例頁；頁數由 AI 決定時建議 1~4 頁。"""
+    res, captured = generate(monkeypatch, deck_mode="dense", num_pages=0)
+    assert res.status_code == 200
+    system = captured["system"]
+    assert "【簡報模式：密集資訊模式（儀表板型 / Dashboard）】" in system
+    assert "【範例頁（只學版面結構、層次與設計手法）】" in system
+    for name, _ in app_module.DENSE_EXAMPLES:
+        assert f"▍範例：{name}" in system
+    assert "範例中的主題、文字與數字都是虛構的" in system
+    assert app_module.DECK_MODE_LABELS["dense"] in captured["prompt"]
+    assert "建議 1~4 頁" in captured["prompt"]
+
+
+def test_examples_only_in_dense_mode(monkeypatch):
+    for mode in ("speaker", "document"):
+        _, captured = generate(monkeypatch, deck_mode=mode)
+        assert "【範例頁" not in captured["system"]
+
+
+def test_dense_one_page_skips_one_page_report_rules(monkeypatch):
+    _, captured = generate(monkeypatch, deck_mode="dense", num_pages=1)
+    assert "【一頁式簡報報告" not in captured["system"]
+    _, captured = generate(monkeypatch, deck_mode="document", num_pages=1)
+    assert "【一頁式簡報報告" in captured["system"]
+
+
+def test_dense_mode_allows_four_charts_per_slide(monkeypatch):
+    chart = {"type": "bar", "title": "t", "unit": "", "labels": ["a", "b"], "datasets": [{"label": "s", "values": [1, 2]}],
+             "colors": [], "ref_lines": [], "highlight": []}
+    slide = {**SLIDE, "charts": [chart] * 5, "speaker_notes": "x"}
+    for mode, expected in (("dense", 4), ("document", 2)):
+        capture_llm(monkeypatch, {"presentation_title": "t", "slides": [slide]})
+        res = client.post("/api/generate", json={"content": "素材", "deck_mode": mode})
+        assert len(res.json()["slides"][0]["charts"]) == expected
+
+
+def test_regenerate_and_outline_accept_dense_mode(monkeypatch):
+    captured = capture_llm(monkeypatch, {**SLIDE, "charts": [], "speaker_notes": "x"})
+    res = client.post("/api/regenerate-slide", json={"content": "素材", "slide_index": 0, "slides": [SLIDE], "deck_mode": "dense"})
+    assert res.status_code == 200 and "【範例頁" in captured["system"] and "密集資訊模式" in captured["system"]
+    captured = capture_llm(monkeypatch, {"presentation_title": "t", "slides": []})
+    res = client.post("/api/outline", json={"content": "素材", "deck_mode": "dense", "num_pages": 0})
+    assert res.status_code == 200 and "密集資訊模式" in captured["system"] and "建議 1~4 頁" in captured["prompt"]
+    assert client.post("/api/generate", json={"content": "素材", "deck_mode": "unknown"}).status_code == 422

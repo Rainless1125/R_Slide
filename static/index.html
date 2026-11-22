@@ -227,7 +227,7 @@
                         <legend
                             class="block text-xs font-bold text-zinc-500 dark:text-zinc-400 mb-2 uppercase tracking-wider"><i
                                 class="fa-solid fa-layer-group mr-1"></i>簡報模式</legend>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                             <label class="mode-card">
                                 <input type="radio" name="deckMode" value="speaker" class="sr-only" checked>
                                 <span class="mode-thumb" aria-hidden="true">
@@ -256,6 +256,18 @@
                                     <span class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold"><span class="whitespace-nowrap">詳細模式</span><span
                                             class="mode-tag">閱讀型 · Document</span></span>
                                     <span class="block text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">完整論述與數據，不需講者也能看懂，適合會後寄送與自行閱讀</span>
+                                </span>
+                                <i class="mode-check fa-solid fa-circle-check" aria-hidden="true"></i>
+                            </label>
+                            <label class="mode-card">
+                                <input type="radio" name="deckMode" value="dense" class="sr-only">
+                                <span class="mode-thumb mode-thumb-grid" aria-hidden="true">
+                                    <b class="mode-accent col-span-2"></b><b></b><b></b><b class="col-span-2"></b>
+                                </span>
+                                <span class="min-w-0 flex-1">
+                                    <span class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold"><span class="whitespace-nowrap">密集資訊模式</span><span
+                                            class="mode-tag">儀表板型 · Dashboard</span></span>
+                                    <span class="block text-xs text-zinc-500 dark:text-zinc-400 mt-1 leading-relaxed">一頁同時呈現數據、進度與結論的儀表板，適合一頁報告與營運摘要</span>
                                 </span>
                                 <i class="mode-check fa-solid fa-circle-check" aria-hidden="true"></i>
                             </label>
@@ -702,11 +714,13 @@
             </div>
             <fieldset class="mt-4">
                 <legend class="text-xs font-semibold text-zinc-500 dark:text-zinc-400">簡報模式</legend>
-                <div class="mt-1.5 grid grid-cols-2 gap-2">
+                <div class="mt-1.5 grid grid-cols-3 gap-2">
                     <label class="regen-mode"><input type="radio" name="regenDeckMode" value="speaker" class="sr-only">
                         <span class="font-semibold">簡易模式</span><span class="regen-mode-sub">演講型 · 少字大圖</span></label>
                     <label class="regen-mode"><input type="radio" name="regenDeckMode" value="document" class="sr-only">
                         <span class="font-semibold">詳細模式</span><span class="regen-mode-sub">閱讀型 · 完整論述</span></label>
+                    <label class="regen-mode"><input type="radio" name="regenDeckMode" value="dense" class="sr-only">
+                        <span class="font-semibold">密集資訊</span><span class="regen-mode-sub">儀表板型 · 一頁報告</span></label>
                 </div>
                 <p class="text-[11px] text-zinc-400 mt-1.5">預設沿用此簡報的模式；改選後，這份簡報之後的重產都會改用新模式。</p>
             </fieldset>
@@ -916,6 +930,7 @@
                         <div class="guide-grid">
                             <div class="guide-card"><b>簡易模式 · 演講型</b><span>少字大圖、一頁一重點，論述細節寫進講者備註，適合上台報告。</span></div>
                             <div class="guide-card"><b>詳細模式 · 閱讀型</b><span>以結論句當標題、附完整論述與數據出處，不需講者也能看懂，適合會後寄送；同一主題盡量放在同一頁，做成資訊豐富、層次分明的版面（例如分類比較卡加圖表）。</span></div>
+                            <div class="guide-card"><b>密集資訊模式 · 儀表板型</b><span>每一頁都是一張儀表板：大小不一的區塊同時呈現 KPI 數字、迷你圖表、進度表格與結論，適合一頁報告、營運摘要與專案進度；頁數建議 1~4 頁。</span></div>
                         </div>
                         <h5>其他選項</h5>
                         <ul>

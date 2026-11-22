@@ -220,8 +220,8 @@ function getStylePreference() {
     return v === CUSTOM_STYLE ? buildCustomStyle(customColors) : v;
 }
 // 簡報模式：speaker = 簡易模式（演講型），document = 詳細模式（閱讀型）；舊紀錄沒有此欄位時視為演講型
-const DECK_MODE_SHORT = { speaker: '演講型', document: '閱讀型' };
-function normDeckMode(mode) { return mode === 'document' ? 'document' : 'speaker'; }
+const DECK_MODE_SHORT = { speaker: '演講型', document: '閱讀型', dense: '密集型' };
+function normDeckMode(mode) { return mode === 'document' || mode === 'dense' ? mode : 'speaker'; }
 function getDeckMode() {
     return document.querySelector('input[name="deckMode"]:checked')?.value || 'speaker';
 }

@@ -342,7 +342,7 @@ function updateDeckModeBadges() {
     document.querySelectorAll('[data-deck-mode-badge]').forEach(el => {
         el.textContent = DECK_MODE_SHORT[mode];
         el.dataset.mode = mode;
-        el.title = mode === 'document' ? '詳細模式（閱讀型）：單頁重產會沿用此模式' : '簡易模式（演講型）：單頁重產會沿用此模式';
+        el.title = { speaker: '簡易模式（演講型）', document: '詳細模式（閱讀型）', dense: '密集資訊模式（儀表板型）' }[mode] + '：單頁重產會沿用此模式';
     });
 }
 // 重產時改用另一種模式：寫回這份簡報的生成設定，之後的重產都沿用

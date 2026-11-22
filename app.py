@@ -27,6 +27,7 @@ from deck_design import (CONTENT_ACCURACY_RULES, DECK_RHYTHM_RULES, FLOW_RULES, 
 from admin import router as admin_router
 from brand_icons import router as brand_icons_router
 from charts import CHART_RULES, MAX_CHARTS_PER_SLIDE, ChartSpec, normalize_charts
+from deck_examples import DENSE_EXAMPLES, examples_block
 from exporter import ExportError, build_pptx
 from extract import MAX_REQUEST_BYTES, ExtractError, extract_text
 from ldap_auth import check_config as check_auth_config
@@ -480,6 +481,24 @@ DECK_MODE_RULES = {
        把次要細節移到講者備註，最後才拆頁或刪除區塊；頁數已指定時則精簡、合併論述。
     8. 講者備註只做補充：約 50 ~ 120 字、1 ~ 3 句，補充延伸資訊或閱讀重點，不重複畫面內容。
 """,
+    "dense": """
+    【簡報模式：密集資訊模式（儀表板型 / Dashboard）】：
+    這份簡報的每一頁都是一張資訊儀表板：讀者在一頁內同時看到數據、進度、重點與結論，像一份精心設計的一頁報告。
+    本模式覆蓋【版面尺寸硬性限制】第 4 點的並排數量、【圖表】的每頁張數上限與【整份簡報的節奏】的封面 / 結尾規定，其餘尺寸規則仍須遵守。
+    1. 頁面結構：頁首（小標籤 + 寫成結論句的主標題 text-2xl，右側可放期間或狀態標籤）→ 區塊格線 → 頁尾一列結論或下一步橫幅
+       （強調色或漸層底、白字、text-sm，開頭用粗體短詞，例如「結論」「下一步」）。
+    2. 區塊格線：以 grid-cols-3 或 grid-cols-4 排出 5 ~ 8 個區塊，區塊大小要有變化（col-span-2、row-span-2），重要的區塊佔較大面積；
+       頁面用淺灰底（或 theme 的淡色底），區塊用白底圓角卡片（rounded-2xl、shadow-sm、p-4），區塊間距 gap-3。
+    3. 每個區塊左上角有區塊標題列：小圖示（放在強調色淡底的圓形或圓角方塊中）+ 粗體短標題（text-sm），讓讀者能快速掃過整頁。
+    4. 依素材選擇區塊內容並混合使用：KPI 大數字（text-3xl ~ text-4xl 粗體、單位用小字，下方附變化與比較基準）、迷你圖表、
+       精簡條列（每點不超過 25 字）、狀態表格（狀態用彩色圓角標籤，例如完成 / 進行中 / 延遲）、編號步驟、問題與解法並列、負責單位清單。
+    5. 一頁最多 4 張小圖表，每張放在自己的區塊中並以 flex-1 min-h-0 撐滿區塊剩餘高度；1 ~ 2 個重點區塊可用強調色或漸層滿版底、白字凸顯。
+    6. 字級：內文 text-xs ~ text-sm，區塊標題 text-sm，數字依重要性 text-2xl ~ text-4xl；不要使用比 text-xs 更小的字。
+    7. 區塊內不要留下大片空白：內容少的區塊縮小佔用的格數，或補上素材中的對比數字、時程標籤；也不要把內容塞到超出區塊或畫面。
+    8. 每一頁都是儀表板，不需要封面、議程與結尾頁；多頁時每頁聚焦一個主題（例如營運、財務、專案進度），相鄰兩頁的區塊格局要有變化。
+    9. 素材中沒有的數字不要捏造來填滿區塊；素材不夠時減少區塊數量、放大重要區塊。
+    10. 講者備註：約 100 ~ 200 字，依區塊順序說明這頁的重點與結論。
+""",
 }
 # 一頁式報告：整份素材濃縮成單一頁（例如給主管的一頁摘要），不是封面也不是只放一個重點的內容頁，
 # 因此取代【整份簡報的節奏】中的封面 / 結尾規則，文字量也比【簡報模式】的單頁上限多
@@ -503,12 +522,24 @@ ONE_PAGE_OUTLINE_RULES = """
 """
 
 
-def one_page_rules(pages: int, rules: str = ONE_PAGE_REPORT_RULES) -> str:
-    return rules if pages == 1 else ""
+def one_page_rules(pages: int, rules: str = ONE_PAGE_REPORT_RULES, deck_mode: str = "speaker") -> str:
+    # 密集資訊模式的每一頁本來就是一頁報告（儀表板），不再套用一頁式報告的區塊與字數規定
+    return rules if pages == 1 and deck_mode != "dense" else ""
 
 
-DECK_MODE_LABELS = {"speaker": "簡易模式（演講型 / Speaker Deck）", "document": "詳細模式（閱讀型 / Document Deck）"}
-DeckMode = Literal["speaker", "document"]
+DECK_MODE_LABELS = {"speaker": "簡易模式（演講型 / Speaker Deck）", "document": "詳細模式（閱讀型 / Document Deck）",
+                    "dense": "密集資訊模式（儀表板型 / Dashboard）"}
+DeckMode = Literal["speaker", "document", "dense"]
+MAX_DENSE_CHARTS_PER_SLIDE = 4                # 密集資訊模式一頁可放的小圖表數
+
+
+def chart_limit(deck_mode: str) -> int:
+    return MAX_DENSE_CHARTS_PER_SLIDE if deck_mode == "dense" else MAX_CHARTS_PER_SLIDE
+
+
+def mode_examples(deck_mode: str) -> str:
+    """範例頁（見 deck_examples.py）：目前只有密集資訊模式附上。"""
+    return examples_block(DENSE_EXAMPLES) if deck_mode == "dense" else ""
 
 
 def check_field_lengths(req):
@@ -780,7 +811,8 @@ def generate_slides(req: GenerateRequest, request: Request, user: dict = Depends
        - 【重要】你必須絕對服從使用者指定的「視覺風格」。如果要求明亮風，請多用 bg-white/bg-slate-50；如果要求科技風，才使用深色底 bg-slate-900 搭配螢光點綴色。
     """ + THEME_RULES + LAYOUT_CATALOG + FLOW_RULES + DECK_RHYTHM_RULES + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] \
         + CHART_RULES + SPEAKER_NOTES_RULES + CONTENT_ACCURACY_RULES \
-        + one_page_rules(len(req.outline.slides) if req.outline else req.num_pages)
+        + one_page_rules(len(req.outline.slides) if req.outline else req.num_pages, deck_mode=req.deck_mode) \
+        + mode_examples(req.deck_mode)
 
     outline_block = ""
     if req.outline:
@@ -798,7 +830,9 @@ def generate_slides(req: GenerateRequest, request: Request, user: dict = Depends
     else:
         # 頁數固定時，模式規則中的「拆成更多頁」改以精簡內容達成，避免與指定頁數衝突
         pages_hint = (f"{req.num_pages} 頁（頁數固定，必須剛好 {req.num_pages} 頁；素材太多時請精簡文字、合併重點，不可增加頁數）"
-                      if req.num_pages > 0 else "由你依內容多寡與重點自行決定（建議 3~8 頁）")
+                      if req.num_pages > 0 else
+                      "由你依主題數量自行決定（建議 1~4 頁，每頁一個主題的儀表板）" if req.deck_mode == "dense" else
+                      "由你依內容多寡與重點自行決定（建議 3~8 頁）")
     prompt = f"""
     【簡報目標客群】：{req.target_audience}
     【預計生成頁數】：{pages_hint}
@@ -816,7 +850,7 @@ def generate_slides(req: GenerateRequest, request: Request, user: dict = Depends
                             thinking=req.thinking)
             data["theme"] = theme_from_input(data.get("theme"))   # 去除多餘空白、限制長度；格式不符時為 None
             for slide in data.get("slides") or []:
-                slide["charts"] = normalize_charts(slide.get("charts"))
+                slide["charts"] = normalize_charts(slide.get("charts"), chart_limit(req.deck_mode))
             usage["slides_returned"] = len(data.get("slides") or [])
             return data
         except HTTPException:
@@ -851,10 +885,11 @@ def generate_outline(req: GenerateRequest, request: Request, user: dict = Depend
     4. 建議版型從【版型目錄】中依內容型態選擇（寫出版型名稱即可），並遵守【整份簡報的節奏】。
     5. 使用與原始素材相同的語言。
     """ + LAYOUT_CATALOG + DECK_RHYTHM_RULES + DECK_MODE_RULES[req.deck_mode] + CONTENT_ACCURACY_RULES \
-        + one_page_rules(req.num_pages, ONE_PAGE_OUTLINE_RULES)
+        + one_page_rules(req.num_pages, ONE_PAGE_OUTLINE_RULES, req.deck_mode)
 
-    pages_hint = (f"{req.num_pages} 頁（必須剛好 {req.num_pages} 頁）"
-                  if req.num_pages > 0 else "由你依內容多寡與重點自行決定（建議 3~8 頁）")
+    pages_hint = (f"{req.num_pages} 頁（必須剛好 {req.num_pages} 頁）" if req.num_pages > 0 else
+                  "由你依主題數量自行決定（建議 1~4 頁，每頁一個主題的儀表板）" if req.deck_mode == "dense" else
+                  "由你依內容多寡與重點自行決定（建議 3~8 頁）")
     prompt = f"""
     【簡報目標客群】：{req.target_audience}
     【預計頁數】：{pages_hint}
@@ -1040,7 +1075,7 @@ def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict =
     9. 原標題、原版型概念與原講者備註可能是舊資料（例如從其他頁複製後改寫了內容），與【此頁目前的內容】的主題不一致時，
        以【此頁目前的內容】為準，不可依它們把內容改回原本的主題；講者備註依目前的內容重新撰寫。
     """ + (REGEN_KEEP_CONTENT_RULES if req.keep_content else REGEN_REWRITE_RULES) + LAYOUT_CATALOG + FLOW_RULES + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode] + CHART_RULES + SPEAKER_NOTES_RULES \
-        + CONTENT_ACCURACY_RULES + one_page_rules(len(req.slides))
+        + CONTENT_ACCURACY_RULES + one_page_rules(len(req.slides), deck_mode=req.deck_mode) + mode_examples(req.deck_mode)
 
     prompt = f"""
     【簡報標題】：{req.presentation_title}
@@ -1082,7 +1117,7 @@ def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict =
                             thinking=req.thinking)
             data["page_number"] = target_slide.page_number
             # 使用者可能自行插入超過 MAX_CHARTS_PER_SLIDE 張圖表：至少保留原頁的張數，避免重產後被截掉
-            data["charts"] = normalize_charts(data.get("charts"), max(MAX_CHARTS_PER_SLIDE, len(target_slide.charts)))
+            data["charts"] = normalize_charts(data.get("charts"), max(chart_limit(req.deck_mode), len(target_slide.charts)))
             usage["slides_returned"] = 1
             return data
         except HTTPException:
@@ -1151,7 +1186,7 @@ def regenerate_element(req: RegenerateElementRequest, request: Request, user: di
                             thinking=req.thinking, **({"images": [source_image]} if source_image else {}))
             if not (data.get("html_content") or "").strip():
                 raise HTTPException(status_code=502, detail="模型沒有回傳新的元素內容")
-            data["charts"] = normalize_charts(data.get("charts"), max(MAX_CHARTS_PER_SLIDE, len(req.charts)))
+            data["charts"] = normalize_charts(data.get("charts"), max(chart_limit(req.deck_mode), len(req.charts)))
             usage["slides_returned"] = 1
             return data
         except HTTPException:
@@ -1220,7 +1255,7 @@ def regenerate_elements(req: RegenerateElementsRequest, request: Request, user: 
         try:
             schema = ElementRewrite if req.merge else ElementsRewrite
             data = call_llm(req.provider, req.model, system_instruction, prompt, schema, 0.6, usage, thinking=req.thinking)
-            charts = normalize_charts(data.get("charts"), max(MAX_CHARTS_PER_SLIDE, len(req.charts)))
+            charts = normalize_charts(data.get("charts"), max(chart_limit(req.deck_mode), len(req.charts)))
             if req.merge:
                 html = (data.get("html_content") or "").strip()
                 if not html:
