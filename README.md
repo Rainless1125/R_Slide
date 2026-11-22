@@ -174,6 +174,25 @@ OPENAI_DISPLAY_NAME=Databricks
   - 模型名稱是 Databricks「Serving」頁面上的 endpoint 名稱。
   - 正式環境使用 service principal 的權杖。不要使用個人權杖。
 
+### 模型選單的顯示方式
+
+| 變數 | 說明 | 預設值 |
+|------|------|--------|
+| `MODEL_ALIASES` | 模型選單上顯示的代稱。格式為「模型名稱=代稱」，用逗號分開。所有可用模型都設定代稱時，選單也不顯示平台名稱與圖示。 | 無 |
+| `HIDE_SINGLE_MODEL` | 設為 `true` 時，只有一個可用模型就隱藏模型選單，右上角只保留思考長度。 | `false` |
+
+範例：
+
+```env
+MODEL_ALIASES=corp-llm-large=高效能模型,corp-llm-small=經濟模型
+HIDE_SINGLE_MODEL=true
+```
+
+說明：
+
+- 代稱只改變畫面上的名稱。呼叫 AI 與後台的用量紀錄仍使用實際的模型名稱。
+- 「可用模型」只計算已設定 API Key 的平台。
+
 ### 呼叫 AI 時附加的標頭
 
 有些公司的 AI 閘道要求每次呼叫附加識別資料，例如系統名稱與使用區域。在 `LLM_EXTRA_HEADERS` 設定這些 HTTP 標頭：

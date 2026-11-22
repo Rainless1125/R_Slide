@@ -51,6 +51,25 @@ def parse_model_list(value: str | None) -> list[str]:
     return list(dict.fromkeys(m.strip() for m in (value or "").split(",") if m.strip()))
 
 
+MAX_MODEL_ALIAS_CHARS = 30
+
+
+def parse_model_aliases(value: str | None) -> dict[str, str]:
+    """MODEL_ALIASES：模型選單上顯示的代稱，格式為「模型名稱=代稱」並以逗號分隔，
+    例如 gemini-3.8-flash=高效能模型,gemini-3.5-flash=經濟模型。格式不符的項目略過。"""
+    out = {}
+    for item in (value or "").split(","):
+        model, sep, alias = item.partition("=")
+        if sep and model.strip() and alias.strip():
+            out[model.strip()] = alias.strip()[:MAX_MODEL_ALIAS_CHARS]
+    return out
+
+
+def env_flag(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    return default if value is None else value.strip().lower() in ("1", "true", "yes", "on")
+
+
 # HTTP 標頭名稱（RFC 9110 token）；值只允許可見的 ASCII 字元與空白
 HEADER_NAME_RE = re.compile(r"^[!#$%&'*+.^_`|~0-9A-Za-z-]+$")
 HEADER_VALUE_RE = re.compile(r"^[\x20-\x7e]*$")
@@ -132,6 +151,9 @@ MODEL_CATALOG = {
     "gemini": ["gemini-3.5-flash", "gemini-3.7-flash", "gemini-3.8-flash"],
     "openai": OPENAI_MODELS,
 }
+# 模型選單的顯示設定（只影響畫面，送出與記錄仍使用實際的模型名稱）：
+# MODEL_ALIASES 以代稱取代模型名稱；HIDE_SINGLE_MODEL=true 時，只有一個可用模型就隱藏模型選單、只保留思考長度
+MODEL_ALIASES = parse_model_aliases(os.getenv("MODEL_ALIASES"))
 MISSING_KEY_MSG = {
     "gemini": "未設定 GEMINI_API_KEY",
     "openai": "未設定 OPENAI_API_KEY",
@@ -798,10 +820,13 @@ async def static_cache_headers(request: Request, call_next):
 
 @app.get("/api/models")
 async def list_models():
-    data = {provider: {"available": provider_client(provider) is not None, "models": models}
+    data = {provider: {"available": provider_client(provider) is not None, "models": models,
+                       "labels": {m: MODEL_ALIASES[m] for m in models if m in MODEL_ALIASES}}
             for provider, models in MODEL_CATALOG.items()}
     # 自訂端點顯示設定的名稱與通用圖示，避免畫面顯示「OpenAI」但實際連的是公司內部的模型
     data["openai"].update(name=OPENAI_DISPLAY_NAME, custom=bool(OPENAI_BASE_URL))
+    # 畫面設定（不是平台）：只有一個可用模型時是否隱藏模型選單（每次讀取環境變數，改 .env 後重啟即生效）
+    data["options"] = {"hide_single_model": env_flag("HIDE_SINGLE_MODEL")}
     return data
 
 @app.get("/api/quota")

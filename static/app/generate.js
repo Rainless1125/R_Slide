@@ -202,6 +202,17 @@ function providerIcon(provider, cls = 'w-4 h-4') {
     return `<svg class="${cls} shrink-0" viewBox="0 0 24 24" aria-hidden="true">${defs}<path fill="${fill}" d="${meta.path}"/></svg>`;
 }
 
+/* ----- 模型的顯示名稱（.env 的 MODEL_ALIASES）與隱藏單一模型（HIDE_SINGLE_MODEL）----- */
+// 只改變畫面上的名稱：送出與用量紀錄仍使用實際的模型名稱
+let modelUiOptions = {};
+function modelLabel(provider, model) { return modelCatalog[provider]?.labels?.[model] || model; }
+// 所有可用模型都有代稱：選單不顯示平台名稱與圖示，只列出代稱
+function allModelsAliased() {
+    const opts = modelOptions().filter(o => !o.disabled);
+    return opts.length > 0 && opts.every(o => modelCatalog[o.provider]?.labels?.[o.model]);
+}
+const ALIAS_ICON = '<i class="fa-solid fa-microchip text-violet-500 w-4 h-4 shrink-0 inline-flex items-center justify-center" aria-hidden="true"></i>';
+
 function modelOptions() {
     return [...document.getElementById('providerSelect').options].flatMap(opt =>
         (modelCatalog[opt.value]?.models || []).map(model => ({ provider: opt.value, model, disabled: opt.disabled })));
@@ -217,20 +228,23 @@ function selectModel(provider, model) {
 function renderModelPicker() {
     const provider = document.getElementById('providerSelect').value;
     const model = document.getElementById('modelSelect').value;
+    const aliased = allModelsAliased();
+    const label = model ? modelLabel(provider, model) : '選擇模型';
     document.getElementById('modelBtn').innerHTML =
-        `${providerIcon(provider)}<span class="font-medium truncate max-w-[11rem]">${esc(model || '選擇模型')}</span><i class="fa-solid fa-chevron-down text-[10px] text-zinc-400"></i>`;
-    document.getElementById('modelBtn').title = `${providerMeta(provider)?.name || provider} · ${model}`;
-    // 沒有任何模型的平台整組不顯示
-    document.getElementById('modelList').innerHTML = [...document.getElementById('providerSelect').options].filter(opt => modelCatalog[opt.value]?.models?.length).map(opt => {
+        `${aliased ? ALIAS_ICON : providerIcon(provider)}<span class="font-medium truncate max-w-[11rem]">${esc(label)}</span><i class="fa-solid fa-chevron-down text-[10px] text-zinc-400"></i>`;
+    document.getElementById('modelBtn').title = aliased ? label : `${providerMeta(provider)?.name || provider} · ${label}`;
+    // 沒有任何模型的平台整組不顯示；全部使用代稱時不顯示平台標題，也不列出未設定金鑰的平台
+    document.getElementById('modelList').innerHTML = [...document.getElementById('providerSelect').options]
+        .filter(opt => modelCatalog[opt.value]?.models?.length && !(aliased && opt.disabled)).map(opt => {
         const p = opt.value;
-        const header = `<li role="presentation" class="flex items-center gap-2 px-4 pt-2.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+        const header = aliased ? '' : `<li role="presentation" class="flex items-center gap-2 px-4 pt-2.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
             ${providerIcon(p, 'w-3.5 h-3.5')}<span>${esc(providerMeta(p)?.name || p)}</span>
             ${opt.disabled ? '<span class="ml-auto normal-case tracking-normal font-medium text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800">未設定金鑰</span>' : ''}</li>`;
         const items = (modelCatalog[p]?.models || []).map(m => {
             const selected = p === provider && m === model;
             return `<li role="option" data-provider="${esc(p)}" data-model="${esc(m)}" aria-selected="${selected}" aria-disabled="${opt.disabled}"
-                class="flex items-center justify-between gap-3 pl-10 pr-4 py-2 text-sm cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 aria-selected:font-bold aria-selected:bg-zinc-100 dark:aria-selected:bg-zinc-800 aria-disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:hover:bg-transparent">
-                <span class="truncate">${esc(m)}</span>${selected ? '<i class="fa-solid fa-check text-xs"></i>' : ''}</li>`;
+                class="flex items-center justify-between gap-3 ${aliased ? 'pl-4' : 'pl-10'} pr-4 py-2 text-sm cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800 aria-selected:font-bold aria-selected:bg-zinc-100 dark:aria-selected:bg-zinc-800 aria-disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:hover:bg-transparent">
+                <span class="truncate">${esc(modelLabel(p, m))}</span>${selected ? '<i class="fa-solid fa-check text-xs"></i>' : ''}</li>`;
         }).join('');
         return header + items;
     }).join('');
@@ -279,7 +293,8 @@ async function initModelSelectors() {
         const res = await fetch('/api/models');
         if (res.ok) {
             const data = await res.json();
-            for (const k of Object.keys(data)) modelCatalog[k] = data[k];
+            modelUiOptions = data.options || {};
+            for (const k of Object.keys(data)) if (k !== 'options') modelCatalog[k] = data[k];
             const providerSel = document.getElementById('providerSelect');
             for (const opt of providerSel.options) {
                 if (data[opt.value] && !data[opt.value].available) opt.disabled = true;
@@ -293,6 +308,9 @@ async function initModelSelectors() {
     providerSel.value = opt ? opt.value : ([...providerSel.options].find(o => !o.disabled)?.value || 'gemini');
     populateModels(saved.model);
     renderModelPicker();
+    // 只有一個可用模型且設定 HIDE_SINGLE_MODEL：隱藏模型選單（隱藏的 select 仍保留實際值，供生成時讀取）
+    const single = modelOptions().filter(o => !o.disabled).length === 1;
+    document.getElementById('modelDropdown').classList.toggle('hidden', !!modelUiOptions.hide_single_model && single);
 }
 initModelSelectors();
 
