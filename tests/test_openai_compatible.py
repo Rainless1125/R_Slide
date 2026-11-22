@@ -108,5 +108,5 @@ def test_models_endpoint_shows_custom_endpoint_name(monkeypatch):
     use_endpoint(monkeypatch, FakeClient())
     monkeypatch.setattr(app_module, "OPENAI_DISPLAY_NAME", "公司 AI 閘道")
     data = TestClient(app_module.app).get("/api/models").json()
-    assert data["openai"] == {"available": True, "models": ["corp-llm-a", "corp-llm-b"], "name": "公司 AI 閘道", "custom": True}
+    assert data["openai"] == {"available": True, "models": ["corp-llm-a", "corp-llm-b"], "name": "公司 AI 閘道", "custom": True, "labels": {}}
     assert "databricks" not in data

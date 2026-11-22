@@ -96,7 +96,7 @@ print(json.dumps({
     assert out.returncode == 0, out.stderr[-2000:]
     result = json.loads(out.stdout.strip().splitlines()[-1])
     assert result["catalog"] == {"available": True, "models": ["corp-llm-large", "corp-llm-small"],
-                                 "name": "公司 AI 閘道", "custom": True}
+                                 "name": "公司 AI 閘道", "custom": True, "labels": {}}
     assert "DATABRICKS_* 設定已不再使用" in out.stderr                # 舊設定提示改用 OPENAI_*
     assert result["reply"] == {"images": []}                         # 不支援結構化輸出時改用提示詞附 schema
     assert [r["path"] for r in _Gateway.requests] == ["/v1/chat/completions"] * 2
