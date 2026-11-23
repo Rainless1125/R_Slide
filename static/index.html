@@ -610,6 +610,10 @@
                             <i id="regenCurrentIcon" class="fa-solid fa-arrows-rotate text-[11px]"></i><span class="hidden sm:inline"
                                 id="regenCurrentLabel">重產此頁</span>
                         </button>
+                        <button id="refineCurrentBtn" onclick="refineSlide(currentSlideIdx)" class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5 text-violet-700 dark:text-violet-300 disabled:opacity-60"
+                            aria-label="AI 精修此頁" title="AI 看著畫面找出版面問題（超出、留白、對齊、對比）並修正，不改文字與數字">
+                            <i id="refineCurrentIcon" class="fa-solid fa-wand-sparkles text-[11px]"></i><span class="hidden sm:inline" id="refineCurrentLabel">AI 精修</span>
+                        </button>
                         <div id="exportMenu" class="relative">
                             <button id="exportBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="exportList"
                                 class="icon-btn h-8 px-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-xs font-semibold flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
@@ -955,6 +959,7 @@
                             <li><b>調整頁序與刪除</b>：拖曳卡片左上角的把手，或用左右箭頭前移 / 後移；「刪除」可移除該頁。</li>
                             <li><b>新增空白頁</b>：每張卡片的「+」可在該頁後新增空白頁，最後一格可新增到最後；空白頁沿用參考頁的背景與文字顏色。</li>
                             <li><b>重產此頁</b>：對某頁不滿意時，可輸入提示詞（例如「重點三點式、加上 KPI 資訊卡」）單獨重新生成，其他頁面維持不變。預設開啟「保留目前內容，只換版面」：此頁的文字與數字（包含你手動修改的部分）維持不變，AI 只重新排版；關閉後 AI 會參考原始素材重新整理此頁內容。</li>
+                            <li><b>AI 精修</b>：按播放器的「AI 精修」或審查頁卡片上的 <i class="fa-solid fa-wand-sparkles"></i>，AI 會看著這一頁實際的畫面，找出內容超出、留白、對齊、對比等版面問題並修正，不改文字與數字（若 AI 改動了內容，系統不會套用）。修正結果存成新版本，可用「舊版本」比較或切回；沒有問題時不會修改。所選的模型需支援圖片輸入。</li>
                             <li><b>切換模式重產</b>：重產視窗可改用另一種簡報模式，之後這份簡報的重產都會沿用。</li>
                             <li><b>還原舊版</b>：重產前的版本會自動保留（每頁最多 3 個，跟著簡報存入歷史記錄）。點縮圖右上角的「舊版本」或播放器的「舊版本」按鈕，所有版本會排成預覽圖，點擊即可改用該版本，可以來回切換比較；關閉後若要回到原本的版本，可按提示中的「撤銷」。</li>
                         </ul>
@@ -1289,6 +1294,7 @@
     <script src="/static/app/brand.js"></script>
     <script src="/static/app/player.js"></script>
     <script src="/static/app/versions.js"></script>
+    <script src="/static/app/refine.js"></script>
     <script src="/static/app/auth.js"></script>
     <script src="/static/app/guide.js"></script>
     <script src="/static/app/feedback.js"></script>

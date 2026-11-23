@@ -542,6 +542,9 @@ function renderReviewSection(quiet = false) {
       <i id="regenSlideIcon-${idx}" class="fa-solid fa-arrows-rotate text-[10px]"></i>
       <span id="regenSlideLabel-${idx}">重產此頁</span>
     </button>
+    <button id="refineSlideBtn-${idx}" onclick="refineSlide(${idx})" class="icon-btn w-8 h-8 shrink-0 rounded-full border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center text-violet-600 dark:text-violet-300" title="AI 精修此頁：AI 看著畫面找出版面問題並修正，不改內容" aria-label="AI 精修此頁">
+      <i id="refineSlideIcon-${idx}" class="fa-solid fa-wand-sparkles text-[11px]"></i>
+    </button>
   </div>
   <div class="flex items-center justify-between gap-1 px-1 pb-1 text-zinc-500 dark:text-zinc-400">
     <button onclick="moveSlide(${idx}, ${idx - 1})" ${idx === 0 ? 'disabled' : ''} class="icon-btn w-8 h-8 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center" title="前移" aria-label="前移"><i class="fa-solid fa-arrow-left text-[11px]"></i></button>
@@ -569,7 +572,10 @@ function renderReviewSection(quiet = false) {
     addTile.onclick = () => addBlankSlide(currentPresentationData.slides.length - 1);
     container.appendChild(addTile);
     fitReviewThumbs();
-    if (regeneratingSlideIdx !== null && regeneratingDeck === currentPresentationData) setReviewRegenerateState(regeneratingSlideIdx, true);
+    if (regeneratingSlideIdx !== null && regeneratingDeck === currentPresentationData) {
+        setReviewRegenerateState(regeneratingSlideIdx, true);
+        if (typeof refiningSlide !== 'undefined' && refiningSlide) setRefineState(regeneratingSlideIdx, true);
+    }
 
     if (!quiet) review.scrollIntoView({ behavior: 'smooth' });
 }
@@ -613,6 +619,9 @@ function backToReview() {
     renderReviewSection();
 }
 
+// 此頁忙碌中的按鈕文字：重產與 AI 精修（refine.js）共用 regeneratingSlideIdx 鎖定這一頁
+let slideBusyLabel = '重產中...';
+
 function setReviewRegenerateState(idx, on) {
     const btn = document.getElementById(`regenSlideBtn-${idx}`);
     const icon = document.getElementById(`regenSlideIcon-${idx}`);
@@ -620,7 +629,7 @@ function setReviewRegenerateState(idx, on) {
     if (!btn || !icon || !label) return;
     btn.disabled = on;
     icon.className = on ? 'fa-solid fa-circle-notch fa-spin text-[10px]' : 'fa-solid fa-arrows-rotate text-[10px]';
-    label.textContent = on ? '重產中...' : '重產此頁';
+    label.textContent = on ? slideBusyLabel : '重產此頁';
 }
 
 function setCurrentRegenerateState(on) {
@@ -630,7 +639,7 @@ function setCurrentRegenerateState(on) {
     if (!btn || !icon || !label) return;
     btn.disabled = on;
     icon.className = on ? 'fa-solid fa-circle-notch fa-spin text-[11px]' : 'fa-solid fa-arrows-rotate text-[11px]';
-    label.textContent = on ? '重產中...' : '重產此頁';
+    label.textContent = on ? slideBusyLabel : '重產此頁';
 }
 
 function regenerateCurrentSlide() {

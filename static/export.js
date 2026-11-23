@@ -495,7 +495,8 @@ async function _exportReplaceBrokenImages(root) {
     return broken;
 }
 
-async function _exportRenderSlides(slides, onProgress) {
+// opts.pixelRatio：輸出倍率（匯出 2 倍；AI 精修的截圖 1 倍）；opts.inspect(frame, i)：轉圖前在同一個畫面上量測（AI 精修用）
+async function _exportRenderSlides(slides, onProgress, opts = {}) {
     const h2i = await _exportLoadLib('htmlToImage');
     const host = document.createElement('div');
     host.setAttribute('aria-hidden', 'true');
@@ -523,8 +524,9 @@ async function _exportRenderSlides(slides, onProgress) {
             brokenImages += await _exportReplaceBrokenImages(frame);
             // 字型（Font Awesome 圖示等）只需內嵌一次，之後各頁共用
             if (fontEmbedCSS === undefined) fontEmbedCSS = await h2i.getFontEmbedCSS(frame).catch(() => '');
+            opts.inspect?.(frame, i);
             images.push(await h2i.toJpeg(frame, {
-                width: EXPORT_W, height: EXPORT_H, pixelRatio: 2, quality: 0.92,
+                width: EXPORT_W, height: EXPORT_H, pixelRatio: opts.pixelRatio || 2, quality: 0.92,
                 backgroundColor: '#ffffff', fontEmbedCSS, imagePlaceholder: EXPORT_PLACEHOLDER_IMG
             }));
         }
