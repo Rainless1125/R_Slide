@@ -61,6 +61,7 @@ static/app/           主畫面的樣式與程式：
   overflow.js         版面檢查：找出超出畫面（1024×576）的元素，編輯時標示、匯出前檢查
   aiedit.js           AI 修改此元素：只送出選取的元素給 AI，回來後替換該元素並沿用位置、大小與圖層；多選時一次送出多個元素（/api/regenerate-elements）
   multisel.js         多選元素：Shift / Ctrl + 點擊、拖曳框選，供 AI 一起修改
+  refine.js           AI 精修此頁：截圖與程式量測（超出畫面、超出區塊）送給 AI（/api/refine-slide），比對內容後存成新版本
   editor.js           撤銷 / 重做、選取、文字編輯、編輯列與格式工具列
   media.js            插入圖片、文字方塊、圖示；拖曳、縮放；版面元素的移動與縮放；圖表編輯器
   player.js           頁面管理、播放器、全螢幕、匯出選單

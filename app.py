@@ -795,7 +795,8 @@ ELEMENT_CURRENT_CONTENT_RULES = """
 """
 
 # 2. API 端點
-LLM_PATHS = {"/api/generate", "/api/outline", "/api/regenerate-slide", "/api/regenerate-element", "/api/regenerate-elements"}
+LLM_PATHS = {"/api/generate", "/api/outline", "/api/regenerate-slide", "/api/regenerate-element", "/api/regenerate-elements",
+             "/api/refine-slide"}
 
 
 @app.middleware("http")
@@ -1164,6 +1165,110 @@ def regenerate_slide(req: RegenerateSlideRequest, request: Request, user: dict =
             raise
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
+
+# ===================== AI 精修：看著畫面截圖檢查並修正版面 =====================
+# 一般的生成與重產時 AI 看不到畫面；精修把這一頁實際呈現的截圖附給 AI，依檢查清單找出版面問題後只修正版面。
+# 文字與數字是否被改動由前端比對（不依賴 AI 自律），圖表數值一律沿用原資料，因此回應不含 charts。
+MAX_REFINE_HINTS = 20
+MAX_REFINE_HINT_CHARS = 200
+
+
+class RefineSlideRequest(BaseModel):
+    content: str = ""                              # 精修不需要原始素材；保留欄位供用量紀錄使用
+    num_pages: int = Field(0, ge=0, le=MAX_REGEN_SLIDES)
+    style_preference: str = ""
+    presentation_title: str = "未命名簡報"
+    deck_mode: DeckMode = "speaker"
+    theme: dict | None = None
+    slide_title: str = ""
+    slide_html: str                                # 圖片已換成 rs-img 代號、圖表容器已清空
+    image: str                                     # 這一頁目前的畫面截圖（data URL）
+    hints: list[str] = Field(default_factory=list, max_length=MAX_REFINE_HINTS)   # 程式量測到的問題
+    provider: str = "gemini"
+    model: str = ""
+    thinking: ThinkingLevel = "medium"
+
+
+class SlideRefinement(BaseModel):
+    issues: list[str] = Field(description="從截圖看到的版面問題，每項一句（例如「右側卡片的表格最後一列被裁掉」）；沒有問題時為空陣列")
+    needs_fix: bool = Field(description="是否需要修正；沒有明顯的版面問題時為 false")
+    html_content: str = Field(description="修正後的整頁 HTML（單一根元素）；needs_fix 為 false 時為空字串")
+
+
+REFINE_RULES = """
+    【AI 精修：依畫面截圖檢查並修正版面（最優先）】：
+    1. 附上的圖片是這一頁目前實際呈現的畫面（1024 × 576），【此頁 HTML】是它的原始碼。先仔細看圖片，依下方清單找出版面問題，再修正 HTML。
+    2. 檢查清單：
+       - 內容超出畫面或所屬的區塊、被裁切、元素互相重疊；
+       - 區塊內或區塊之間留下大片空白、空間分配不均、內容擠在一角；
+       - 對齊不整齊、同類元素的間距或大小不一致；
+       - 文字與背景對比不足、字太小看不清楚；標題換行後最後一行只剩一兩個字；
+       - 層次不清楚（標題、重點數字與說明的字級差異不足）、配色不符合【整份簡報的設計規範】。
+    3. 【程式量測到的問題】是程式在畫面上實際量測到的，一定要修正。
+    4. 只修正版面與樣式：可以調整字級、間距、區塊大小與排列、對齊、顏色與換行位置；
+       不可新增、刪除或改寫任何文字、數字與項目，也不可增減圖表或圖片。
+    5. 必須保留所有 data-rs-* 屬性（例如 data-rs-img、data-rs-chart、data-rs-float、data-rs-text、data-rs-icon、data-rs-shape）
+       與 <img> 的 src 原樣；使用者自行插入的浮動物件（data-rs-float）保留 style 中的位置與大小。
+    6. 沒有明顯的問題時 needs_fix 設為 false、html_content 為空字串，不要為了修改而修改。
+       需要修正時輸出完整的整頁 HTML：單一根元素，最外層維持 w-full h-full overflow-hidden，並遵守【版面尺寸硬性限制】。
+    7. issues 使用與頁面相同的語言，每項一句，具體指出位置與問題。
+"""
+
+
+@app.post("/api/refine-slide")
+def refine_slide(req: RefineSlideRequest, request: Request, user: dict = Depends(current_user)):
+    """AI 精修此頁：附上畫面截圖與程式量測到的問題，請 AI 找出版面問題並只修正版面（不改內容）。"""
+    for label, value, limit in [("此頁", req.slide_html, MAX_SLIDE_HTML_CHARS), ("頁面標題", req.slide_title, MAX_SLIDE_META_CHARS),
+                                ("簡報標題", req.presentation_title, MAX_TITLE_CHARS), ("視覺風格", req.style_preference, MAX_STYLE_CHARS),
+                                ("平台", req.provider, MAX_MODEL_CHARS), ("模型名稱", req.model, MAX_MODEL_CHARS)]:
+        if len(value) > limit:
+            raise HTTPException(status_code=400, detail=f"{label}內容過多，無法精修")
+    if not req.slide_html.strip():
+        raise HTTPException(status_code=400, detail="缺少此頁內容")
+    image = decode_source_image(req.image)
+    hints = [h.strip()[:MAX_REFINE_HINT_CHARS] for h in req.hints if h.strip()]
+    theme = theme_from_input(req.theme)
+    theme_block = (format_theme(theme) if theme
+                   else "（這份簡報沒有記錄設計規範，請沿用此頁現有的配色、卡片與標題樣式）")
+
+    system_instruction = """
+    你是一位資深的簡報視覺設計師，負責上線前的最後品質檢查：看著投影片的實際畫面，找出版面問題並修正，讓畫面整齊、平衡、好讀。
+    """ + REFINE_RULES + SLIDE_LAYOUT_RULES + DECK_MODE_RULES[req.deck_mode]
+
+    hint_block = "\n".join(f"    - {h}" for h in hints) if hints else "    （無）"
+    prompt = f"""
+    【簡報標題】：{req.presentation_title}
+    【簡報模式】：{DECK_MODE_LABELS[req.deck_mode]}
+    【指定視覺風格】：{req.style_preference or "（未指定）"}
+    【整份簡報的設計規範】：
+    {theme_block}
+
+    【此頁標題】：{req.slide_title or "（無）"}
+    【程式量測到的問題（一定要修正）】：
+{hint_block}
+
+    【此頁 HTML】（圖片以 rs-img 代號表示、圖表容器內容已省略，請保留原樣）：
+    {req.slide_html}
+
+    請先看最後附上的畫面截圖，列出版面問題，判斷是否需要修正；需要時輸出修正後的完整 HTML。
+    """
+
+    with llm_usage_log(request, user, "refine", req) as usage:
+        try:
+            data = call_llm(req.provider, req.model, system_instruction, prompt, SlideRefinement, 0.3, usage,
+                            thinking=req.thinking, images=[image])
+        except HTTPException:
+            raise
+        except Exception as e:     # 最常見的原因是所選的模型不支援圖片輸入
+            raise HTTPException(status_code=502, detail=f"圖片辨識失敗，所選的模型可能不支援圖片輸入，請改用支援圖片的模型後再試（{str(e)[:200]}）")
+        issues = [str(i).strip()[:MAX_REFINE_HINT_CHARS] for i in (data.get("issues") or []) if str(i).strip()][:MAX_REFINE_HINTS]
+        html = (data.get("html_content") or "").strip()
+        needs_fix = bool(data.get("needs_fix")) and bool(html)
+        if data.get("needs_fix") and not html:
+            raise HTTPException(status_code=502, detail="模型判斷需要修正，但沒有回傳修正後的內容，請再試一次")
+        usage["slides_returned"] = 1 if needs_fix else 0
+        return {"issues": issues, "needs_fix": needs_fix, "html_content": html if needs_fix else ""}
+
 
 @app.post("/api/regenerate-element")
 def regenerate_element(req: RegenerateElementRequest, request: Request, user: dict = Depends(current_user)):
